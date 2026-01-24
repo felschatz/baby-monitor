@@ -326,14 +326,27 @@
                     // Monitor track for unmute (when data starts flowing)
                     event.track.onunmute = () => {
                         console.log('Video track unmuted - data flowing');
-                        remoteVideo.play().catch(err => console.log('Play error:', err));
+                        // Keep video element muted for autoplay, unmute after user interaction
+                        remoteVideo.play().catch(err => {
+                            console.log('Play error on track unmute:', err);
+                            showPlayOverlay();
+                        });
                     };
 
-                    // Force play
+                    // Force play (muted for autoplay policy)
+                    remoteVideo.muted = true;
                     remoteVideo.play().then(() => {
-                        console.log('Video playing, dimensions:', remoteVideo.videoWidth, 'x', remoteVideo.videoHeight);
+                        console.log('Video playing (muted), dimensions:', remoteVideo.videoWidth, 'x', remoteVideo.videoHeight);
+                        // If user already interacted, unmute
+                        if (userHasInteracted) {
+                            remoteVideo.muted = false;
+                            overlay.classList.add('hidden');
+                        } else {
+                            showPlayOverlay();
+                        }
                     }).catch(err => {
                         console.error('Video play error:', err);
+                        showPlayOverlay();
                     });
 
                     // Check dimensions after a delay
@@ -364,7 +377,12 @@
                 console.log('ICE connection state:', peerConnection.iceConnectionState);
                 if (peerConnection.iceConnectionState === 'connected') {
                     console.log('ICE connected! Video should work now.');
-                    remoteVideo.play().catch(e => console.log('Play on ICE connect:', e));
+                    // Keep muted for autoplay
+                    remoteVideo.muted = !userHasInteracted;
+                    remoteVideo.play().catch(e => {
+                        console.log('Play on ICE connect:', e);
+                        showPlayOverlay();
+                    });
                 }
                 if (peerConnection.iceConnectionState === 'failed') {
                     console.error('ICE connection failed - trying restart');
@@ -565,55 +583,39 @@
         });
 
         // Handle unmuting (video starts muted for autoplay policy)
-        function promptUnmute() {
-            // Auto-unmute if we were previously streaming (page refresh)
-            if (wasStreaming) {
-                remoteVideo.muted = false;
-                overlay.classList.add('hidden');
-                console.log('Auto-unmuted after refresh');
-                return;
-            }
-
-            if (remoteVideo.muted) {
-                overlayText.textContent = 'Tap to enable sound';
-                overlay.classList.remove('hidden');
-                overlay.style.background = 'rgba(0,0,0,0.5)';
-
-                const unmute = () => {
-                    remoteVideo.muted = false;
-                    overlay.classList.add('hidden');
-                    overlay.style.background = '';
-                    overlay.onclick = null;
-                    overlay.ontouchstart = null;
-                };
-
-                overlay.onclick = unmute;
-                overlay.ontouchstart = unmute;
-            }
+        function showPlayOverlay(message) {
+            overlayText.textContent = message || 'Tap to play';
+            overlay.classList.remove('hidden');
+            console.log('Showing overlay:', message);
+        }
+        
+        function hideOverlay() {
+            overlay.classList.add('hidden');
         }
 
         // Handle video play (required for autoplay on mobile)
         function tryPlayVideo() {
             if (!remoteVideo.srcObject) return;
             
-            // If user has interacted, unmute
-            if (userHasInteracted || wasStreaming) {
-                remoteVideo.muted = false;
-            }
-            
+            // First try: play with sound (might work if user already interacted)
+            remoteVideo.muted = false;
             remoteVideo.play().then(() => {
-                console.log('Video playing, muted:', remoteVideo.muted);
-                if (remoteVideo.muted && !userHasInteracted && !wasStreaming) {
-                    // Video is playing but muted, prompt for sound
-                    setTimeout(promptUnmute, 500);
-                } else {
-                    overlay.classList.add('hidden');
-                }
+                console.log('Video playing with sound!');
+                hideOverlay();
             }).catch(err => {
-                console.log('Play failed:', err);
-                // Show tap to play overlay
-                overlayText.textContent = 'Tap to play';
-                overlay.classList.remove('hidden');
+                console.log('Play with sound failed, trying muted:', err.message);
+                
+                // Second try: play muted
+                remoteVideo.muted = true;
+                remoteVideo.play().then(() => {
+                    console.log('Video playing muted');
+                    // Show overlay to let user enable sound
+                    showPlayOverlay('Tap to enable sound');
+                }).catch(err2 => {
+                    console.log('Even muted play failed:', err2.message);
+                    // Need user interaction to play at all
+                    showPlayOverlay('Tap to play');
+                });
             });
         }
         
