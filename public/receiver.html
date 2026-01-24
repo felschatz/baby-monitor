@@ -525,6 +525,7 @@
                     setConnectedState(true);
                     info.textContent = 'Streaming';
                 } else if (peerConnection.connectionState === 'disconnected') {
+                    setDisconnectedState();
                     info.textContent = 'Connection lost. Reconnecting...';
                     // Try to restart ICE
                     setTimeout(() => {
