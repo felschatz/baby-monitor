@@ -159,6 +159,50 @@
             transition: width 0.1s;
         }
 
+        .ptt-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(33, 150, 243, 0.95);
+            color: white;
+            padding: 30px 50px;
+            border-radius: 20px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 9999;
+            display: none;
+            animation: pttPulse 1s infinite;
+        }
+
+        .ptt-indicator.active {
+            display: block;
+        }
+
+        @keyframes pttPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+        }
+
+        .audio-enable-hint {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 152, 0, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            z-index: 100;
+            cursor: pointer;
+            display: none;
+        }
+
+        .audio-enable-hint.show {
+            display: block;
+        }
+
         /* Screen dimming overlay */
         .screen-off-overlay {
             position: fixed;
@@ -237,6 +281,18 @@
 
     <div class="video-container">
         <video id="localVideo" autoplay muted playsinline></video>
+        <!-- Hidden audio element for PTT playback -->
+        <audio id="pttAudio" autoplay></audio>
+    </div>
+
+    <!-- PTT indicator -->
+    <div class="ptt-indicator" id="pttIndicator">
+        🔊 Parent is speaking...
+    </div>
+
+    <!-- Audio enable hint -->
+    <div class="audio-enable-hint" id="audioEnableHint">
+        Tap here to enable parent talk-back audio
     </div>
 
     <div class="controls">
@@ -391,6 +447,10 @@
         const audioLevel = document.getElementById('audioLevel');
         const enableVideo = document.getElementById('enableVideo');
         const enableAudio = document.getElementById('enableAudio');
+        const pttAudio = document.getElementById('pttAudio');
+        const pttIndicator = document.getElementById('pttIndicator');
+        const audioEnableHint = document.getElementById('audioEnableHint');
+        let audioEnabled = false;
 
         // Public STUN servers (only used for IP discovery, no media passes through)
         const rtcConfig = {
@@ -497,6 +557,12 @@
                     case 'no-receivers':
                         info.textContent = 'No receivers connected. Waiting...';
                         break;
+
+                    case 'ptt-offer':
+                        console.log('Received PTT offer from parent');
+                        console.log('Current peer connection state:', peerConnection?.signalingState);
+                        await handlePTTOffer(message.offer);
+                        break;
                 }
             };
 
@@ -557,6 +623,11 @@
                 info.textContent = 'Streaming... Waiting for receivers.';
                 setConnectedState(true);
 
+                // Show hint to enable audio for PTT
+                if (!audioEnabled) {
+                    audioEnableHint.classList.add('show');
+                }
+
                 // Create offer for any existing receivers
                 await createOffer();
 
@@ -604,6 +675,41 @@
                     info.textContent = 'Connected to receiver!';
                 } else if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
                     info.textContent = 'Receiver disconnected. Waiting...';
+                }
+            };
+
+            // Handle incoming audio from parent (PTT)
+            peerConnection.ontrack = (event) => {
+                console.log('Received track from parent:', event.track.kind, event.streams);
+                if (event.track.kind === 'audio' && event.streams[0] !== localStream) {
+                    console.log('PTT audio track received, setting up playback');
+                    pttAudio.srcObject = event.streams[0];
+                    pttIndicator.classList.add('active');
+
+                    // Force play with user interaction workaround
+                    pttAudio.play().then(() => {
+                        console.log('PTT audio playing');
+                    }).catch(err => {
+                        console.error('PTT audio play error:', err);
+                    });
+
+                    // Hide indicator when track ends
+                    event.track.onended = () => {
+                        console.log('PTT track ended');
+                        pttIndicator.classList.remove('active');
+                        pttAudio.srcObject = null;
+                    };
+
+                    event.track.onmute = () => {
+                        console.log('PTT track muted');
+                        pttIndicator.classList.remove('active');
+                    };
+
+                    event.track.onunmute = () => {
+                        console.log('PTT track unmuted');
+                        pttIndicator.classList.add('active');
+                        pttAudio.play().catch(e => console.log('Play on unmute error:', e));
+                    };
                 }
             };
 
@@ -669,6 +775,73 @@
 
             updateAudioLevel();
         }
+
+        // Handle PTT offer from parent
+        async function handlePTTOffer(offer) {
+            if (!peerConnection) {
+                console.log('No peer connection for PTT');
+                return;
+            }
+
+            try {
+                console.log('Processing PTT offer, signaling state:', peerConnection.signalingState);
+
+                // Handle glare (both sides sending offers)
+                if (peerConnection.signalingState !== 'stable') {
+                    console.log('Waiting for stable state...');
+                    await new Promise(resolve => {
+                        const checkState = () => {
+                            if (peerConnection.signalingState === 'stable') {
+                                resolve();
+                            } else {
+                                setTimeout(checkState, 100);
+                            }
+                        };
+                        checkState();
+                    });
+                }
+
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                console.log('Set remote description for PTT');
+
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                console.log('Created PTT answer');
+
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'ptt-answer',
+                        answer: peerConnection.localDescription
+                    }));
+                    console.log('Sent PTT answer');
+                }
+            } catch (err) {
+                console.error('PTT offer error:', err);
+            }
+        }
+
+        // Enable audio playback on user interaction (for PTT)
+        function enableAudioPlayback() {
+            if (!audioEnabled) {
+                audioEnabled = true;
+                audioEnableHint.classList.remove('show');
+                console.log('Audio playback enabled');
+
+                // Create and play a silent audio to unlock audio context
+                const silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+                silentAudio.play().catch(e => {});
+
+                if (pttAudio.srcObject) {
+                    pttAudio.play().catch(e => console.log('PTT play after enable:', e));
+                }
+            }
+        }
+
+        document.addEventListener('click', enableAudioPlayback, { once: false });
+        document.addEventListener('touchstart', enableAudioPlayback, { once: false });
+
+        audioEnableHint.addEventListener('click', enableAudioPlayback);
+        audioEnableHint.addEventListener('touchstart', enableAudioPlayback);
 
         startBtn.addEventListener('click', startStreaming);
         stopBtn.addEventListener('click', stopStreaming);

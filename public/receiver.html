@@ -223,6 +223,52 @@
             border-radius: 8px;
             cursor: pointer;
         }
+
+        .ptt-btn {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            border: none;
+            color: white;
+            padding: 20px;
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            font-size: 2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            transition: transform 0.1s, box-shadow 0.1s;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        .ptt-btn:active, .ptt-btn.active {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(244, 67, 54, 0.5);
+        }
+
+        .ptt-btn:disabled {
+            background: #666;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .ptt-container {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 10001; /* Above alert overlays */
+        }
+
+        .ptt-label {
+            font-size: 0.8rem;
+            margin-top: 8px;
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -248,6 +294,11 @@
         <div class="overlay" id="overlay">
             <p id="overlayText">Waiting for sender to start streaming...</p>
         </div>
+    </div>
+
+    <div class="ptt-container">
+        <button class="ptt-btn" id="pttBtn" disabled>🎤</button>
+        <div class="ptt-label" id="pttLabel">Hold to talk to baby</div>
     </div>
 
     <div class="controls">
@@ -310,6 +361,11 @@
 
         const loudAlert = document.getElementById('loudAlert');
         const disconnectAlert = document.getElementById('disconnectAlert');
+        const pttBtn = document.getElementById('pttBtn');
+        const pttLabel = document.getElementById('pttLabel');
+
+        let pttStream = null;
+        let pttSender = null;
 
         const remoteVideo = document.getElementById('remoteVideo');
         const statusDot = document.getElementById('statusDot');
@@ -343,11 +399,16 @@
                 overlay.classList.add('hidden');
                 // Hide disconnect alert when reconnected
                 disconnectAlert.classList.remove('active');
+                // Enable PTT
+                pttBtn.disabled = false;
             } else {
                 document.body.classList.remove('connected');
                 statusDot.classList.remove('connected');
                 statusText.textContent = 'Waiting';
                 overlay.classList.remove('hidden');
+                // Disable PTT
+                pttBtn.disabled = true;
+                stopPTT();
             }
         }
 
@@ -437,6 +498,18 @@
                                 // Queue candidate for later
                                 console.log('Queuing ICE candidate');
                                 pendingCandidates.push(message.candidate);
+                            }
+                        }
+                        break;
+
+                    case 'ptt-answer':
+                        console.log('Received PTT answer');
+                        if (peerConnection) {
+                            try {
+                                await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
+                                console.log('PTT renegotiation complete');
+                            } catch (err) {
+                                console.error('PTT answer error:', err);
                             }
                         }
                         break;
@@ -747,6 +820,98 @@
                 };
             });
         });
+
+        // Push-to-talk functionality
+        async function startPTT() {
+            if (!peerConnection || !isConnected) return;
+
+            try {
+                pttBtn.classList.add('active');
+                pttLabel.textContent = 'Speaking...';
+
+                // Get microphone access
+                pttStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+
+                // Add audio track to peer connection
+                const audioTrack = pttStream.getAudioTracks()[0];
+                pttSender = peerConnection.addTrack(audioTrack, pttStream);
+
+                // Renegotiate connection
+                console.log('Creating PTT offer, signaling state:', peerConnection.signalingState);
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                console.log('PTT offer created');
+
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'ptt-offer',
+                        offer: peerConnection.localDescription
+                    }));
+                    console.log('PTT offer sent to server');
+                }
+
+                console.log('PTT started, waiting for answer...');
+            } catch (err) {
+                console.error('PTT error:', err);
+                pttLabel.textContent = 'Mic access denied';
+                stopPTT();
+            }
+        }
+
+        function stopPTT() {
+            pttBtn.classList.remove('active');
+            pttLabel.textContent = 'Hold to talk to baby';
+
+            // Stop microphone
+            if (pttStream) {
+                pttStream.getTracks().forEach(track => track.stop());
+                pttStream = null;
+            }
+
+            // Remove track from peer connection
+            if (pttSender && peerConnection) {
+                try {
+                    peerConnection.removeTrack(pttSender);
+                } catch (e) {
+                    console.log('Could not remove PTT track:', e);
+                }
+                pttSender = null;
+            }
+
+            console.log('PTT stopped');
+        }
+
+        // PTT button events (mouse)
+        pttBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startPTT();
+        });
+
+        pttBtn.addEventListener('mouseup', stopPTT);
+        pttBtn.addEventListener('mouseleave', stopPTT);
+
+        // PTT button events (touch)
+        pttBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startPTT();
+        });
+
+        pttBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stopPTT();
+        });
+
+        pttBtn.addEventListener('touchcancel', stopPTT);
+
+        // Enable PTT when connected
+        function updatePTTState() {
+            pttBtn.disabled = !isConnected || !peerConnection;
+        }
 
         // Debug video events
         remoteVideo.addEventListener('loadeddata', () => {

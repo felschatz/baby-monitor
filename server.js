@@ -90,6 +90,22 @@ wss.on('connection', (ws) => {
                     sendToSender({ type: 'answer', answer: message.answer });
                     break;
 
+                case 'ptt-offer':
+                    // Forward PTT offer from receiver to sender
+                    console.log('Forwarding PTT offer to sender, sender available:', hasSender());
+                    if (hasSender()) {
+                        sendToSender({ type: 'ptt-offer', offer: message.offer });
+                    } else {
+                        console.log('No sender available for PTT');
+                    }
+                    break;
+
+                case 'ptt-answer':
+                    // Forward PTT answer from sender to receivers
+                    console.log('Forwarding PTT answer to receivers, count:', receivers.size);
+                    broadcastToReceivers({ type: 'ptt-answer', answer: message.answer });
+                    break;
+
                 case 'ice-candidate':
                     // Forward ICE candidates
                     if (ws.role === 'sender') {
