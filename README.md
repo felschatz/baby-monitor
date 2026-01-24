@@ -5,14 +5,16 @@ A real-time baby monitor web application using WebRTC for peer-to-peer audio/vid
 ## Features
 
 - **Real-time streaming** - Low-latency video and audio via WebRTC
+- **Push-to-talk** - Talk back to your baby from the parent's phone
 - **No data storage** - All streaming is peer-to-peer, nothing is recorded or stored
 - **Screen wake lock** - Keeps both devices awake while monitoring
 - **Visual alerts**:
   - Green background when connected
-  - Black/white flashing on loud sounds (adjustable sensitivity)
-  - Red/black flashing on disconnect
+  - Red flashing overlay with "LOUD SOUND DETECTED" on loud sounds
+  - Red flashing overlay with "CONNECTION LOST" on disconnect
 - **Sender screen dimming** - Screen turns black after 5 seconds to save battery, tap to wake
-- **Audio level meter** - Visual indicator of sound levels on both devices
+- **Audio level meter** - Visual indicator with threshold marker
+- **Adjustable sensitivity** - Control when loud sound alerts trigger
 - **Volume control** - Adjust playback volume on receiver
 - **Fullscreen mode** - Immersive viewing on receiver
 
@@ -21,6 +23,7 @@ A real-time baby monitor web application using WebRTC for peer-to-peer audio/vid
 - Node.js 21.7.x or higher
 - Two devices with modern browsers (Chrome, Firefox, Safari, Edge)
 - Camera and microphone permissions
+- HTTPS for production (required for camera/mic access)
 
 ## Installation
 
@@ -51,86 +54,219 @@ npm start
 - Allow camera and microphone access
 - Select video/audio options
 - Click **"Start Streaming"**
+- **Tap the orange hint** to enable talk-back audio from parent
 
 ### 3. Open Receiver (Parent's Device)
 
 - Navigate to `http://<server-ip>:3000/receiver`
 - The stream will connect automatically
+- **Tap anywhere** to enable audio (required by browsers)
 - Adjust volume and alert sensitivity as needed
+- **Hold the 🎤 button** to talk to baby
 
-## Network Setup
+## Deployment
 
-### Local Network (Same WiFi)
+### Server Requirements
 
-1. Find your computer's local IP address:
-   - Windows: `ipconfig`
-   - Mac/Linux: `ifconfig` or `ip addr`
-2. Access via `http://<local-ip>:3000` on both phones
+- Node.js 21.x runtime
+- HTTPS certificate (required for camera/microphone access)
+- WebSocket support
+- Open ports for WebRTC (or use STUN/TURN servers)
 
-### Remote Access (Different Networks)
+### Deploy with FTP
 
-For use over the internet, you'll need to:
+This project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`) for automated FTP deployment.
 
-1. **Use a tunneling service** like [ngrok](https://ngrok.com):
-   ```bash
-   ngrok http 3000
-   ```
+**Required GitHub Secrets:**
 
-2. **Or deploy to a hosting service** (Heroku, Railway, Render, etc.)
+| Secret | Description |
+|--------|-------------|
+| `FTP_SERVER` | FTP server hostname |
+| `FTP_USERNAME` | FTP username |
+| `FTP_PASSWORD` | FTP password |
+| `FTP_SERVER_DIR` | Target directory on server |
 
-**Note:** HTTPS is required for camera/microphone access on mobile browsers (except localhost).
+### Running on a Server
+
+After deploying files, SSH into your server and:
+
+```bash
+cd /path/to/baby-monitor
+
+# Install dependencies
+npm install --production
+
+# Start with PM2 (recommended)
+pm2 start server.js --name baby-monitor
+
+# Or run directly
+node server.js
+```
+
+### Reverse Proxy (Nginx)
+
+Example Nginx configuration:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name baby-monitor.example.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $websocket_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+### Password Protection (.htaccess)
+
+**Important:** Since this app streams your baby's video, always password protect it!
+
+#### Apache (.htaccess)
+
+Create `.htaccess` in your web root:
+
+```apache
+AuthType Basic
+AuthName "Baby Monitor"
+AuthUserFile /path/to/.htpasswd
+Require valid-user
+
+# Allow WebSocket upgrade
+RewriteEngine On
+RewriteCond %{HTTP:Upgrade} websocket [NC]
+RewriteCond %{HTTP:Connection} upgrade [NC]
+RewriteRule ^(.*)$ ws://localhost:3000/$1 [P,L]
+```
+
+Create `.htpasswd`:
+
+```bash
+htpasswd -c /path/to/.htpasswd username
+```
+
+#### Nginx
+
+```nginx
+location / {
+    auth_basic "Baby Monitor";
+    auth_basic_user_file /path/to/.htpasswd;
+
+    proxy_pass http://localhost:3000;
+    # ... other proxy settings
+}
+```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Server port | 3000 |
 
 ## Project Structure
 
 ```
 baby-monitor/
-├── server.js           # Node.js server with WebSocket signaling
-├── package.json        # Project dependencies
+├── server.js              # Node.js server with WebSocket signaling
+├── package.json           # Project dependencies
+├── .github/
+│   └── workflows/
+│       └── deploy.yml     # GitHub Actions FTP deployment
 └── public/
-    ├── index.html      # Landing page
-    ├── sender.html     # Baby's phone (camera/mic sender)
-    └── receiver.html   # Parent's phone (viewer)
+    ├── index.html         # Landing page
+    ├── sender.html        # Baby's phone (camera/mic sender)
+    └── receiver.html      # Parent's phone (viewer)
 ```
 
 ## Visual Indicators
 
-| State | Background Color |
-|-------|-----------------|
-| Connected | Green |
-| Disconnected | Red/Black flashing |
-| Loud sound detected | White/Black flashing |
-| Idle (sender) | Black (after 5 seconds) |
+### Receiver (Parent's Phone)
 
-## Configuration
+| State | Indicator |
+|-------|-----------|
+| Connected | Green background |
+| Disconnected | Red/black flashing overlay: "CONNECTION LOST" |
+| Loud sound | Red/black flashing overlay: "LOUD SOUND DETECTED" |
+| Audio meter | Green/yellow/red bar with white threshold marker |
 
-### Environment Variables
+### Sender (Baby's Phone)
 
-- `PORT` - Server port (default: 3000)
+| State | Indicator |
+|-------|-----------|
+| Connected | Green background |
+| Streaming | Camera preview visible |
+| Screen saving | Black screen (tap to wake) |
+| Parent talking | Blue pulsing overlay: "Parent is speaking..." |
 
-### Receiver Controls
+## Controls
 
-- **Volume slider** - Adjust audio playback volume
-- **Sensitivity slider** - Adjust loud sound detection threshold (higher = more sensitive)
-- **Fullscreen button** - Toggle fullscreen mode
+### Receiver (Parent's Phone)
+
+| Control | Function |
+|---------|----------|
+| 🎤 Button | Hold to talk to baby |
+| Volume slider | Adjust playback volume |
+| Sensitivity slider | Adjust loud sound threshold (white marker shows level) |
+| Fullscreen button | Toggle fullscreen mode |
+
+### Sender (Baby's Phone)
+
+| Control | Function |
+|---------|----------|
+| Video checkbox | Enable/disable video |
+| Audio checkbox | Enable/disable audio |
+| Start/Stop button | Begin or end streaming |
+
+## Privacy & Security
+
+- **No data storage** - Video/audio streams peer-to-peer, never stored
+- **No external services** - Only STUN servers are contacted (for NAT traversal)
+- **STUN servers used** - stunprotocol.org, nextcloud.com, sipgate.net (only see IP addresses, not media)
+- **Always use HTTPS** - Prevents eavesdropping
+- **Always password protect** - Prevent unauthorized access
 
 ## Troubleshooting
 
 ### Camera/Microphone not working
 
 - Ensure you've granted permissions in browser settings
-- HTTPS is required for media access on mobile (use ngrok or deploy with SSL)
+- HTTPS is required for media access on mobile (localhost is exempt)
+- Try a different browser
 
 ### Connection not establishing
 
 1. Check browser console (F12) for errors
-2. Ensure both devices are on the same network or server is publicly accessible
+2. Ensure both devices can reach the server
 3. Try refreshing both pages
 4. Check that sender has clicked "Start Streaming"
+5. Verify STUN servers are accessible (not blocked by firewall)
+
+### No audio on parent talk-back
+
+1. On baby's phone, tap the orange "enable audio" hint
+2. Check browser console for PTT-related logs
+3. Ensure microphone permission granted on parent's phone
+
+### Loud sound alerts not working
+
+1. Tap anywhere on the receiver page first (enables AudioContext)
+2. Check the white threshold marker on the audio meter
+3. Adjust sensitivity slider (higher = more sensitive)
+4. Check browser console for "Loud sound detected" logs
 
 ### High latency
 
-- WebRTC should provide low latency, but network conditions affect quality
-- Try reducing video quality or disabling video for audio-only monitoring
+- WebRTC provides low latency, but network conditions matter
+- Try disabling video for audio-only monitoring
+- Check your internet connection speed
 
 ## Technology Stack
 
@@ -138,6 +274,7 @@ baby-monitor/
 - **Frontend**: Vanilla JavaScript, WebRTC API
 - **Signaling**: WebSocket for offer/answer/ICE candidate exchange
 - **Streaming**: WebRTC peer-to-peer
+- **NAT Traversal**: STUN (stunprotocol.org, nextcloud.com, sipgate.net)
 
 ## License
 
