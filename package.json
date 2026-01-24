@@ -20,7 +20,6 @@
   },
   "homepage": "https://github.com/felschatz/baby-monitor#readme",
   "dependencies": {
-    "express": "^5.2.1",
-    "ws": "^8.19.0"
+    "express": "^5.2.1"
   }
 }

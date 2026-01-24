@@ -1,30 +1,39 @@
 const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
 const path = require('path');
 
 const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+
+// Parse JSON bodies
+app.use(express.json());
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Explicit route for root to serve index.html
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Track connected clients
+// Track connected clients using SSE
 let sender = null;
-let receivers = new Set();
+let senderRes = null;
+let receivers = new Map(); // id -> response object
+
+// Generate unique IDs
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// Send SSE message to a client
+function sendSSE(res, data) {
+    if (res && !res.finished) {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+        return true;
+    }
+    return false;
+}
 
 // Broadcast to all receivers
 function broadcastToReceivers(message) {
-    console.log('Broadcasting to receivers:', message.type);
-    receivers.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(message));
+    console.log('Broadcasting to receivers:', message.type, 'count:', receivers.size);
+    receivers.forEach((res, id) => {
+        if (!sendSSE(res, message)) {
+            receivers.delete(id);
         }
     });
 }
@@ -32,138 +41,171 @@ function broadcastToReceivers(message) {
 // Send to sender
 function sendToSender(message) {
     console.log('Sending to sender:', message.type);
-    if (sender && sender.readyState === WebSocket.OPEN) {
-        sender.send(JSON.stringify(message));
+    if (senderRes) {
+        if (!sendSSE(senderRes, message)) {
+            sender = null;
+            senderRes = null;
+        }
     }
 }
 
 // Check if sender is active
 function hasSender() {
-    return sender && sender.readyState === WebSocket.OPEN;
+    return sender !== null && senderRes !== null;
 }
 
-wss.on('connection', (ws) => {
-    console.log('New connection');
+// SSE endpoint for sender
+app.get('/api/sse/sender', (req, res) => {
+    const id = generateId();
+    
+    // Check if sender already exists
+    if (hasSender()) {
+        res.status(409).json({ error: 'Sender already exists' });
+        return;
+    }
 
-    ws.on('message', (data) => {
-        try {
-            const message = JSON.parse(data);
-            // Log all messages except ping/pong for debugging
-            if (message.type !== 'ping') {
-                console.log('Received:', message.type, 'from', ws.role || 'unknown');
-            }
+    // Set up SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    res.flushHeaders();
 
-            switch (message.type) {
-                case 'register-sender':
-                    if (hasSender()) {
-                        ws.send(JSON.stringify({ type: 'error', message: 'Sender already exists' }));
-                        ws.close();
-                        return;
-                    }
-                    sender = ws;
-                    ws.role = 'sender';
-                    console.log('Sender registered');
-                    ws.send(JSON.stringify({ type: 'registered', role: 'sender' }));
+    sender = id;
+    senderRes = res;
+    console.log('Sender connected:', id);
 
-                    // Notify all receivers that sender is available
-                    broadcastToReceivers({ type: 'sender-available' });
-                    break;
+    // Send registration confirmation
+    sendSSE(res, { type: 'registered', role: 'sender' });
 
-                case 'register-receiver':
-                    receivers.add(ws);
-                    ws.role = 'receiver';
-                    console.log('Receiver registered, total receivers:', receivers.size);
-                    ws.send(JSON.stringify({
-                        type: 'registered',
-                        role: 'receiver',
-                        senderAvailable: hasSender()
-                    }));
-                    break;
+    // Notify all receivers that sender is available
+    broadcastToReceivers({ type: 'sender-available' });
 
-                case 'request-offer':
-                    // Receiver is requesting an offer from sender
-                    console.log('Receiver requesting offer');
-                    if (hasSender()) {
-                        sendToSender({ type: 'request-offer' });
-                    }
-                    break;
-
-                case 'offer':
-                    // Forward offer from sender to all receivers
-                    broadcastToReceivers({ type: 'offer', offer: message.offer });
-                    break;
-
-                case 'answer':
-                    // Forward answer from receiver to sender
-                    sendToSender({ type: 'answer', answer: message.answer });
-                    break;
-
-                case 'ptt-offer':
-                    // Forward PTT offer from receiver to sender
-                    console.log('Forwarding PTT offer to sender, sender available:', hasSender());
-                    if (hasSender()) {
-                        sendToSender({ type: 'ptt-offer', offer: message.offer });
-                    } else {
-                        console.log('No sender available for PTT');
-                    }
-                    break;
-
-                case 'ptt-start':
-                    // Forward PTT start from receiver to sender
-                    console.log('Forwarding PTT start to sender');
-                    sendToSender({ type: 'ptt-start' });
-                    break;
-
-                case 'ptt-answer':
-                    // Forward PTT answer from sender to receivers
-                    console.log('Forwarding PTT answer to receivers, count:', receivers.size);
-                    broadcastToReceivers({ type: 'ptt-answer', answer: message.answer });
-                    break;
-
-                case 'ptt-stop':
-                    // Forward PTT stop from receiver to sender
-                    console.log('Forwarding PTT stop to sender');
-                    sendToSender({ type: 'ptt-stop' });
-                    break;
-
-                case 'ice-candidate':
-                    // Forward ICE candidates
-                    if (ws.role === 'sender') {
-                        broadcastToReceivers({ type: 'ice-candidate', candidate: message.candidate });
-                    } else {
-                        sendToSender({ type: 'ice-candidate', candidate: message.candidate });
-                    }
-                    break;
-
-                case 'ping':
-                    ws.send(JSON.stringify({ type: 'pong' }));
-                    break;
-            }
-        } catch (err) {
-            console.error('Error processing message:', err);
+    // Keep connection alive with heartbeat
+    const heartbeat = setInterval(() => {
+        if (!sendSSE(res, { type: 'heartbeat' })) {
+            clearInterval(heartbeat);
         }
-    });
+    }, 30000);
 
-    ws.on('close', () => {
-        console.log('Connection closed, role:', ws.role);
-
-        if (ws.role === 'sender') {
+    // Handle disconnect
+    req.on('close', () => {
+        console.log('Sender disconnected:', id);
+        clearInterval(heartbeat);
+        if (sender === id) {
             sender = null;
-            // Notify all receivers that sender disconnected
+            senderRes = null;
             broadcastToReceivers({ type: 'sender-disconnected' });
-        } else if (ws.role === 'receiver') {
-            receivers.delete(ws);
-            console.log('Receiver disconnected, remaining:', receivers.size);
-            // Notify sender if needed
-            if (receivers.size === 0) {
-                sendToSender({ type: 'no-receivers' });
-            }
         }
     });
+});
 
-    ws.on('error', (err) => {
-        console.error('WebSocket error:', err);
+// SSE endpoint for receivers
+app.get('/api/sse/receiver', (req, res) => {
+    const id = generateId();
+
+    // Set up SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    res.flushHeaders();
+
+    receivers.set(id, res);
+    console.log('Receiver connected:', id, 'total:', receivers.size);
+
+    // Send registration confirmation
+    sendSSE(res, { 
+        type: 'registered', 
+        role: 'receiver',
+        receiverId: id,
+        senderAvailable: hasSender()
     });
+
+    // Keep connection alive with heartbeat
+    const heartbeat = setInterval(() => {
+        if (!sendSSE(res, { type: 'heartbeat' })) {
+            clearInterval(heartbeat);
+            receivers.delete(id);
+        }
+    }, 30000);
+
+    // Handle disconnect
+    req.on('close', () => {
+        console.log('Receiver disconnected:', id, 'remaining:', receivers.size - 1);
+        clearInterval(heartbeat);
+        receivers.delete(id);
+        if (receivers.size === 0) {
+            sendToSender({ type: 'no-receivers' });
+        }
+    });
+});
+
+// Message endpoint (replaces WebSocket messages)
+app.post('/api/signal', (req, res) => {
+    const message = req.body;
+    
+    if (!message || !message.type) {
+        return res.status(400).json({ error: 'Invalid message' });
+    }
+
+    console.log('Signal received:', message.type, 'from', message.role || 'unknown');
+
+    switch (message.type) {
+        case 'request-offer':
+            // Receiver is requesting an offer from sender
+            if (hasSender()) {
+                sendToSender({ type: 'request-offer' });
+            }
+            break;
+
+        case 'offer':
+            // Forward offer from sender to all receivers
+            broadcastToReceivers({ type: 'offer', offer: message.offer });
+            break;
+
+        case 'answer':
+            // Forward answer from receiver to sender
+            sendToSender({ type: 'answer', answer: message.answer });
+            break;
+
+        case 'ptt-offer':
+            // Forward PTT offer from receiver to sender
+            console.log('Forwarding PTT offer to sender');
+            if (hasSender()) {
+                sendToSender({ type: 'ptt-offer', offer: message.offer });
+            }
+            break;
+
+        case 'ptt-start':
+            // Forward PTT start from receiver to sender
+            sendToSender({ type: 'ptt-start' });
+            break;
+
+        case 'ptt-answer':
+            // Forward PTT answer from sender to receivers
+            broadcastToReceivers({ type: 'ptt-answer', answer: message.answer });
+            break;
+
+        case 'ptt-stop':
+            // Forward PTT stop from receiver to sender
+            sendToSender({ type: 'ptt-stop' });
+            break;
+
+        case 'ice-candidate':
+            // Forward ICE candidates
+            if (message.role === 'sender') {
+                broadcastToReceivers({ type: 'ice-candidate', candidate: message.candidate });
+            } else {
+                sendToSender({ type: 'ice-candidate', candidate: message.candidate });
+            }
+            break;
+
+        default:
+            console.log('Unknown message type:', message.type);
+    }
+
+    res.json({ success: true });
 });
 
 // Routes
@@ -188,7 +230,8 @@ app.get('/api/status', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+app.listen(PORT, () => {
     console.log(`Baby Monitor server running on port ${PORT}`);
     console.log(`Open http://localhost:${PORT} in your browser`);
+    console.log('Using SSE for signaling (no WebSockets required)');
 });

@@ -90,8 +90,8 @@
         // Track user interaction for autoplay
         let userHasInteracted = false;
 
-        // WebSocket and WebRTC
-        let ws = null;
+        // SSE and WebRTC (no WebSockets!)
+        let eventSource = null;
         let peerConnection = null;
         let audioContext = null;
         let analyser = null;
@@ -99,6 +99,7 @@
         let loudSoundTimeout = null;
         let loudSoundCooldown = false;
         let pendingCandidates = [];
+        let receiverId = null;
 
         const loudAlert = document.getElementById('loudAlert');
         const disconnectAlert = document.getElementById('disconnectAlert');
@@ -143,6 +144,26 @@
             ],
             iceCandidatePoolSize: 10
         };
+
+        // Send signal via HTTP POST (replaces WebSocket send)
+        async function sendSignal(message) {
+            message.role = 'receiver';
+            if (receiverId) {
+                message.receiverId = receiverId;
+            }
+            try {
+                const response = await fetch('/api/signal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(message)
+                });
+                if (!response.ok) {
+                    console.error('Signal failed:', response.status);
+                }
+            } catch (err) {
+                console.error('Signal error:', err);
+            }
+        }
 
         function setConnectedState(connected) {
             isConnected = connected;
@@ -200,26 +221,32 @@
             }, 1000); // Show alert for 1 second
         }
 
-        function connectWebSocket() {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${protocol}//${window.location.host}`);
+        function connectSSE() {
+            // Close existing connection
+            if (eventSource) {
+                eventSource.close();
+            }
 
-            ws.onopen = () => {
-                console.log('WebSocket connected');
-                ws.send(JSON.stringify({ type: 'register-receiver' }));
+            eventSource = new EventSource('/api/sse/receiver');
+
+            eventSource.onopen = () => {
+                console.log('SSE connected');
             };
 
-            ws.onmessage = async (event) => {
+            eventSource.onmessage = async (event) => {
                 const message = JSON.parse(event.data);
-                console.log('Receiver received:', message.type);
+                if (message.type !== 'heartbeat') {
+                    console.log('Receiver received:', message.type);
+                }
 
                 switch (message.type) {
                     case 'registered':
                         console.log('Registered as receiver');
+                        receiverId = message.receiverId;
                         if (message.senderAvailable) {
                             overlayText.textContent = 'Sender available. Requesting stream...';
                             // Request an offer from the sender
-                            ws.send(JSON.stringify({ type: 'request-offer' }));
+                            sendSignal({ type: 'request-offer' });
                         } else {
                             overlayText.textContent = 'Waiting for sender to start streaming...';
                         }
@@ -228,7 +255,7 @@
                     case 'sender-available':
                         overlayText.textContent = 'Sender started. Requesting stream...';
                         // Request an offer from the sender
-                        ws.send(JSON.stringify({ type: 'request-offer' }));
+                        sendSignal({ type: 'request-offer' });
                         break;
 
                     case 'sender-disconnected':
@@ -269,25 +296,19 @@
                             }
                         }
                         break;
+
+                    case 'heartbeat':
+                        // Server heartbeat - connection is alive
+                        break;
                 }
             };
 
-            ws.onclose = () => {
-                console.log('WebSocket disconnected');
+            eventSource.onerror = (err) => {
+                console.error('SSE error:', err);
                 setDisconnectedState();
-                setTimeout(connectWebSocket, 3000);
+                eventSource.close();
+                setTimeout(connectSSE, 3000);
             };
-
-            ws.onerror = (err) => {
-                console.error('WebSocket error:', err);
-            };
-
-            // Keep alive
-            setInterval(() => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'ping' }));
-                }
-            }, 30000);
         }
 
         async function handleOffer(offer) {
@@ -364,12 +385,12 @@
             };
 
             peerConnection.onicecandidate = (event) => {
-                if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                if (event.candidate && eventSource) {
                     console.log('Sending ICE candidate');
-                    ws.send(JSON.stringify({
+                    sendSignal({
                         type: 'ice-candidate',
                         candidate: event.candidate
-                    }));
+                    });
                 }
             };
 
@@ -412,8 +433,8 @@
                     info.textContent = 'Connection failed. Requesting new stream...';
                     // Request a new offer from sender
                     setTimeout(() => {
-                        if (ws && ws.readyState === WebSocket.OPEN) {
-                            ws.send(JSON.stringify({ type: 'request-offer' }));
+                        if (eventSource) {
+                            sendSignal({ type: 'request-offer' });
                         }
                     }, 2000);
                 }
@@ -438,11 +459,11 @@
                 await peerConnection.setLocalDescription(answer);
                 console.log('Created and set local answer');
 
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
+                if (eventSource) {
+                    sendSignal({
                         type: 'answer',
                         answer: peerConnection.localDescription
-                    }));
+                    });
                     console.log('Sent answer to server');
                 }
             } catch (err) {
@@ -671,8 +692,8 @@
                 pttLabel.textContent = 'Speaking...';
 
                 // Immediately notify sender that PTT is starting
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'ptt-start' }));
+                if (eventSource) {
+                    sendSignal({ type: 'ptt-start' });
                     console.log('PTT: Sent start notification');
                 }
 
@@ -697,16 +718,16 @@
                 await peerConnection.setLocalDescription(offer);
                 console.log('PTT: Offer created');
 
-                if (ws && ws.readyState === WebSocket.OPEN) {
+                if (eventSource) {
                     const message = {
                         type: 'ptt-offer',
                         offer: peerConnection.localDescription
                     };
                     console.log('PTT: Sending to server:', message.type);
-                    ws.send(JSON.stringify(message));
+                    sendSignal(message);
                     console.log('PTT: Sent to server');
                 } else {
-                    console.error('PTT: WebSocket not open, state:', ws?.readyState);
+                    console.error('PTT: SSE not connected');
                 }
 
                 console.log('PTT: Started, waiting for answer...');
@@ -728,8 +749,8 @@
             pttLabel.textContent = 'Hold to talk to baby';
 
             // Notify sender that PTT has stopped
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'ptt-stop' }));
+            if (eventSource) {
+                sendSignal({ type: 'ptt-stop' });
                 console.log('PTT: Sent stop notification');
             }
 
@@ -798,8 +819,8 @@
             console.log('Video stalled');
         });
 
-        // Initialize
-        connectWebSocket();
+        // Initialize - connect SSE
+        connectSSE();
     </script>
 </body>
 </html>
