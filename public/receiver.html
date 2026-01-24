@@ -91,6 +91,11 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
+            background: #222;
+        }
+
+        #remoteVideo:not([src]):not([srcObject]) {
+            background: #333;
         }
 
         .overlay {
@@ -185,7 +190,7 @@
     </div>
 
     <div class="video-container">
-        <video id="remoteVideo" autoplay playsinline></video>
+        <video id="remoteVideo" autoplay playsinline muted></video>
         <div class="overlay" id="overlay">
             <p id="overlayText">Waiting for sender to start streaming...</p>
         </div>
@@ -245,6 +250,7 @@
         let analyser = null;
         let isConnected = false;
         let loudSoundTimeout = null;
+        let pendingCandidates = [];
 
         const remoteVideo = document.getElementById('remoteVideo');
         const statusDot = document.getElementById('statusDot');
@@ -259,11 +265,14 @@
         const fullscreenBtn = document.getElementById('fullscreenBtn');
         const info = document.getElementById('info');
 
+        // Public STUN servers (only used for IP discovery, no media passes through)
         const rtcConfig = {
             iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
-            ]
+                { urls: 'stun:stun.stunprotocol.org:3478' },
+                { urls: 'stun:stun.nextcloud.com:443' },
+                { urls: 'stun:stun.sipgate.net:3478' }
+            ],
+            iceCandidatePoolSize: 10
         };
 
         function setConnectedState(connected) {
@@ -350,11 +359,18 @@
                         break;
 
                     case 'ice-candidate':
-                        if (peerConnection && message.candidate) {
-                            try {
-                                await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
-                            } catch (err) {
-                                console.error('Error adding ICE candidate:', err);
+                        if (message.candidate) {
+                            if (peerConnection && peerConnection.remoteDescription) {
+                                try {
+                                    await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+                                    console.log('Added ICE candidate');
+                                } catch (err) {
+                                    console.log('ICE candidate error (may be stale):', err.message);
+                                }
+                            } else {
+                                // Queue candidate for later
+                                console.log('Queuing ICE candidate');
+                                pendingCandidates.push(message.candidate);
                             }
                         }
                         break;
@@ -383,12 +399,50 @@
             console.log('Handling offer...');
             closePeerConnection();
 
+            // Clear any pending candidates from previous session
+            pendingCandidates = [];
+
             peerConnection = new RTCPeerConnection(rtcConfig);
             console.log('Created peer connection');
 
             peerConnection.ontrack = (event) => {
-                console.log('Received track:', event.track.kind);
+                console.log('Received track:', event.track.kind, event.streams);
+
+                // Always update srcObject with the latest stream
                 remoteVideo.srcObject = event.streams[0];
+                console.log('Set video srcObject, tracks in stream:', event.streams[0].getTracks().length);
+
+                // Show video as soon as we receive tracks
+                if (event.track.kind === 'video') {
+                    console.log('Video track received, showing video');
+                    console.log('Video track enabled:', event.track.enabled);
+                    console.log('Video track readyState:', event.track.readyState);
+                    console.log('Video track muted:', event.track.muted);
+
+                    setConnectedState(true);
+                    info.textContent = 'Streaming';
+
+                    // Monitor track for unmute (when data starts flowing)
+                    event.track.onunmute = () => {
+                        console.log('Video track unmuted - data flowing');
+                        remoteVideo.play().catch(err => console.log('Play error:', err));
+                    };
+
+                    // Force play
+                    remoteVideo.play().then(() => {
+                        console.log('Video playing, dimensions:', remoteVideo.videoWidth, 'x', remoteVideo.videoHeight);
+                    }).catch(err => {
+                        console.error('Video play error:', err);
+                    });
+
+                    // Check dimensions after a delay
+                    setTimeout(() => {
+                        console.log('Video check - dimensions:', remoteVideo.videoWidth, 'x', remoteVideo.videoHeight);
+                        console.log('Video check - paused:', remoteVideo.paused);
+                        console.log('Video check - readyState:', remoteVideo.readyState);
+                        console.log('Stream active:', remoteVideo.srcObject?.active);
+                    }, 2000);
+                }
 
                 if (event.track.kind === 'audio') {
                     setupAudioAnalysis(event.streams[0]);
@@ -407,6 +461,18 @@
 
             peerConnection.oniceconnectionstatechange = () => {
                 console.log('ICE connection state:', peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === 'connected') {
+                    console.log('ICE connected! Video should work now.');
+                    remoteVideo.play().catch(e => console.log('Play on ICE connect:', e));
+                }
+                if (peerConnection.iceConnectionState === 'failed') {
+                    console.error('ICE connection failed - trying restart');
+                    peerConnection.restartIce();
+                }
+            };
+
+            peerConnection.onicegatheringstatechange = () => {
+                console.log('ICE gathering state:', peerConnection.iceGatheringState);
             };
 
             peerConnection.onconnectionstatechange = () => {
@@ -423,6 +489,17 @@
             try {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
                 console.log('Set remote description');
+
+                // Process any queued ICE candidates
+                console.log('Processing', pendingCandidates.length, 'queued ICE candidates');
+                for (const candidate of pendingCandidates) {
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                    } catch (err) {
+                        console.log('Queued ICE candidate error:', err.message);
+                    }
+                }
+                pendingCandidates = [];
 
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
@@ -490,7 +567,9 @@
         volumeSlider.addEventListener('input', () => {
             const value = volumeSlider.value / 100;
             remoteVideo.volume = value;
+            remoteVideo.muted = false; // Unmute when adjusting volume
             volumeValue.textContent = volumeSlider.value + '%';
+            overlay.classList.add('hidden'); // Hide unmute prompt if shown
         });
 
         // Sensitivity control
@@ -507,19 +586,60 @@
             }
         });
 
+        // Handle unmuting (video starts muted for autoplay policy)
+        function promptUnmute() {
+            if (remoteVideo.muted) {
+                overlayText.textContent = 'Tap to enable sound';
+                overlay.classList.remove('hidden');
+                overlay.style.background = 'rgba(0,0,0,0.5)';
+
+                const unmute = () => {
+                    remoteVideo.muted = false;
+                    overlay.classList.add('hidden');
+                    overlay.style.background = '';
+                    overlay.onclick = null;
+                    overlay.ontouchstart = null;
+                };
+
+                overlay.onclick = unmute;
+                overlay.ontouchstart = unmute;
+            }
+        }
+
         // Handle video play (required for autoplay on mobile)
         remoteVideo.addEventListener('loadedmetadata', () => {
-            remoteVideo.play().catch(err => {
+            remoteVideo.play().then(() => {
+                console.log('Video playing (muted)');
+                // Prompt user to enable sound
+                setTimeout(promptUnmute, 500);
+            }).catch(err => {
                 console.log('Autoplay prevented:', err);
-                // Show play button overlay
                 overlayText.textContent = 'Tap to play';
                 overlay.classList.remove('hidden');
                 overlay.onclick = () => {
                     remoteVideo.play();
+                    remoteVideo.muted = false;
                     overlay.classList.add('hidden');
                     overlay.onclick = null;
                 };
             });
+        });
+
+        // Debug video events
+        remoteVideo.addEventListener('loadeddata', () => {
+            console.log('Video loadeddata - dimensions:', remoteVideo.videoWidth, 'x', remoteVideo.videoHeight);
+        });
+
+        remoteVideo.addEventListener('playing', () => {
+            console.log('Video is now playing');
+        });
+
+        remoteVideo.addEventListener('waiting', () => {
+            console.log('Video is waiting for data');
+        });
+
+        remoteVideo.addEventListener('stalled', () => {
+            console.log('Video stalled');
         });
 
         // Initialize
