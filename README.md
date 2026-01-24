@@ -1,10 +1,10 @@
 # Baby Monitor
 
-A real-time baby monitor web application using WebRTC for peer-to-peer audio/video streaming between two devices. Designed for use with two phones (Android/iOS) over a local network or the internet.
+A real-time baby monitor web application for streaming audio and video between two phones. Place one phone near your baby and watch/listen from the other. Works on Android and iOS over local network or internet. Talk back to the baby supported. No data storage.
 
 ## Features
 
-- **Real-time streaming** - Low-latency video and audio via WebRTC peer-to-peer
+- **Real-time streaming** - Low-latency peer-to-peer video and audio
 - **Push-to-talk (PTT)** - Talk back to your baby from the parent's phone
 - **Audio ducking** - Automatically lowers baby audio during PTT to prevent echo
 - **No data storage** - All streaming is peer-to-peer, nothing is recorded or stored on the server
@@ -239,16 +239,16 @@ baby-monitor/
 
 ### Architecture
 
-1. **Signaling Server** - Express.js server uses Server-Sent Events (SSE) for signaling
-2. **WebRTC** - Peer-to-peer connection for low-latency media streaming
-3. **STUN Servers** - Public STUN servers for NAT traversal (no TURN by default)
+1. **Signaling Server** - Express.js server uses Server-Sent Events (SSE) for connection setup
+2. **Peer-to-Peer Streaming** - Direct connection between devices for low-latency media
+3. **STUN Servers** - Public servers for NAT traversal (no TURN by default)
 
 ### Connection Flow
 
 1. Sender connects to `/api/sse/sender` (SSE endpoint)
 2. Receiver connects to `/api/sse/receiver` (SSE endpoint)
-3. Receiver requests offer via `/api/signal` (HTTP POST)
-4. Sender creates WebRTC offer and sends via signal endpoint
+3. Receiver requests connection via `/api/signal` (HTTP POST)
+4. Sender creates offer and sends via signal endpoint
 5. Receiver responds with answer
 6. ICE candidates are exchanged
 7. Direct peer-to-peer media connection established
@@ -319,9 +319,8 @@ baby-monitor/
 ## Technology Stack
 
 - **Backend**: Node.js 21.x, Express 5.x
-- **Frontend**: Vanilla JavaScript (no framework dependencies)
+- **Frontend**: Vanilla JavaScript, WebRTC API
 - **Signaling**: Server-Sent Events (SSE) + HTTP POST
-- **Streaming**: WebRTC (RTCPeerConnection API)
 - **NAT Traversal**: STUN (public servers)
 - **Deployment**: GitHub Actions with FTPS
 
@@ -335,7 +334,7 @@ baby-monitor/
 | `/api/status` | GET | JSON status (senderActive, receiverCount) |
 | `/api/sse/sender` | GET | SSE endpoint for sender |
 | `/api/sse/receiver` | GET | SSE endpoint for receivers |
-| `/api/signal` | POST | WebRTC signaling (offers, answers, ICE candidates) |
+| `/api/signal` | POST | Signaling (offers, answers, ICE candidates) |
 
 ## License
 
