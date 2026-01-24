@@ -359,9 +359,23 @@
                 if (peerConnection.connectionState === 'connected') {
                     setConnectedState(true);
                     info.textContent = 'Streaming';
-                } else if (peerConnection.connectionState === 'disconnected' ||
-                           peerConnection.connectionState === 'failed') {
+                } else if (peerConnection.connectionState === 'disconnected') {
+                    info.textContent = 'Connection lost. Reconnecting...';
+                    // Try to restart ICE
+                    setTimeout(() => {
+                        if (peerConnection && peerConnection.connectionState === 'disconnected') {
+                            peerConnection.restartIce();
+                        }
+                    }, 2000);
+                } else if (peerConnection.connectionState === 'failed') {
                     setDisconnectedState();
+                    info.textContent = 'Connection failed. Requesting new stream...';
+                    // Request a new offer from sender
+                    setTimeout(() => {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({ type: 'request-offer' }));
+                        }
+                    }, 2000);
                 }
             };
 
@@ -595,6 +609,12 @@
                 pttBtn.classList.add('active');
                 pttLabel.textContent = 'Speaking...';
 
+                // Immediately notify sender that PTT is starting
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ptt-start' }));
+                    console.log('PTT: Sent start notification');
+                }
+
                 // Get microphone access
                 console.log('PTT: Requesting microphone...');
                 pttStream = await navigator.mediaDevices.getUserMedia({
@@ -645,6 +665,12 @@
             console.log('PTT: Stopping...');
             pttBtn.classList.remove('active');
             pttLabel.textContent = 'Hold to talk to baby';
+
+            // Notify sender that PTT has stopped
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ptt-stop' }));
+                console.log('PTT: Sent stop notification');
+            }
 
             // Stop microphone
             if (pttStream) {

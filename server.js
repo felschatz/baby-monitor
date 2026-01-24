@@ -103,10 +103,22 @@ wss.on('connection', (ws) => {
                     }
                     break;
 
+                case 'ptt-start':
+                    // Forward PTT start from receiver to sender
+                    console.log('Forwarding PTT start to sender');
+                    sendToSender({ type: 'ptt-start' });
+                    break;
+
                 case 'ptt-answer':
                     // Forward PTT answer from sender to receivers
                     console.log('Forwarding PTT answer to receivers, count:', receivers.size);
                     broadcastToReceivers({ type: 'ptt-answer', answer: message.answer });
+                    break;
+
+                case 'ptt-stop':
+                    // Forward PTT stop from receiver to sender
+                    console.log('Forwarding PTT stop to sender');
+                    sendToSender({ type: 'ptt-stop' });
                     break;
 
                 case 'ice-candidate':
