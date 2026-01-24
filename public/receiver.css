@@ -48,10 +48,14 @@ body.connected {
 }
 
 .loud-alert {
+    background: rgba(255, 0, 0, 0.9);
+    color: white;
     animation: loudBlink 0.3s infinite;
 }
 
 .disconnect-alert {
+    background: rgba(180, 0, 0, 1);
+    color: white;
     animation: disconnectBlink 0.5s infinite;
 }
 

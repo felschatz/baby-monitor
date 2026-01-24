@@ -6,6 +6,7 @@ A real-time baby monitor web application using WebRTC for peer-to-peer audio/vid
 
 - **Real-time streaming** - Low-latency video and audio via WebRTC peer-to-peer
 - **Push-to-talk (PTT)** - Talk back to your baby from the parent's phone
+- **Audio ducking** - Automatically lowers baby audio during PTT to prevent echo
 - **No data storage** - All streaming is peer-to-peer, nothing is recorded or stored on the server
 - **Screen wake lock** - Keeps both devices awake while monitoring
 - **Visual alerts**:
