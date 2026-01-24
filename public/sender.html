@@ -258,6 +258,7 @@
 
             console.log('Starting music with', timerMinutes, 'minute timer');
             musicPlaying = true;
+            isFadingOut = false;
             musicShuffled = shuffleArray(musicPlaylist);
             musicCurrentIndex = 0;
             musicTimerRemaining = timerMinutes * 60;
@@ -319,11 +320,14 @@
             }
         });
 
-        // Fade out and stop music (used when timer expires)
+        // Fade out and stop music (used when timer expires or streaming stops)
+        let isFadingOut = false;
         function fadeOutAndStop() {
+            if (isFadingOut || !musicPlaying) return; // Prevent multiple fade outs
+            isFadingOut = true;
             console.log('Fading out music...');
             const fadeInterval = 50; // ms between volume steps
-            const fadeDuration = 2000; // total fade duration in ms
+            const fadeDuration = 5000; // total fade duration in ms
             const steps = fadeDuration / fadeInterval;
             const volumeStep = musicAudio.volume / steps;
 
@@ -339,7 +343,8 @@
                 } else {
                     clearInterval(fadeTimer);
                     musicAudio.volume = 0;
-                    stopMusic(true); // Always broadcast when timer expires
+                    isFadingOut = false;
+                    stopMusic(true); // Always broadcast
                 }
             }, fadeInterval);
         }
@@ -555,7 +560,7 @@
 
                     case 'music-stop':
                         console.log('Received music stop');
-                        stopMusic(true);
+                        fadeOutAndStop();
                         break;
 
                     case 'heartbeat':
@@ -730,6 +735,11 @@
         }
 
         function stopStreaming() {
+            // Fade out music if playing
+            if (musicPlaying) {
+                fadeOutAndStop();
+            }
+
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
