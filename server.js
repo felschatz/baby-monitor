@@ -43,7 +43,10 @@ wss.on('connection', (ws) => {
     ws.on('message', (data) => {
         try {
             const message = JSON.parse(data);
-            console.log('Received:', message.type, 'from', ws.role || 'unknown');
+            // Log all messages except ping/pong for debugging
+            if (message.type !== 'ping') {
+                console.log('Received:', message.type, 'from', ws.role || 'unknown');
+            }
 
             switch (message.type) {
                 case 'register-sender':
