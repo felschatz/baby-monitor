@@ -51,3 +51,4 @@ Real-time baby monitor web app using WebRTC for peer-to-peer streaming between t
    - `CLAUDE.md` - Update for dev context changes
    - `.github/copilot-instructions.md` - Keep in sync with CLAUDE.md
    - `README.md` - Update for user-facing feature changes
+8. **Trigger server restart:** After making changes, update the `// Wisdom:` comment at the end of `server.js` with a new random sentence of wisdom. This triggers nodemon to restart the server.

@@ -280,3 +280,5 @@ app.listen(PORT, () => {
     console.log(`Open http://localhost:${PORT} in your browser`);
     console.log('Using SSE for signaling (no WebSockets required)');
 });
+
+// Wisdom: A sleeping baby is the universe's way of saying "take a break, you've earned it."
