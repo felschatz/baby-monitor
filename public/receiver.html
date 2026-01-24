@@ -86,6 +86,9 @@
 
         // Track if we were previously streaming (for auto-resume on refresh)
         const wasStreaming = sessionStorage.getItem('receiver-streaming') === 'true';
+        
+        // Track user interaction for autoplay
+        let userHasInteracted = false;
 
         // WebSocket and WebRTC
         let ws = null;
@@ -117,6 +120,19 @@
         const sensitivityValue = document.getElementById('sensitivityValue');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
         const info = document.getElementById('info');
+
+        // Load saved settings from localStorage
+        const savedVolume = localStorage.getItem('receiver-volume');
+        const savedSensitivity = localStorage.getItem('receiver-sensitivity');
+        
+        if (savedVolume !== null) {
+            volumeSlider.value = savedVolume;
+            volumeValue.textContent = savedVolume + '%';
+        }
+        if (savedSensitivity !== null) {
+            sensitivitySlider.value = savedSensitivity;
+            sensitivityValue.textContent = savedSensitivity;
+        }
 
         // Public STUN servers (only used for IP discovery, no media passes through)
         const rtcConfig = {
@@ -290,6 +306,12 @@
                 // Always update srcObject with the latest stream
                 remoteVideo.srcObject = event.streams[0];
                 console.log('Set video srcObject, tracks in stream:', event.streams[0].getTracks().length);
+                
+                // Apply saved volume setting
+                const savedVol = localStorage.getItem('receiver-volume');
+                if (savedVol !== null) {
+                    remoteVideo.volume = parseInt(savedVol) / 100;
+                }
 
                 // Show video as soon as we receive tracks
                 if (event.track.kind === 'video') {
@@ -511,6 +533,8 @@
             remoteVideo.muted = false; // Unmute when adjusting volume
             volumeValue.textContent = volumeSlider.value + '%';
             overlay.classList.add('hidden'); // Hide unmute prompt if shown
+            // Save to localStorage
+            localStorage.setItem('receiver-volume', volumeSlider.value);
         });
 
         // Sensitivity control
@@ -524,7 +548,11 @@
             sensitivityValue.textContent = sensitivitySlider.value;
         }
 
-        sensitivitySlider.addEventListener('input', updateThresholdMarker);
+        sensitivitySlider.addEventListener('input', () => {
+            updateThresholdMarker();
+            // Save to localStorage
+            localStorage.setItem('receiver-sensitivity', sensitivitySlider.value);
+        });
         updateThresholdMarker(); // Set initial position
 
         // Fullscreen
@@ -565,31 +593,62 @@
         }
 
         // Handle video play (required for autoplay on mobile)
-        remoteVideo.addEventListener('loadedmetadata', () => {
-            // If refreshing (was previously streaming), auto-unmute before playing
-            if (wasStreaming) {
+        function tryPlayVideo() {
+            if (!remoteVideo.srcObject) return;
+            
+            // If user has interacted, unmute
+            if (userHasInteracted || wasStreaming) {
                 remoteVideo.muted = false;
             }
-
+            
             remoteVideo.play().then(() => {
-                console.log('Video playing', wasStreaming ? '(auto-resumed)' : '(muted)');
-                // Prompt user to enable sound only if not auto-resuming
-                if (!wasStreaming) {
+                console.log('Video playing, muted:', remoteVideo.muted);
+                if (remoteVideo.muted && !userHasInteracted && !wasStreaming) {
+                    // Video is playing but muted, prompt for sound
                     setTimeout(promptUnmute, 500);
                 } else {
                     overlay.classList.add('hidden');
                 }
             }).catch(err => {
-                console.log('Autoplay prevented:', err);
+                console.log('Play failed:', err);
+                // Show tap to play overlay
                 overlayText.textContent = 'Tap to play';
                 overlay.classList.remove('hidden');
-                overlay.onclick = () => {
-                    remoteVideo.play();
-                    remoteVideo.muted = false;
-                    overlay.classList.add('hidden');
-                    overlay.onclick = null;
-                };
             });
+        }
+        
+        remoteVideo.addEventListener('loadedmetadata', tryPlayVideo);
+        
+        // Handle user interaction - enable autoplay and unmute
+        function handleUserInteraction() {
+            if (userHasInteracted) return;
+            userHasInteracted = true;
+            console.log('User interaction detected');
+            
+            // Try to play and unmute
+            if (remoteVideo.srcObject) {
+                remoteVideo.muted = false;
+                remoteVideo.play().then(() => {
+                    console.log('Video playing after interaction');
+                    overlay.classList.add('hidden');
+                }).catch(e => console.log('Play after interaction failed:', e));
+            }
+        }
+        
+        // Listen for any user interaction
+        ['click', 'touchstart', 'touchend', 'keydown'].forEach(event => {
+            document.addEventListener(event, handleUserInteraction, { once: false, passive: true });
+        });
+        
+        // Also handle overlay click specifically
+        overlay.addEventListener('click', () => {
+            handleUserInteraction();
+            if (remoteVideo.srcObject) {
+                remoteVideo.muted = false;
+                remoteVideo.play().then(() => {
+                    overlay.classList.add('hidden');
+                }).catch(e => console.log('Overlay play error:', e));
+            }
         });
 
         // Push-to-talk functionality

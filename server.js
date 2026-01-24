@@ -10,6 +10,11 @@ const wss = new WebSocket.Server({ server });
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Explicit route for root to serve index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Track connected clients
 let sender = null;
 let receivers = new Set();
