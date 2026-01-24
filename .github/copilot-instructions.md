@@ -34,9 +34,10 @@ Real-time baby monitor web app using WebRTC for peer-to-peer streaming between t
 ## API Endpoints
 
 - `GET /api/sse/sender` - SSE stream for sender
-- `GET /api/sse/receiver` - SSE stream for receivers  
+- `GET /api/sse/receiver` - SSE stream for receivers
 - `POST /api/signal` - WebRTC signaling (offers, answers, ICE)
 - `GET /api/status` - JSON: `{senderActive, receiverCount}`
+- `GET /api/music` - JSON: `{files: [{name, url}], debugTimer}`
 
 ## When Making Changes
 

@@ -38,6 +38,15 @@
         🔊 Parent is speaking...
     </div>
 
+    <!-- Music indicator -->
+    <div class="music-indicator" id="musicIndicator">
+        🎵 <span id="musicTrackName">Playing music...</span>
+        <div class="music-timer" id="musicTimer"></div>
+    </div>
+
+    <!-- Hidden audio element for music playback -->
+    <audio id="musicAudio"></audio>
+
     <div class="controls">
         <div class="options">
             <label class="option">
@@ -204,6 +213,189 @@
         let isStreaming = false;
         let sseConnected = false;
 
+        // Music player state
+        const musicAudio = document.getElementById('musicAudio');
+        const musicIndicator = document.getElementById('musicIndicator');
+        const musicTrackName = document.getElementById('musicTrackName');
+        const musicTimerEl = document.getElementById('musicTimer');
+        let musicPlaylist = [];
+        let musicShuffled = [];
+        let musicCurrentIndex = 0;
+        let musicPlaying = false;
+        let musicTimer = null;
+        let musicTimerRemaining = 0;
+        let musicStatusInterval = null;
+
+        // Fetch available music files
+        async function fetchMusicPlaylist() {
+            try {
+                const response = await fetch('/api/music');
+                const data = await response.json();
+                musicPlaylist = data.files || [];
+                console.log('Music playlist loaded:', musicPlaylist.length, 'tracks');
+            } catch (err) {
+                console.error('Failed to fetch music playlist:', err);
+                musicPlaylist = [];
+            }
+        }
+
+        // Fisher-Yates shuffle
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        // Start music playback
+        function startMusic(timerMinutes) {
+            if (musicPlaylist.length === 0) {
+                console.log('No music files available');
+                return;
+            }
+
+            console.log('Starting music with', timerMinutes, 'minute timer');
+            musicPlaying = true;
+            musicShuffled = shuffleArray(musicPlaylist);
+            musicCurrentIndex = 0;
+            musicTimerRemaining = timerMinutes * 60;
+
+            // Show indicator
+            musicIndicator.classList.add('active');
+
+            // Reset volume to full
+            musicAudio.volume = 1.0;
+
+            // Start timer countdown
+            if (musicTimer) clearInterval(musicTimer);
+            musicTimer = setInterval(() => {
+                musicTimerRemaining--;
+                updateMusicTimerDisplay();
+                if (musicTimerRemaining <= 0) {
+                    console.log('Music timer expired');
+                    fadeOutAndStop();
+                }
+            }, 1000);
+
+            // Start status broadcast
+            if (musicStatusInterval) clearInterval(musicStatusInterval);
+            musicStatusInterval = setInterval(broadcastMusicStatus, 5000);
+
+            // Play first track
+            playNextTrack();
+
+            // Broadcast initial status
+            broadcastMusicStatus();
+        }
+
+        // Play next track in shuffled playlist
+        function playNextTrack() {
+            if (!musicPlaying || musicShuffled.length === 0) return;
+
+            const track = musicShuffled[musicCurrentIndex];
+            console.log('Playing track:', track.name);
+            musicTrackName.textContent = track.name;
+
+            musicAudio.src = track.url;
+            musicAudio.play().catch(err => {
+                console.error('Music play error:', err);
+            });
+
+            // Move to next track, loop if exhausted
+            musicCurrentIndex = (musicCurrentIndex + 1) % musicShuffled.length;
+
+            // Reshuffle when we've played all tracks
+            if (musicCurrentIndex === 0 && musicPlaying) {
+                musicShuffled = shuffleArray(musicPlaylist);
+            }
+        }
+
+        // Handle track ended - play next
+        musicAudio.addEventListener('ended', () => {
+            if (musicPlaying) {
+                playNextTrack();
+            }
+        });
+
+        // Fade out and stop music (used when timer expires)
+        function fadeOutAndStop() {
+            console.log('Fading out music...');
+            const fadeInterval = 50; // ms between volume steps
+            const fadeDuration = 2000; // total fade duration in ms
+            const steps = fadeDuration / fadeInterval;
+            const volumeStep = musicAudio.volume / steps;
+
+            // Clear the main timer first
+            if (musicTimer) {
+                clearInterval(musicTimer);
+                musicTimer = null;
+            }
+
+            const fadeTimer = setInterval(() => {
+                if (musicAudio.volume > volumeStep) {
+                    musicAudio.volume -= volumeStep;
+                } else {
+                    clearInterval(fadeTimer);
+                    musicAudio.volume = 0;
+                    stopMusic(true); // Always broadcast when timer expires
+                }
+            }, fadeInterval);
+        }
+
+        // Stop music playback
+        function stopMusic(broadcast = true) {
+            console.log('Stopping music');
+            musicPlaying = false;
+            musicAudio.pause();
+            musicAudio.src = '';
+            musicAudio.volume = 1.0; // Reset volume for next playback
+
+            if (musicTimer) {
+                clearInterval(musicTimer);
+                musicTimer = null;
+            }
+
+            if (musicStatusInterval) {
+                clearInterval(musicStatusInterval);
+                musicStatusInterval = null;
+            }
+
+            musicIndicator.classList.remove('active');
+            musicTimerRemaining = 0;
+
+            if (broadcast) {
+                broadcastMusicStatus();
+            }
+        }
+
+        // Update timer display
+        function updateMusicTimerDisplay() {
+            const mins = Math.floor(musicTimerRemaining / 60);
+            const secs = musicTimerRemaining % 60;
+            musicTimerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')} remaining`;
+        }
+
+        // Broadcast music status to receivers
+        function broadcastMusicStatus() {
+            if (!sseConnected) return;
+
+            const currentTrack = musicPlaying && musicShuffled.length > 0
+                ? musicShuffled[(musicCurrentIndex - 1 + musicShuffled.length) % musicShuffled.length].name
+                : '';
+
+            sendSignal({
+                type: 'music-status',
+                playing: musicPlaying,
+                currentTrack: currentTrack,
+                timerRemaining: musicTimerRemaining
+            });
+        }
+
+        // Fetch playlist on load
+        fetchMusicPlaylist();
+
         // Public STUN servers (only used for IP discovery, no media passes through)
         const rtcConfig = {
             iceServers: [
@@ -354,6 +546,16 @@
                         console.log('Received PTT stop from parent');
                         pttActive = false;
                         hidePTTIndicator();
+                        break;
+
+                    case 'music-start':
+                        console.log('Received music start:', message.timerMinutes, 'minutes');
+                        startMusic(message.timerMinutes);
+                        break;
+
+                    case 'music-stop':
+                        console.log('Received music stop');
+                        stopMusic(true);
                         break;
 
                     case 'heartbeat':

@@ -19,6 +19,7 @@ A real-time baby monitor web application for streaming audio and video between t
 - **Volume control** - Adjust playback volume on receiver (settings persist)
 - **Fullscreen mode** - Immersive viewing on receiver
 - **Auto-reconnect** - Automatically reconnects when connection is lost
+- **Lullaby playback** - Play music on baby's phone with configurable sleep timer
 - **No WebSocket required** - Uses Server-Sent Events (SSE) for signaling, works with simple hosting
 
 ## Requirements
@@ -175,6 +176,7 @@ Require valid-user
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PORT` | Server port | `3000` |
+| `ENABLE_DEBUG_TIMER` | Show 1-minute timer option for testing | `false` |
 
 ## Project Structure
 
@@ -184,6 +186,7 @@ baby-monitor/
 ├── package.json           # Project dependencies (Express only)
 ├── CLAUDE.md              # AI assistant context file
 ├── README.md              # This file
+├── mp3/                   # Lullaby MP3 files (add your own)
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml     # GitHub Actions FTPS deployment
@@ -205,6 +208,7 @@ baby-monitor/
 | Disconnected | Red/black flashing overlay: "CONNECTION LOST" |
 | Loud sound | Red/black flashing overlay: "LOUD SOUND DETECTED" |
 | Audio meter | Bar with white threshold marker showing current level |
+| Music playing | Track name and time remaining under music button |
 
 ### Sender (Baby's Phone)
 
@@ -215,6 +219,7 @@ baby-monitor/
 | Streaming | Camera preview visible |
 | Screen saving | Black overlay after 5s (tap to wake) |
 | Parent talking | Blue pulsing indicator: "🔊 Parent is speaking..." |
+| Music playing | Purple pulsing indicator: "🎵 [track name]" with timer |
 
 ## Controls
 
@@ -223,6 +228,8 @@ baby-monitor/
 | Control | Function |
 |---------|----------|
 | 🎤 Button | Hold to talk to baby (Push-to-Talk) |
+| 🎵 Button | Toggle lullaby playback on baby's phone |
+| Timer dropdown | Select sleep timer duration (45 min, 1 hour) |
 | Volume slider | Adjust playback volume (saved to localStorage) |
 | Sensitivity slider | Adjust loud sound threshold (saved to localStorage) |
 | ⛶ Fullscreen | Toggle fullscreen mode |
@@ -259,6 +266,14 @@ baby-monitor/
 2. Receiver adds audio track and renegotiates connection
 3. Sender receives audio and plays through speaker
 4. Parent releases button, track is removed
+
+### Lullaby Playback
+
+1. Add MP3 files to the `mp3/` folder on the server
+2. Parent taps 🎵 button and selects timer duration
+3. Sender shuffles playlist and plays through speaker
+4. Music stops automatically when timer expires
+5. Parent can stop manually by tapping the stop button
 
 ## Privacy & Security
 
@@ -335,6 +350,7 @@ baby-monitor/
 | `/api/sse/sender` | GET | SSE endpoint for sender |
 | `/api/sse/receiver` | GET | SSE endpoint for receivers |
 | `/api/signal` | POST | Signaling (offers, answers, ICE candidates) |
+| `/api/music` | GET | List available MP3 files and debug timer setting |
 
 ## License
 

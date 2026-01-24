@@ -1,5 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
+
+const ENABLE_DEBUG_TIMER = process.env.ENABLE_DEBUG_TIMER === 'true';
 
 const app = express();
 
@@ -8,6 +12,7 @@ app.use(express.json());
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/mp3', express.static(path.join(__dirname, 'mp3')));
 
 // Track connected clients using SSE
 let sender = null;
@@ -192,6 +197,27 @@ app.post('/api/signal', (req, res) => {
             sendToSender({ type: 'ptt-stop' });
             break;
 
+        case 'music-start':
+            if (hasSender()) {
+                sendToSender({ type: 'music-start', timerMinutes: message.timerMinutes });
+            }
+            break;
+
+        case 'music-stop':
+            if (hasSender()) {
+                sendToSender({ type: 'music-stop' });
+            }
+            break;
+
+        case 'music-status':
+            broadcastToReceivers({
+                type: 'music-status',
+                playing: message.playing,
+                currentTrack: message.currentTrack,
+                timerRemaining: message.timerRemaining
+            });
+            break;
+
         case 'ice-candidate':
             // Forward ICE candidates
             if (message.role === 'sender') {
@@ -206,6 +232,25 @@ app.post('/api/signal', (req, res) => {
     }
 
     res.json({ success: true });
+});
+
+// Music API endpoint
+app.get('/api/music', (req, res) => {
+    const mp3Dir = path.join(__dirname, 'mp3');
+    try {
+        if (!fs.existsSync(mp3Dir)) {
+            return res.json({ files: [], debugTimer: ENABLE_DEBUG_TIMER });
+        }
+        const files = fs.readdirSync(mp3Dir)
+            .filter(file => file.toLowerCase().endsWith('.mp3'))
+            .map(file => ({
+                name: file.replace(/\.mp3$/i, ''),
+                url: `/mp3/${encodeURIComponent(file)}`
+            }));
+        res.json({ files, debugTimer: ENABLE_DEBUG_TIMER });
+    } catch (err) {
+        res.json({ files: [], debugTimer: ENABLE_DEBUG_TIMER });
+    }
 });
 
 // Routes

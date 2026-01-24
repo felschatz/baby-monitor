@@ -1,2 +1,4 @@
 node_modules/
 .claude/
+mp3/
+.env

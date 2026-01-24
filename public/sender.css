@@ -195,6 +195,47 @@ body.disconnected {
     }
 }
 
+/* Music indicator */
+.music-indicator {
+    position: fixed;
+    top: 60%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(156, 39, 176, 0.9);
+    color: white;
+    padding: 20px 30px;
+    border-radius: 15px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    z-index: 99;
+    display: none;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(156, 39, 176, 0.5);
+}
+
+.music-indicator.active {
+    display: block;
+    animation: musicPulse 2s ease-in-out infinite;
+}
+
+.music-indicator .music-timer {
+    font-size: 0.9rem;
+    margin-top: 8px;
+    font-weight: normal;
+    opacity: 0.9;
+}
+
+@keyframes musicPulse {
+    0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        box-shadow: 0 0 30px rgba(156, 39, 176, 0.5);
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.02);
+        box-shadow: 0 0 40px rgba(156, 39, 176, 0.7);
+    }
+}
+
 .audio-enable-hint {
     position: fixed;
     bottom: 100px;

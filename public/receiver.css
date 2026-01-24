@@ -269,3 +269,76 @@ body.connected {
     margin-top: 8px;
     opacity: 0.8;
 }
+
+/* Music controls */
+.music-container {
+    text-align: center;
+    padding: 10px;
+    background: rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 10001;
+}
+
+.music-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
+
+.music-btn {
+    background: linear-gradient(135deg, #9c27b0, #7b1fa2);
+    border: none;
+    color: white;
+    padding: 15px;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s, box-shadow 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.music-btn:active, .music-btn.active {
+    background: linear-gradient(135deg, #f44336, #d32f2f);
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(244, 67, 54, 0.5);
+}
+
+.music-timer-select {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.music-timer-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.music-timer-select option {
+    background: #333;
+    color: white;
+}
+
+.music-label {
+    font-size: 0.8rem;
+    margin-top: 8px;
+    opacity: 0.8;
+}
+
+.music-status {
+    font-size: 0.75rem;
+    margin-top: 5px;
+    color: #ce93d8;
+    min-height: 1em;
+}

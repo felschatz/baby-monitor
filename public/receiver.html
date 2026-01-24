@@ -36,6 +36,18 @@
         <div class="ptt-label" id="pttLabel">Hold to talk to baby</div>
     </div>
 
+    <div class="music-container" id="musicContainer" style="display: none;">
+        <div class="music-controls">
+            <button class="music-btn" id="musicBtn">🎵</button>
+            <select class="music-timer-select" id="musicTimerSelect">
+                <option value="45">45 min</option>
+                <option value="60">1 hour</option>
+            </select>
+        </div>
+        <div class="music-label" id="musicLabel">Play lullabies</div>
+        <div class="music-status" id="musicStatus"></div>
+    </div>
+
     <div class="controls">
         <div class="audio-meter">
             <div class="audio-level" id="audioLevel"></div>
@@ -123,6 +135,91 @@
         const sensitivityValue = document.getElementById('sensitivityValue');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
         const info = document.getElementById('info');
+
+        // Music controls
+        const musicContainer = document.getElementById('musicContainer');
+        const musicBtn = document.getElementById('musicBtn');
+        const musicTimerSelect = document.getElementById('musicTimerSelect');
+        const musicLabel = document.getElementById('musicLabel');
+        const musicStatus = document.getElementById('musicStatus');
+        let musicPlaying = false;
+        let musicAvailable = false;
+
+        // Check music availability
+        async function checkMusicAvailability() {
+            try {
+                const response = await fetch('/api/music');
+                const data = await response.json();
+
+                // Add debug timer option if enabled
+                if (data.debugTimer) {
+                    const debugOption = document.createElement('option');
+                    debugOption.value = '1';
+                    debugOption.textContent = '1 min (debug)';
+                    musicTimerSelect.insertBefore(debugOption, musicTimerSelect.firstChild);
+                }
+
+                if (data.files && data.files.length > 0) {
+                    musicAvailable = true;
+                    musicContainer.style.display = 'block';
+                    console.log('Music available:', data.files.length, 'tracks');
+                } else {
+                    musicContainer.style.display = 'none';
+                    console.log('No music files available');
+                }
+            } catch (err) {
+                console.error('Failed to check music availability:', err);
+                musicContainer.style.display = 'none';
+            }
+        }
+
+        // Toggle music playback
+        function toggleMusic() {
+            if (!musicAvailable) return;
+
+            if (musicPlaying) {
+                // Stop music
+                sendSignal({ type: 'music-stop' });
+            } else {
+                // Start music
+                const timerMinutes = parseInt(musicTimerSelect.value);
+                sendSignal({ type: 'music-start', timerMinutes: timerMinutes });
+            }
+        }
+
+        // Update music UI based on status
+        function updateMusicUI() {
+            if (musicPlaying) {
+                musicBtn.textContent = '⏹️';
+                musicBtn.classList.add('active');
+                musicLabel.textContent = 'Stop music';
+                musicTimerSelect.disabled = true;
+            } else {
+                musicBtn.textContent = '🎵';
+                musicBtn.classList.remove('active');
+                musicLabel.textContent = 'Play lullabies';
+                musicTimerSelect.disabled = false;
+                musicStatus.textContent = '';
+            }
+        }
+
+        // Handle music status updates from sender
+        function handleMusicStatus(message) {
+            musicPlaying = message.playing;
+            updateMusicUI();
+
+            if (message.playing && message.currentTrack) {
+                const mins = Math.floor(message.timerRemaining / 60);
+                const secs = message.timerRemaining % 60;
+                musicStatus.textContent = `♪ ${message.currentTrack} • ${mins}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
+
+        // Music button click handler
+        musicBtn.addEventListener('click', toggleMusic);
+
+        // Check music availability on load
+        checkMusicAvailability();
 
         // Load saved settings from localStorage
         const savedVolume = localStorage.getItem('receiver-volume');
@@ -297,6 +394,11 @@
                                 console.error('PTT answer error:', err);
                             }
                         }
+                        break;
+
+                    case 'music-status':
+                        console.log('Received music status:', message);
+                        handleMusicStatus(message);
                         break;
 
                     case 'heartbeat':
