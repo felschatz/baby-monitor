@@ -46,3 +46,7 @@ Real-time baby monitor web app using WebRTC for peer-to-peer streaming between t
 4. Test on mobile browsers (Chrome Android recommended)
 5. HTTPS required for camera/mic in production
 6. CSS is in separate files, not inline
+7. **Update documentation on significant changes:**
+   - `CLAUDE.md` - Update for dev context changes
+   - `.github/copilot-instructions.md` - Keep in sync with CLAUDE.md
+   - `README.md` - Update for user-facing feature changes
