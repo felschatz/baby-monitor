@@ -59,6 +59,22 @@ body.connected {
     animation: disconnectBlink 0.5s infinite;
 }
 
+.soft-alert {
+    background: rgba(255, 152, 0, 0.85);
+    color: white;
+    font-size: 1.5rem;
+    animation: softPulse 1s ease-in-out infinite;
+}
+
+@keyframes softPulse {
+    0%, 100% {
+        background: rgba(255, 152, 0, 0.85);
+    }
+    50% {
+        background: rgba(255, 193, 7, 0.9);
+    }
+}
+
 @keyframes loudBlink {
     0%, 50% {
         background: rgba(255, 0, 0, 0.9);

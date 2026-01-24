@@ -11,6 +11,9 @@
     <div class="alert-overlay loud-alert" id="loudAlert">
         LOUD SOUND DETECTED
     </div>
+    <div class="alert-overlay soft-alert" id="softAlert">
+        Check on baby?
+    </div>
     <div class="alert-overlay disconnect-alert" id="disconnectAlert">
         CONNECTION LOST
     </div>
@@ -111,6 +114,7 @@
         let receiverId = null;
 
         const loudAlert = document.getElementById('loudAlert');
+        const softAlert = document.getElementById('softAlert');
         const disconnectAlert = document.getElementById('disconnectAlert');
         const pttBtn = document.getElementById('pttBtn');
         const pttLabel = document.getElementById('pttLabel');
@@ -301,11 +305,15 @@
             disconnectAlert.classList.add('active');
         }
 
-        function triggerLoudSoundAlert() {
+        function triggerLoudSoundAlert(isSoft = false) {
             if (!isConnected || loudSoundCooldown) return;
 
-            // Show loud sound overlay
-            loudAlert.classList.add('active');
+            // Show appropriate alert overlay
+            if (isSoft) {
+                softAlert.classList.add('active');
+            } else {
+                loudAlert.classList.add('active');
+            }
 
             // Set cooldown to prevent constant re-triggering
             loudSoundCooldown = true;
@@ -313,11 +321,12 @@
             clearTimeout(loudSoundTimeout);
             loudSoundTimeout = setTimeout(() => {
                 loudAlert.classList.remove('active');
+                softAlert.classList.remove('active');
                 // Cooldown period after alert hides
                 setTimeout(() => {
                     loudSoundCooldown = false;
                 }, 2000); // 2 second cooldown before next alert
-            }, 1000); // Show alert for 1 second
+            }, isSoft ? 2000 : 1000); // Soft alert shows longer
         }
 
         function connectSSE() {
@@ -636,10 +645,26 @@
                     // Check for loud sounds based on sensitivity
                     // Sensitivity 10 = threshold 90 (hard to trigger)
                     // Sensitivity 100 = threshold 0 (very easy to trigger)
-                    const threshold = 100 - parseInt(sensitivitySlider.value);
-                    if (percentage > threshold && isConnected) {
-                        console.log('Loud sound detected! Level:', percentage.toFixed(1), 'Threshold:', threshold);
-                        triggerLoudSoundAlert();
+                    const baseThreshold = 100 - parseInt(sensitivitySlider.value);
+
+                    if (musicPlaying) {
+                        // Two-tier alerts during music playback
+                        const softThreshold = Math.min(95, baseThreshold + 20); // Soft alert
+                        const loudThreshold = Math.min(95, baseThreshold + 40); // Full alert (much louder)
+
+                        if (percentage > loudThreshold && isConnected) {
+                            console.log('Very loud sound during music! Level:', percentage.toFixed(1), 'Threshold:', loudThreshold);
+                            triggerLoudSoundAlert(false); // Full alert
+                        } else if (percentage > softThreshold && isConnected) {
+                            console.log('Loud sound during music. Level:', percentage.toFixed(1), 'Threshold:', softThreshold);
+                            triggerLoudSoundAlert(true); // Soft alert
+                        }
+                    } else {
+                        // Normal alert without music
+                        if (percentage > baseThreshold && isConnected) {
+                            console.log('Loud sound detected! Level:', percentage.toFixed(1), 'Threshold:', baseThreshold);
+                            triggerLoudSoundAlert(false);
+                        }
                     }
 
                     requestAnimationFrame(updateAudioLevel);
