@@ -152,6 +152,8 @@
             flex-direction: column;
             gap: 10px;
             background: rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 10000; /* Above alert overlays */
         }
 
         .audio-meter {
@@ -303,6 +305,7 @@
         let analyser = null;
         let isConnected = false;
         let loudSoundTimeout = null;
+        let loudSoundCooldown = false;
         let pendingCandidates = [];
 
         const loudAlert = document.getElementById('loudAlert');
@@ -362,15 +365,22 @@
         }
 
         function triggerLoudSoundAlert() {
-            if (!isConnected) return;
+            if (!isConnected || loudSoundCooldown) return;
 
             // Show loud sound overlay
             loudAlert.classList.add('active');
 
+            // Set cooldown to prevent constant re-triggering
+            loudSoundCooldown = true;
+
             clearTimeout(loudSoundTimeout);
             loudSoundTimeout = setTimeout(() => {
                 loudAlert.classList.remove('active');
-            }, 1000); // Show for 1 second
+                // Cooldown period after alert hides
+                setTimeout(() => {
+                    loudSoundCooldown = false;
+                }, 2000); // 2 second cooldown before next alert
+            }, 1000); // Show alert for 1 second
         }
 
         function connectWebSocket() {
