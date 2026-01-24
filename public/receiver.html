@@ -26,22 +26,55 @@
             background: #1b5e20;
         }
 
-        body.disconnected {
+        /* Alert overlays */
+        .alert-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .alert-overlay.active {
+            display: flex;
+        }
+
+        .loud-alert {
+            animation: loudBlink 0.3s infinite;
+        }
+
+        .disconnect-alert {
             animation: disconnectBlink 0.5s infinite;
         }
 
-        body.loud-sound {
-            animation: loudBlink 0.2s infinite;
+        @keyframes loudBlink {
+            0%, 50% {
+                background: rgba(255, 0, 0, 0.9);
+                color: white;
+            }
+            51%, 100% {
+                background: rgba(0, 0, 0, 0.9);
+                color: white;
+            }
         }
 
         @keyframes disconnectBlink {
-            0%, 50% { background: #b71c1c; }
-            51%, 100% { background: #000; }
-        }
-
-        @keyframes loudBlink {
-            0%, 50% { background: #fff; }
-            51%, 100% { background: #000; }
+            0%, 50% {
+                background: rgba(180, 0, 0, 1);
+                color: white;
+            }
+            51%, 100% {
+                background: rgba(0, 0, 0, 1);
+                color: red;
+            }
         }
 
         .header {
@@ -126,6 +159,7 @@
             background: #333;
             border-radius: 8px;
             overflow: hidden;
+            position: relative;
         }
 
         .audio-level {
@@ -133,6 +167,16 @@
             background: linear-gradient(90deg, #4caf50, #ffeb3b, #f44336);
             width: 0%;
             transition: width 0.05s;
+        }
+
+        .threshold-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: white;
+            opacity: 0.8;
+            transition: left 0.2s;
         }
 
         .info-row {
@@ -180,6 +224,14 @@
     </style>
 </head>
 <body>
+    <!-- Alert overlays -->
+    <div class="alert-overlay loud-alert" id="loudAlert">
+        LOUD SOUND DETECTED
+    </div>
+    <div class="alert-overlay disconnect-alert" id="disconnectAlert">
+        CONNECTION LOST
+    </div>
+
     <div class="header">
         <a href="/" class="back-link">←</a>
         <h2>Parent's Phone</h2>
@@ -199,6 +251,7 @@
     <div class="controls">
         <div class="audio-meter">
             <div class="audio-level" id="audioLevel"></div>
+            <div class="threshold-marker" id="thresholdMarker"></div>
         </div>
 
         <div class="info-row">
@@ -252,6 +305,9 @@
         let loudSoundTimeout = null;
         let pendingCandidates = [];
 
+        const loudAlert = document.getElementById('loudAlert');
+        const disconnectAlert = document.getElementById('disconnectAlert');
+
         const remoteVideo = document.getElementById('remoteVideo');
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
@@ -279,10 +335,11 @@
             isConnected = connected;
             if (connected) {
                 document.body.classList.add('connected');
-                document.body.classList.remove('disconnected');
                 statusDot.classList.add('connected');
                 statusText.textContent = 'Connected';
                 overlay.classList.add('hidden');
+                // Hide disconnect alert when reconnected
+                disconnectAlert.classList.remove('active');
             } else {
                 document.body.classList.remove('connected');
                 statusDot.classList.remove('connected');
@@ -293,28 +350,27 @@
 
         function setDisconnectedState() {
             isConnected = false;
-            document.body.classList.add('disconnected');
             document.body.classList.remove('connected');
-            document.body.classList.remove('loud-sound');
             statusDot.classList.remove('connected');
             statusText.textContent = 'Disconnected!';
             overlay.classList.remove('hidden');
             overlayText.textContent = 'Connection lost! Reconnecting...';
+
+            // Show disconnect alert overlay
+            loudAlert.classList.remove('active');
+            disconnectAlert.classList.add('active');
         }
 
         function triggerLoudSoundAlert() {
             if (!isConnected) return;
 
-            document.body.classList.add('loud-sound');
-            document.body.classList.remove('connected');
+            // Show loud sound overlay
+            loudAlert.classList.add('active');
 
             clearTimeout(loudSoundTimeout);
             loudSoundTimeout = setTimeout(() => {
-                document.body.classList.remove('loud-sound');
-                if (isConnected) {
-                    document.body.classList.add('connected');
-                }
-            }, 500);
+                loudAlert.classList.remove('active');
+            }, 1000); // Show for 1 second
         }
 
         function connectWebSocket() {
@@ -527,30 +583,61 @@
                 audioContext = null;
                 analyser = null;
             }
+            audioStream = null;
         }
 
+        let audioStream = null;
+
         function setupAudioAnalysis(stream) {
+            audioStream = stream;
+            tryStartAudioAnalysis();
+        }
+
+        async function tryStartAudioAnalysis() {
+            if (!audioStream) return;
+
             try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                // Create or resume AudioContext
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
+                // Resume if suspended (browser autoplay policy)
+                if (audioContext.state === 'suspended') {
+                    console.log('AudioContext suspended, will resume on user interaction');
+                    return;
+                }
+
                 analyser = audioContext.createAnalyser();
-                const source = audioContext.createMediaStreamSource(stream);
+                const source = audioContext.createMediaStreamSource(audioStream);
                 source.connect(analyser);
                 analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.3;
 
                 const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                console.log('Audio analysis started');
 
                 function updateAudioLevel() {
                     if (!analyser) return;
 
                     analyser.getByteFrequencyData(dataArray);
-                    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-                    const percentage = Math.min(100, (average / 128) * 100);
+
+                    // Calculate RMS (root mean square) for better loudness detection
+                    let sum = 0;
+                    for (let i = 0; i < dataArray.length; i++) {
+                        sum += dataArray[i] * dataArray[i];
+                    }
+                    const rms = Math.sqrt(sum / dataArray.length);
+                    const percentage = Math.min(100, (rms / 128) * 100);
 
                     audioLevel.style.width = percentage + '%';
 
                     // Check for loud sounds based on sensitivity
+                    // Sensitivity 10 = threshold 90 (hard to trigger)
+                    // Sensitivity 100 = threshold 0 (very easy to trigger)
                     const threshold = 100 - parseInt(sensitivitySlider.value);
-                    if (percentage > threshold) {
+                    if (percentage > threshold && isConnected) {
+                        console.log('Loud sound detected! Level:', percentage.toFixed(1), 'Threshold:', threshold);
                         triggerLoudSoundAlert();
                     }
 
@@ -563,6 +650,23 @@
             }
         }
 
+        // Resume AudioContext on any user interaction
+        document.addEventListener('click', async () => {
+            if (audioContext && audioContext.state === 'suspended') {
+                await audioContext.resume();
+                console.log('AudioContext resumed');
+                tryStartAudioAnalysis();
+            }
+        }, { once: false });
+
+        document.addEventListener('touchstart', async () => {
+            if (audioContext && audioContext.state === 'suspended') {
+                await audioContext.resume();
+                console.log('AudioContext resumed');
+                tryStartAudioAnalysis();
+            }
+        }, { once: false });
+
         // Volume control
         volumeSlider.addEventListener('input', () => {
             const value = volumeSlider.value / 100;
@@ -573,9 +677,18 @@
         });
 
         // Sensitivity control
-        sensitivitySlider.addEventListener('input', () => {
+        const thresholdMarker = document.getElementById('thresholdMarker');
+
+        function updateThresholdMarker() {
+            // threshold = 100 - sensitivity
+            // so marker position should be at (100 - sensitivity)%
+            const threshold = 100 - parseInt(sensitivitySlider.value);
+            thresholdMarker.style.left = threshold + '%';
             sensitivityValue.textContent = sensitivitySlider.value;
-        });
+        }
+
+        sensitivitySlider.addEventListener('input', updateThresholdMarker);
+        updateThresholdMarker(); // Set initial position
 
         // Fullscreen
         fullscreenBtn.addEventListener('click', () => {
