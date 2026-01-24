@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Baby Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 20px 40px;
+            margin: 15px 0;
+            font-size: 1.3rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+        }
+
+        .btn-sender {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .btn-receiver {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .icon {
+            font-size: 2rem;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .status {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            color: white;
+        }
+
+        .instructions {
+            margin-top: 30px;
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Baby Monitor</h1>
+        <p class="subtitle">Real-time audio & video streaming</p>
+
+        <a href="/sender" class="btn btn-sender">
+            <span class="icon">📹</span>
+            Baby's Phone (Sender)
+        </a>
+
+        <a href="/receiver" class="btn btn-receiver">
+            <span class="icon">👶</span>
+            Parent's Phone (Receiver)
+        </a>
+
+        <div class="status" id="status">
+            Checking status...
+        </div>
+
+        <div class="instructions">
+            <p><strong>Instructions:</strong></p>
+            <p>1. Open "Sender" on the phone near the baby</p>
+            <p>2. Open "Receiver" on your phone</p>
+            <p>3. Start streaming and monitor your baby</p>
+        </div>
+    </div>
+
+    <script>
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                const statusEl = document.getElementById('status');
+
+                if (data.senderActive) {
+                    statusEl.innerHTML = `<strong>Stream Active</strong><br>Sender: Online | Receivers: ${data.receiverCount}`;
+                    statusEl.style.background = 'rgba(76, 175, 80, 0.5)';
+                } else {
+                    statusEl.innerHTML = '<strong>No Active Stream</strong><br>Start by opening the Sender page';
+                    statusEl.style.background = 'rgba(255,255,255,0.2)';
+                }
+            } catch (err) {
+                document.getElementById('status').innerHTML = 'Unable to check status';
+            }
+        }
+
+        checkStatus();
+        setInterval(checkStatus, 5000);
+    </script>
+</body>
+</html>

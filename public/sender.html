@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Baby Monitor - Sender</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a2e;
+            color: white;
+            overflow: hidden;
+            transition: background-color 0.1s;
+        }
+
+        body.connected {
+            background: #1b5e20;
+        }
+
+        body.disconnected {
+            animation: disconnectBlink 0.5s infinite;
+        }
+
+        @keyframes disconnectBlink {
+            0%, 50% { background: #b71c1c; }
+            51%, 100% { background: #000; }
+        }
+
+        .header {
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #f44336;
+        }
+
+        .status-dot.connected {
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .video-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            position: relative;
+        }
+
+        #localVideo {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 10px;
+            background: #000;
+        }
+
+        .controls {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: rgba(0,0,0,0.3);
+        }
+
+        .btn {
+            padding: 18px 30px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #4caf50, #2e7d32);
+            color: white;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #f44336, #c62828);
+            color: white;
+        }
+
+        .options {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .option input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+        }
+
+        .info {
+            text-align: center;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .back-link {
+            color: white;
+            text-decoration: none;
+            font-size: 1.5rem;
+        }
+
+        .audio-meter {
+            height: 10px;
+            background: #333;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .audio-level {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #ffeb3b, #f44336);
+            width: 0%;
+            transition: width 0.1s;
+        }
+
+        /* Screen dimming overlay */
+        .screen-off-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000;
+            z-index: 9999;
+            display: none;
+            cursor: pointer;
+        }
+
+        .screen-off-overlay.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .screen-off-overlay .tap-hint {
+            color: rgba(255,255,255,0.3);
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        /* Dimming countdown indicator */
+        .dim-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .dim-indicator.visible {
+            opacity: 1;
+        }
+
+        .dim-indicator .countdown-bar {
+            height: 3px;
+            background: #4caf50;
+            margin-top: 8px;
+            border-radius: 2px;
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+<body>
+    <!-- Screen off overlay -->
+    <div class="screen-off-overlay" id="screenOffOverlay">
+        <div class="tap-hint">Tap to wake</div>
+    </div>
+
+    <!-- Dim countdown indicator -->
+    <div class="dim-indicator" id="dimIndicator">
+        Screen dimming soon...
+        <div class="countdown-bar" id="countdownBar"></div>
+    </div>
+
+    <div class="header">
+        <a href="/" class="back-link">←</a>
+        <h2>Baby's Phone</h2>
+        <div class="status-indicator">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Disconnected</span>
+        </div>
+    </div>
+
+    <div class="video-container">
+        <video id="localVideo" autoplay muted playsinline></video>
+    </div>
+
+    <div class="controls">
+        <div class="options">
+            <label class="option">
+                <input type="checkbox" id="enableVideo" checked>
+                <span>Video</span>
+            </label>
+            <label class="option">
+                <input type="checkbox" id="enableAudio" checked>
+                <span>Audio</span>
+            </label>
+        </div>
+
+        <div class="audio-meter">
+            <div class="audio-level" id="audioLevel"></div>
+        </div>
+
+        <button class="btn btn-start" id="startBtn">Start Streaming</button>
+        <button class="btn btn-stop" id="stopBtn" style="display: none;">Stop Streaming</button>
+
+        <div class="info" id="info">
+            Click "Start Streaming" to begin broadcasting
+        </div>
+    </div>
+
+    <script>
+        // Keep screen awake
+        let wakeLock = null;
+
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake lock acquired');
+                }
+            } catch (err) {
+                console.log('Wake lock failed:', err);
+            }
+        }
+
+        // Re-acquire wake lock when page becomes visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        });
+
+        requestWakeLock();
+
+        // WebSocket and WebRTC
+        let ws = null;
+        let localStream = null;
+        let peerConnection = null;
+        let audioContext = null;
+        let analyser = null;
+
+        const localVideo = document.getElementById('localVideo');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const info = document.getElementById('info');
+        const audioLevel = document.getElementById('audioLevel');
+        const enableVideo = document.getElementById('enableVideo');
+        const enableAudio = document.getElementById('enableAudio');
+
+        const rtcConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        function setConnectedState(connected) {
+            if (connected) {
+                document.body.classList.add('connected');
+                document.body.classList.remove('disconnected');
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+            } else {
+                document.body.classList.remove('connected');
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
+        function setDisconnectedState() {
+            document.body.classList.add('disconnected');
+            document.body.classList.remove('connected');
+            statusDot.classList.remove('connected');
+            statusText.textContent = 'Disconnected!';
+        }
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                ws.send(JSON.stringify({ type: 'register-sender' }));
+            };
+
+            ws.onmessage = async (event) => {
+                const message = JSON.parse(event.data);
+                console.log('Sender received:', message.type);
+
+                switch (message.type) {
+                    case 'registered':
+                        console.log('Registered as sender');
+                        info.textContent = 'Connected to server. Ready to stream.';
+                        break;
+
+                    case 'error':
+                        alert(message.message);
+                        window.location.href = '/';
+                        break;
+
+                    case 'request-offer':
+                        console.log('Receiver requesting offer');
+                        if (localStream) {
+                            await createOffer();
+                        } else {
+                            console.log('No local stream yet');
+                        }
+                        break;
+
+                    case 'answer':
+                        console.log('Received answer');
+                        if (peerConnection && peerConnection.signalingState === 'have-local-offer') {
+                            try {
+                                await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
+                                console.log('Remote description set');
+                            } catch (err) {
+                                console.error('Error setting remote description:', err);
+                            }
+                        }
+                        break;
+
+                    case 'ice-candidate':
+                        if (peerConnection && message.candidate) {
+                            try {
+                                await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+                            } catch (err) {
+                                console.error('Error adding ICE candidate:', err);
+                            }
+                        }
+                        break;
+
+                    case 'no-receivers':
+                        info.textContent = 'No receivers connected. Waiting...';
+                        break;
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                setDisconnectedState();
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+            };
+
+            // Keep alive
+            setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 30000);
+        }
+
+        async function startStreaming() {
+            try {
+                const constraints = {
+                    video: enableVideo.checked ? {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } : false,
+                    audio: enableAudio.checked ? {
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    } : false
+                };
+
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                localVideo.srcObject = localStream;
+
+                // Setup audio analysis
+                if (enableAudio.checked) {
+                    setupAudioAnalysis(localStream);
+                }
+
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'block';
+                enableVideo.disabled = true;
+                enableAudio.disabled = true;
+
+                info.textContent = 'Streaming... Waiting for receivers.';
+                setConnectedState(true);
+
+                // Create offer for any existing receivers
+                await createOffer();
+
+            } catch (err) {
+                console.error('Error starting stream:', err);
+                alert('Failed to access camera/microphone: ' + err.message);
+            }
+        }
+
+        async function createOffer() {
+            // Close existing connection if any
+            if (peerConnection) {
+                peerConnection.close();
+            }
+
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            console.log('Created new peer connection');
+
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+                console.log('Added track:', track.kind);
+            });
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                    console.log('Sending ICE candidate');
+                    ws.send(JSON.stringify({
+                        type: 'ice-candidate',
+                        candidate: event.candidate
+                    }));
+                }
+            };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('ICE connection state:', peerConnection.iceConnectionState);
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                console.log('Connection state:', peerConnection.connectionState);
+                if (peerConnection.connectionState === 'connected') {
+                    setConnectedState(true);
+                    info.textContent = 'Connected to receiver!';
+                } else if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
+                    info.textContent = 'Receiver disconnected. Waiting...';
+                }
+            };
+
+            try {
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                console.log('Created and set local offer');
+
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'offer',
+                        offer: peerConnection.localDescription
+                    }));
+                    console.log('Sent offer to server');
+                }
+            } catch (err) {
+                console.error('Error creating offer:', err);
+            }
+        }
+
+        function stopStreaming() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+
+            localVideo.srcObject = null;
+
+            startBtn.style.display = 'block';
+            stopBtn.style.display = 'none';
+            enableVideo.disabled = false;
+            enableAudio.disabled = false;
+
+            setConnectedState(false);
+            info.textContent = 'Streaming stopped.';
+        }
+
+        function setupAudioAnalysis(stream) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            analyser.fftSize = 256;
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            function updateAudioLevel() {
+                if (!analyser) return;
+
+                analyser.getByteFrequencyData(dataArray);
+                const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                const percentage = Math.min(100, (average / 128) * 100);
+
+                audioLevel.style.width = percentage + '%';
+
+                requestAnimationFrame(updateAudioLevel);
+            }
+
+            updateAudioLevel();
+        }
+
+        startBtn.addEventListener('click', startStreaming);
+        stopBtn.addEventListener('click', stopStreaming);
+
+        // Initialize
+        connectWebSocket();
+    </script>
+</body>
+</html>

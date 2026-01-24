@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Baby Monitor - Receiver</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a2e;
+            color: white;
+            overflow: hidden;
+            transition: background-color 0.1s;
+        }
+
+        body.connected {
+            background: #1b5e20;
+        }
+
+        body.disconnected {
+            animation: disconnectBlink 0.5s infinite;
+        }
+
+        body.loud-sound {
+            animation: loudBlink 0.2s infinite;
+        }
+
+        @keyframes disconnectBlink {
+            0%, 50% { background: #b71c1c; }
+            51%, 100% { background: #000; }
+        }
+
+        @keyframes loudBlink {
+            0%, 50% { background: #fff; }
+            51%, 100% { background: #000; }
+        }
+
+        .header {
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #f44336;
+        }
+
+        .status-dot.connected {
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .video-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            position: relative;
+        }
+
+        #remoteVideo {
+            max-width: 100%;
+            max-height: 100%;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 15px;
+        }
+
+        .overlay.hidden {
+            display: none;
+        }
+
+        .controls {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(0,0,0,0.3);
+        }
+
+        .audio-meter {
+            height: 15px;
+            background: #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .audio-level {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #ffeb3b, #f44336);
+            width: 0%;
+            transition: width 0.05s;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .volume-control input {
+            width: 100px;
+        }
+
+        .back-link {
+            color: white;
+            text-decoration: none;
+            font-size: 1.5rem;
+        }
+
+        .sensitivity-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+        }
+
+        .sensitivity-control input {
+            width: 80px;
+        }
+
+        .fullscreen-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/" class="back-link">←</a>
+        <h2>Parent's Phone</h2>
+        <div class="status-indicator">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Connecting...</span>
+        </div>
+    </div>
+
+    <div class="video-container">
+        <video id="remoteVideo" autoplay playsinline></video>
+        <div class="overlay" id="overlay">
+            <p id="overlayText">Waiting for sender to start streaming...</p>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="audio-meter">
+            <div class="audio-level" id="audioLevel"></div>
+        </div>
+
+        <div class="info-row">
+            <div class="volume-control">
+                <span>🔊</span>
+                <input type="range" id="volume" min="0" max="100" value="100">
+                <span id="volumeValue">100%</span>
+            </div>
+            <button class="fullscreen-btn" id="fullscreenBtn">⛶ Fullscreen</button>
+        </div>
+
+        <div class="info-row">
+            <div class="sensitivity-control">
+                <span>Alert sensitivity:</span>
+                <input type="range" id="sensitivity" min="10" max="100" value="50">
+                <span id="sensitivityValue">50</span>
+            </div>
+            <span id="info">Waiting...</span>
+        </div>
+    </div>
+
+    <script>
+        // Keep screen awake
+        let wakeLock = null;
+
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake lock acquired');
+                }
+            } catch (err) {
+                console.log('Wake lock failed:', err);
+            }
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        });
+
+        requestWakeLock();
+
+        // WebSocket and WebRTC
+        let ws = null;
+        let peerConnection = null;
+        let audioContext = null;
+        let analyser = null;
+        let isConnected = false;
+        let loudSoundTimeout = null;
+
+        const remoteVideo = document.getElementById('remoteVideo');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const overlay = document.getElementById('overlay');
+        const overlayText = document.getElementById('overlayText');
+        const audioLevel = document.getElementById('audioLevel');
+        const volumeSlider = document.getElementById('volume');
+        const volumeValue = document.getElementById('volumeValue');
+        const sensitivitySlider = document.getElementById('sensitivity');
+        const sensitivityValue = document.getElementById('sensitivityValue');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const info = document.getElementById('info');
+
+        const rtcConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        function setConnectedState(connected) {
+            isConnected = connected;
+            if (connected) {
+                document.body.classList.add('connected');
+                document.body.classList.remove('disconnected');
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+                overlay.classList.add('hidden');
+            } else {
+                document.body.classList.remove('connected');
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Waiting';
+                overlay.classList.remove('hidden');
+            }
+        }
+
+        function setDisconnectedState() {
+            isConnected = false;
+            document.body.classList.add('disconnected');
+            document.body.classList.remove('connected');
+            document.body.classList.remove('loud-sound');
+            statusDot.classList.remove('connected');
+            statusText.textContent = 'Disconnected!';
+            overlay.classList.remove('hidden');
+            overlayText.textContent = 'Connection lost! Reconnecting...';
+        }
+
+        function triggerLoudSoundAlert() {
+            if (!isConnected) return;
+
+            document.body.classList.add('loud-sound');
+            document.body.classList.remove('connected');
+
+            clearTimeout(loudSoundTimeout);
+            loudSoundTimeout = setTimeout(() => {
+                document.body.classList.remove('loud-sound');
+                if (isConnected) {
+                    document.body.classList.add('connected');
+                }
+            }, 500);
+        }
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                ws.send(JSON.stringify({ type: 'register-receiver' }));
+            };
+
+            ws.onmessage = async (event) => {
+                const message = JSON.parse(event.data);
+                console.log('Receiver received:', message.type);
+
+                switch (message.type) {
+                    case 'registered':
+                        console.log('Registered as receiver');
+                        if (message.senderAvailable) {
+                            overlayText.textContent = 'Sender available. Requesting stream...';
+                            // Request an offer from the sender
+                            ws.send(JSON.stringify({ type: 'request-offer' }));
+                        } else {
+                            overlayText.textContent = 'Waiting for sender to start streaming...';
+                        }
+                        break;
+
+                    case 'sender-available':
+                        overlayText.textContent = 'Sender started. Requesting stream...';
+                        // Request an offer from the sender
+                        ws.send(JSON.stringify({ type: 'request-offer' }));
+                        break;
+
+                    case 'sender-disconnected':
+                        setDisconnectedState();
+                        closePeerConnection();
+                        break;
+
+                    case 'offer':
+                        console.log('Received offer');
+                        await handleOffer(message.offer);
+                        break;
+
+                    case 'ice-candidate':
+                        if (peerConnection && message.candidate) {
+                            try {
+                                await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+                            } catch (err) {
+                                console.error('Error adding ICE candidate:', err);
+                            }
+                        }
+                        break;
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                setDisconnectedState();
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+            };
+
+            // Keep alive
+            setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 30000);
+        }
+
+        async function handleOffer(offer) {
+            console.log('Handling offer...');
+            closePeerConnection();
+
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            console.log('Created peer connection');
+
+            peerConnection.ontrack = (event) => {
+                console.log('Received track:', event.track.kind);
+                remoteVideo.srcObject = event.streams[0];
+
+                if (event.track.kind === 'audio') {
+                    setupAudioAnalysis(event.streams[0]);
+                }
+            };
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                    console.log('Sending ICE candidate');
+                    ws.send(JSON.stringify({
+                        type: 'ice-candidate',
+                        candidate: event.candidate
+                    }));
+                }
+            };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('ICE connection state:', peerConnection.iceConnectionState);
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                console.log('Connection state:', peerConnection.connectionState);
+                if (peerConnection.connectionState === 'connected') {
+                    setConnectedState(true);
+                    info.textContent = 'Streaming';
+                } else if (peerConnection.connectionState === 'disconnected' ||
+                           peerConnection.connectionState === 'failed') {
+                    setDisconnectedState();
+                }
+            };
+
+            try {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                console.log('Set remote description');
+
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                console.log('Created and set local answer');
+
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'answer',
+                        answer: peerConnection.localDescription
+                    }));
+                    console.log('Sent answer to server');
+                }
+            } catch (err) {
+                console.error('Error in handleOffer:', err);
+            }
+        }
+
+        function closePeerConnection() {
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+                analyser = null;
+            }
+        }
+
+        function setupAudioAnalysis(stream) {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                analyser.fftSize = 256;
+
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                function updateAudioLevel() {
+                    if (!analyser) return;
+
+                    analyser.getByteFrequencyData(dataArray);
+                    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                    const percentage = Math.min(100, (average / 128) * 100);
+
+                    audioLevel.style.width = percentage + '%';
+
+                    // Check for loud sounds based on sensitivity
+                    const threshold = 100 - parseInt(sensitivitySlider.value);
+                    if (percentage > threshold) {
+                        triggerLoudSoundAlert();
+                    }
+
+                    requestAnimationFrame(updateAudioLevel);
+                }
+
+                updateAudioLevel();
+            } catch (err) {
+                console.error('Audio analysis error:', err);
+            }
+        }
+
+        // Volume control
+        volumeSlider.addEventListener('input', () => {
+            const value = volumeSlider.value / 100;
+            remoteVideo.volume = value;
+            volumeValue.textContent = volumeSlider.value + '%';
+        });
+
+        // Sensitivity control
+        sensitivitySlider.addEventListener('input', () => {
+            sensitivityValue.textContent = sensitivitySlider.value;
+        });
+
+        // Fullscreen
+        fullscreenBtn.addEventListener('click', () => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                document.documentElement.requestFullscreen();
+            }
+        });
+
+        // Handle video play (required for autoplay on mobile)
+        remoteVideo.addEventListener('loadedmetadata', () => {
+            remoteVideo.play().catch(err => {
+                console.log('Autoplay prevented:', err);
+                // Show play button overlay
+                overlayText.textContent = 'Tap to play';
+                overlay.classList.remove('hidden');
+                overlay.onclick = () => {
+                    remoteVideo.play();
+                    overlay.classList.add('hidden');
+                    overlay.onclick = null;
+                };
+            });
+        });
+
+        // Initialize
+        connectWebSocket();
+    </script>
+</body>
+</html>
