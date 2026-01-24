@@ -1,15 +1,66 @@
-generate a node.js (21.7.x) website. It should be a website designed for two (android) phones as a baby monitor.
+# Baby Monitor - Development Context
 
-The idea is that one phone is used as the audio and/or sound sender (default both) and the other phone is used as a receiver of the sound and video. When connected to the website, if there is not already a stream ongoing, the device may start the process by clicking a button. All other visitors should automatically see the stream. If it is easier to implement, it could also be done via two websites (one sending, one receiving website). Do what makes sense.
+## Project Overview
 
-As it is used as a baby-monitor the communication should be "real-time". 
+Real-time baby monitor web app using WebRTC for peer-to-peer streaming between two phones.
+- **Sender** (`/sender`) - Baby's phone with camera/mic
+- **Receiver** (`/receiver`) - Parent's phone viewing stream
 
-The screen must be kept on until the website is closed for both.
+## Tech Stack
 
-blink screen black and white if there are loud sounds
+- **Runtime**: Node.js 21.7.x
+- **Server**: Express 5.x (single dependency)
+- **Signaling**: Server-Sent Events (SSE) + HTTP POST (no WebSockets)
+- **Streaming**: WebRTC (RTCPeerConnection)
+- **Frontend**: Vanilla JS, no frameworks
 
-blink screen red and black on disconnect of any kind
+## Key Files
 
-background of the screen should be green if connection established between two devices 
+| File | Purpose |
+|------|---------|
+| `server.js` | Express server, SSE endpoints, signaling |
+| `public/sender.html` | Camera/mic capture, WebRTC offer creation |
+| `public/receiver.html` | Stream playback, PTT, audio analysis |
+| `public/*.css` | Separate stylesheets for sender/receiver |
 
-no data should be stored
+## Architecture Notes
+
+- SSE used instead of WebSockets for simpler hosting compatibility
+- Single sender, multiple receivers supported
+- PTT (Push-to-Talk) works via WebRTC renegotiation
+- Audio ducking reduces baby audio to 15% during PTT
+- STUN servers: stunprotocol.org, nextcloud.com, sipgate.net
+
+## Visual States
+
+| State | Sender | Receiver |
+|-------|--------|----------|
+| Connected | Green background | Green background |
+| Disconnected | Red/black blink | Red/black overlay "CONNECTION LOST" |
+| Loud sound | - | Red/black overlay "LOUD SOUND DETECTED" |
+| PTT active | Blue pulsing "Parent is speaking..." | - |
+| Screen dim | Black overlay after 5s | - |
+
+## Implementation Details
+
+- Wake Lock API keeps screens on
+- AudioContext analyzes volume for loud sound detection
+- Sensitivity slider controls threshold (saved to localStorage)
+- Volume control persisted to localStorage
+- Screen dims on sender after 5s inactivity to save battery
+
+## API Endpoints
+
+- `GET /api/sse/sender` - SSE stream for sender
+- `GET /api/sse/receiver` - SSE stream for receivers  
+- `POST /api/signal` - WebRTC signaling (offers, answers, ICE)
+- `GET /api/status` - JSON: `{senderActive, receiverCount}`
+
+## When Making Changes
+
+1. Keep it dependency-light (Express only)
+2. No WebSockets - use SSE + HTTP POST
+3. No data storage - everything is peer-to-peer
+4. Test on mobile browsers (Chrome Android recommended)
+5. HTTPS required for camera/mic in production
+6. CSS is in separate files, not inline
