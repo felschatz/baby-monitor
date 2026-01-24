@@ -7,13 +7,7 @@
     <link rel="stylesheet" href="receiver.css">
 </head>
 <body>
-    <!-- Alert overlays -->
-    <div class="alert-overlay loud-alert" id="loudAlert">
-        LOUD SOUND DETECTED
-    </div>
-    <div class="alert-overlay soft-alert" id="softAlert">
-        Check on baby?
-    </div>
+    <!-- Disconnect alert overlay -->
     <div class="alert-overlay disconnect-alert" id="disconnectAlert">
         CONNECTION LOST
     </div>
@@ -27,7 +21,7 @@
         </div>
     </div>
 
-    <div class="video-container">
+    <div class="video-container" id="videoContainer">
         <video id="remoteVideo" autoplay playsinline muted></video>
         <div class="overlay" id="overlay">
             <p id="overlayText">Waiting for sender to start streaming...</p>
@@ -113,8 +107,6 @@
         let pendingCandidates = [];
         let receiverId = null;
 
-        const loudAlert = document.getElementById('loudAlert');
-        const softAlert = document.getElementById('softAlert');
         const disconnectAlert = document.getElementById('disconnectAlert');
         const pttBtn = document.getElementById('pttBtn');
         const pttLabel = document.getElementById('pttLabel');
@@ -300,19 +292,20 @@
             overlay.classList.remove('hidden');
             overlayText.textContent = 'Connection lost! Reconnecting...';
 
-            // Show disconnect alert overlay
-            loudAlert.classList.remove('active');
+            // Show disconnect alert overlay, clear any sound alerts
+            document.body.classList.remove('soft-alert-active');
+            document.body.classList.remove('loud-alert-active');
             disconnectAlert.classList.add('active');
         }
 
         function triggerLoudSoundAlert(isSoft = false) {
             if (!isConnected || loudSoundCooldown) return;
 
-            // Show appropriate alert overlay
+            // Pulse everything except video
             if (isSoft) {
-                softAlert.classList.add('active');
+                document.body.classList.add('soft-alert-active');
             } else {
-                loudAlert.classList.add('active');
+                document.body.classList.add('loud-alert-active');
             }
 
             // Set cooldown to prevent constant re-triggering
@@ -320,8 +313,8 @@
 
             clearTimeout(loudSoundTimeout);
             loudSoundTimeout = setTimeout(() => {
-                loudAlert.classList.remove('active');
-                softAlert.classList.remove('active');
+                document.body.classList.remove('soft-alert-active');
+                document.body.classList.remove('loud-alert-active');
                 // Cooldown period after alert hides
                 setTimeout(() => {
                     loudSoundCooldown = false;

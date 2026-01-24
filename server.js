@@ -281,4 +281,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: A sleeping baby is the universe's way of saying "take a break, you've earned it."
+// Wisdom: The best code is no code at all, but this comes close.

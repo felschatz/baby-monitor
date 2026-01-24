@@ -47,43 +47,10 @@ body.connected {
     display: flex;
 }
 
-.loud-alert {
-    background: rgba(255, 0, 0, 0.9);
-    color: white;
-    animation: loudBlink 0.3s infinite;
-}
-
 .disconnect-alert {
     background: rgba(180, 0, 0, 1);
     color: white;
     animation: disconnectBlink 0.5s infinite;
-}
-
-.soft-alert {
-    background: rgba(255, 152, 0, 0.85);
-    color: white;
-    font-size: 1.5rem;
-    animation: softPulse 1s ease-in-out infinite;
-}
-
-@keyframes softPulse {
-    0%, 100% {
-        background: rgba(255, 152, 0, 0.85);
-    }
-    50% {
-        background: rgba(255, 193, 7, 0.9);
-    }
-}
-
-@keyframes loudBlink {
-    0%, 50% {
-        background: rgba(255, 0, 0, 0.9);
-        color: white;
-    }
-    51%, 100% {
-        background: rgba(0, 0, 0, 0.9);
-        color: white;
-    }
 }
 
 @keyframes disconnectBlink {
@@ -138,6 +105,40 @@ body.connected {
     position: relative;
     min-height: 0; /* Important for flex shrinking */
     overflow: hidden;
+}
+
+/* Soft alert - orange pulsing on everything except video */
+body.soft-alert-active .header,
+body.soft-alert-active .ptt-container,
+body.soft-alert-active .music-container,
+body.soft-alert-active .controls {
+    animation: softPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes softPulse {
+    0%, 100% {
+        background: rgba(255, 152, 0, 0.3);
+    }
+    50% {
+        background: rgba(255, 193, 7, 0.5);
+    }
+}
+
+/* Loud alert - red blinking on everything except video */
+body.loud-alert-active .header,
+body.loud-alert-active .ptt-container,
+body.loud-alert-active .music-container,
+body.loud-alert-active .controls {
+    animation: loudPulse 0.3s infinite;
+}
+
+@keyframes loudPulse {
+    0%, 50% {
+        background: rgba(255, 0, 0, 0.7);
+    }
+    51%, 100% {
+        background: rgba(0, 0, 0, 0.8);
+    }
 }
 
 #remoteVideo {

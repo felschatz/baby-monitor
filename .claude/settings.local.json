@@ -4,7 +4,9 @@
       "Bash(npm init:*)",
       "Bash(npm install:*)",
       "Bash(timeout 3 node:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(node -c:*)",
+      "Bash(node -e:*)"
     ]
   }
 }
