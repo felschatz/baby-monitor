@@ -563,6 +563,15 @@
                         fadeOutAndStop();
                         break;
 
+                    case 'music-timer-reset':
+                        console.log('Received music timer reset:', message.timerMinutes, 'minutes');
+                        if (musicPlaying) {
+                            musicTimerRemaining = message.timerMinutes * 60;
+                            updateMusicTimerDisplay();
+                            broadcastMusicStatus();
+                        }
+                        break;
+
                     case 'heartbeat':
                         // Server heartbeat - connection is alive
                         break;

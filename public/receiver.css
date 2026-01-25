@@ -347,6 +347,21 @@ body.loud-alert-active .controls {
     color: white;
 }
 
+.music-reset-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.music-reset-btn:active {
+    background: rgba(255,255,255,0.4);
+}
+
 .music-label {
     font-size: 0.8rem;
     margin-top: 8px;

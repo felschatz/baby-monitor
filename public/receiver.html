@@ -40,6 +40,7 @@
                 <option value="45">45 min</option>
                 <option value="60">1 hour</option>
             </select>
+            <button class="music-reset-btn" id="musicResetBtn" style="display: none;">Reset Timer</button>
         </div>
         <div class="music-label" id="musicLabel">Play lullabies</div>
         <div class="music-status" id="musicStatus"></div>
@@ -136,6 +137,7 @@
         const musicContainer = document.getElementById('musicContainer');
         const musicBtn = document.getElementById('musicBtn');
         const musicTimerSelect = document.getElementById('musicTimerSelect');
+        const musicResetBtn = document.getElementById('musicResetBtn');
         const musicLabel = document.getElementById('musicLabel');
         const musicStatus = document.getElementById('musicStatus');
         let musicPlaying = false;
@@ -189,14 +191,22 @@
                 musicBtn.textContent = '⏹️';
                 musicBtn.classList.add('active');
                 musicLabel.textContent = 'Stop music';
-                musicTimerSelect.disabled = true;
+                musicTimerSelect.disabled = false; // Allow changing timer for reset
+                musicResetBtn.style.display = 'inline-block';
             } else {
                 musicBtn.textContent = '🎵';
                 musicBtn.classList.remove('active');
                 musicLabel.textContent = 'Play lullabies';
                 musicTimerSelect.disabled = false;
+                musicResetBtn.style.display = 'none';
                 musicStatus.textContent = '';
             }
+        }
+
+        // Reset music UI to default state (used on disconnect)
+        function resetMusicUI() {
+            musicPlaying = false;
+            updateMusicUI();
         }
 
         // Handle music status updates from sender
@@ -213,6 +223,14 @@
 
         // Music button click handler
         musicBtn.addEventListener('click', toggleMusic);
+
+        // Reset timer button click handler
+        musicResetBtn.addEventListener('click', () => {
+            if (!musicPlaying) return;
+            const timerMinutes = parseInt(musicTimerSelect.value);
+            console.log('Resetting music timer to', timerMinutes, 'minutes');
+            sendSignal({ type: 'music-timer-reset', timerMinutes: timerMinutes });
+        });
 
         // Check music availability on load
         checkMusicAvailability();

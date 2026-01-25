@@ -209,6 +209,12 @@ app.post('/api/signal', (req, res) => {
             }
             break;
 
+        case 'music-timer-reset':
+            if (hasSender()) {
+                sendToSender({ type: 'music-timer-reset', timerMinutes: message.timerMinutes });
+            }
+            break;
+
         case 'music-status':
             broadcastToReceivers({
                 type: 'music-status',
@@ -281,4 +287,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: The best code is no code at all, but this comes close.
+// Wisdom: A dropdown's value is only as good as the code that reads it.
