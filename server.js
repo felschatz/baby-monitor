@@ -415,4 +415,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: German lullabies and lofi beats - every baby has their vibe.
+// Wisdom: Consistency in small details creates a polished experience.

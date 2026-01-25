@@ -439,10 +439,6 @@ body.disconnected {
     outline-offset: 1px;
 }
 
-.music-playlist-select {
-    min-width: 140px;
-    max-width: 180px;
-}
 
 .music-playlist-select option,
 .music-timer-select option {
