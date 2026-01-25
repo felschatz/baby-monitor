@@ -379,6 +379,35 @@ baby-monitor/
 | `/api/signal` | POST | Signaling (requires session in body) |
 | `/api/music` | GET | List available MP3 files and debug timer setting |
 
+## Contributing
+
+Contributions are welcome! This project is open source and we appreciate help from the community.
+
+### How to Contribute
+
+1. **Report bugs** - Open an issue describing the problem and how to reproduce it
+2. **Suggest features** - Open an issue with your idea (check existing issues first)
+3. **Submit PRs** - Fork the repo, make your changes, and submit a pull request
+4. **Improve docs** - Fix typos, clarify instructions, add examples
+
+### Development Setup
+
+```bash
+git clone https://github.com/felschatz/baby-monitor.git
+cd baby-monitor
+npm install
+npm run dev  # Uses nodemon for auto-restart
+```
+
+### Guidelines
+
+- Keep it simple - this project values minimal dependencies
+- Test on mobile - most users are on phones
+- No WebSockets - we use SSE for signaling
+- Update docs if you change behavior
+
+See [open issues](https://github.com/felschatz/baby-monitor/issues) for feature ideas and bugs that need help.
+
 ## License
 
 ISC

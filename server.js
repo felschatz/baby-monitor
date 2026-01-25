@@ -364,4 +364,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: Static files need no routes - simplicity is the ultimate sophistication.
+// Wisdom: A community that builds together, grows together.
