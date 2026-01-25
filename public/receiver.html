@@ -663,32 +663,48 @@
                 peerConnection.close();
                 peerConnection = null;
             }
-            if (audioContext) {
-                audioContext.close();
-                audioContext = null;
-                analyser = null;
-            }
+            // Reset audio analysis state (but keep audioContext for reuse)
+            audioAnalysisRunning = false;
+            analyser = null;
             audioStream = null;
+            // Don't close audioContext - it can be reused and is expensive to recreate
         }
 
         function setupAudioAnalysis(stream) {
+            console.log('setupAudioAnalysis called, stream active:', stream?.active);
             audioStream = stream;
             tryStartAudioAnalysis();
         }
 
+        let audioAnalysisRunning = false;
+
         async function tryStartAudioAnalysis() {
-            if (!audioStream) return;
+            // Guard against duplicate setup
+            if (audioAnalysisRunning) {
+                console.log('Audio analysis already running');
+                return;
+            }
+            if (!audioStream) {
+                console.log('No audio stream available yet');
+                return;
+            }
 
             try {
-                // Create or resume AudioContext
+                // Create AudioContext if needed
                 if (!audioContext) {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    console.log('Created AudioContext, state:', audioContext.state);
                 }
 
                 // Resume if suspended (browser autoplay policy)
                 if (audioContext.state === 'suspended') {
                     console.log('AudioContext suspended, will resume on user interaction');
                     return;
+                }
+
+                // Clean up old analyser if exists
+                if (analyser) {
+                    analyser = null;
                 }
 
                 analyser = audioContext.createAnalyser();
@@ -698,10 +714,11 @@
                 analyser.smoothingTimeConstant = 0.3;
 
                 const dataArray = new Uint8Array(analyser.frequencyBinCount);
-                console.log('Audio analysis started');
+                audioAnalysisRunning = true;
+                console.log('Audio analysis started successfully');
 
                 function updateAudioLevel() {
-                    if (!analyser) return;
+                    if (!analyser || !audioAnalysisRunning) return;
 
                     analyser.getByteFrequencyData(dataArray);
 
@@ -746,25 +763,37 @@
                 updateAudioLevel();
             } catch (err) {
                 console.error('Audio analysis error:', err);
+                audioAnalysisRunning = false;
             }
         }
 
-        // Resume AudioContext on any user interaction
-        document.addEventListener('click', async () => {
-            if (audioContext && audioContext.state === 'suspended') {
-                await audioContext.resume();
-                console.log('AudioContext resumed');
-                tryStartAudioAnalysis();
-            }
-        }, { once: false });
+        // Resume AudioContext and start audio analysis on any user interaction
+        async function ensureAudioContext() {
+            try {
+                // Create AudioContext if needed
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    console.log('Created AudioContext on interaction, state:', audioContext.state);
+                }
 
-        document.addEventListener('touchstart', async () => {
-            if (audioContext && audioContext.state === 'suspended') {
-                await audioContext.resume();
-                console.log('AudioContext resumed');
-                tryStartAudioAnalysis();
+                // Resume if suspended
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                    console.log('AudioContext resumed, state:', audioContext.state);
+                }
+
+                // Try to start audio analysis if we have a stream but analysis isn't running
+                if (audioStream && !audioAnalysisRunning) {
+                    console.log('Starting audio analysis after user interaction');
+                    tryStartAudioAnalysis();
+                }
+            } catch (err) {
+                console.error('Error ensuring AudioContext:', err);
             }
-        }, { once: false });
+        }
+
+        document.addEventListener('click', ensureAudioContext, { once: false });
+        document.addEventListener('touchstart', ensureAudioContext, { once: false });
 
         // Volume control
         volumeSlider.addEventListener('input', () => {

@@ -356,4 +356,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: Absolute paths find their way home, no matter where you wander.
+// Wisdom: Listen carefully to the silence between sounds, for that is where understanding grows.
