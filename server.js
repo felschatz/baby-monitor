@@ -91,10 +91,18 @@ app.get('/api/sse/sender/:session', (req, res) => {
     const id = generateId();
     const session = getSession(sessionName);
 
-    // Check if sender already exists in this session
+    // If sender already exists, close old connection (allows page refresh/takeover)
     if (session.sender !== null && session.senderRes !== null) {
-        res.status(409).json({ error: 'Sender already exists in this session' });
-        return;
+        console.log('Replacing existing sender in session', sessionName);
+        try {
+            // Notify old sender it's being replaced
+            sendSSE(session.senderRes, { type: 'replaced', message: 'Another sender connected' });
+            session.senderRes.end();
+        } catch (e) {
+            // Old connection might already be dead
+        }
+        session.sender = null;
+        session.senderRes = null;
     }
 
     // Set up SSE
@@ -356,4 +364,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: Short paths avoid collisions, like water finding the clearest way through stones.
+// Wisdom: The new broom sweeps clean, but the old one knows where the dust hides.

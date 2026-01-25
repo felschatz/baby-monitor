@@ -511,7 +511,10 @@
                 eventSource.close();
             }
 
-            eventSource = new EventSource(`/api/sse/sender/${encodeURIComponent(sessionName)}`);
+            const sseUrl = `/api/sse/sender/${encodeURIComponent(sessionName)}`;
+            console.log('Connecting to SSE:', sseUrl);
+
+            eventSource = new EventSource(sseUrl);
 
             eventSource.onopen = () => {
                 console.log('SSE connected');
@@ -539,6 +542,15 @@
                     case 'error':
                         alert(message.message);
                         window.location.href = '/';
+                        break;
+
+                    case 'replaced':
+                        // Another sender took over this session
+                        console.log('Replaced by another sender');
+                        sseConnected = false;
+                        eventSource.close();
+                        info.textContent = 'Another device took over as sender. Refresh to reclaim.';
+                        setDisconnectedState();
                         break;
 
                     case 'request-offer':
@@ -645,7 +657,7 @@
                 setDisconnectedState();
                 // Reconnect after delay
                 eventSource.close();
-                setTimeout(connectSSE, 2000);
+                setTimeout(connectSSE, 3000);
             };
         }
 
