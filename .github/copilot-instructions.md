@@ -43,7 +43,25 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - `POST /api/signal` - WebRTC signaling (requires `session` in body, stripped before forwarding)
 - `GET /api/status/:session` - JSON: `{senderActive, receiverCount}` for specific session
 - `GET /api/status` - JSON: `{activeSessions, totalReceivers}` for global status
-- `GET /api/music` - JSON: `{files: [{name, url}], debugTimer}`
+- `GET /api/music?playlist=1` - JSON: `{files: [{name, url}], playlists: ["1","2"], currentPlaylist, debugTimer}`
+
+## Music/Playlist Structure
+
+Music files are organized in numbered subdirectories under `mp3/`:
+```
+mp3/
+├── 1/              # Playlist 1 (default)
+│   └── name.txt    # Optional: custom display name (e.g., "German Lullabies")
+├── 2/
+│   └── name.txt    # e.g., "Lofi Hiphop"
+└── 3/              # Falls back to "Playlist 3" if no name.txt
+```
+
+- Add `name.txt` to a playlist folder for custom display name
+- Playlist selection persisted to localStorage (`sender-music-playlist`, `receiver-music-playlist`)
+- Defaults to playlist "1" if no preference saved
+- Receiver sends playlist ID with `music-start` signal; sender switches if needed
+- Backwards compatible: falls back to root `mp3/` if no subdirectories exist
 
 ## URL Structure
 

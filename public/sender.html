@@ -63,6 +63,7 @@
     <div class="music-controls-panel" id="musicControlsPanel" style="display: none;">
         <div class="music-controls-row">
             <button class="music-btn" id="musicBtn">🎵</button>
+            <select class="music-playlist-select" id="musicPlaylistSelect" title="Select playlist"></select>
             <select class="music-timer-select" id="musicTimerSelect">
                 <option value="45">45 min</option>
                 <option value="60">1 hour</option>
@@ -304,12 +305,15 @@
         const musicTimerEl = document.getElementById('musicTimer');
         const musicControlsPanel = document.getElementById('musicControlsPanel');
         const musicBtn = document.getElementById('musicBtn');
+        const musicPlaylistSelect = document.getElementById('musicPlaylistSelect');
         const musicTimerSelect = document.getElementById('musicTimerSelect');
         const musicResetBtn = document.getElementById('musicResetBtn');
         const musicVolumeSlider = document.getElementById('musicVolume');
         const musicVolumeValue = document.getElementById('musicVolumeValue');
         const musicLabel = document.getElementById('musicLabel');
         let musicPlaylist = [];
+        let musicPlaylists = []; // Available playlist folders
+        let currentPlaylistId = localStorage.getItem('sender-music-playlist') || '1'; // Default to playlist 1
         let musicShuffled = [];
         let musicCurrentIndex = 0;
         let musicPlaying = false;
@@ -373,21 +377,50 @@
             broadcastMusicStatus();
         });
 
-        // Fetch available music files
-        async function fetchMusicPlaylist() {
+        // Fetch available music files for a specific playlist
+        async function fetchMusicPlaylist(playlistId = null) {
             try {
-                const response = await fetch('/api/music');
+                const playlist = playlistId || currentPlaylistId;
+                const response = await fetch(`/api/music?playlist=${encodeURIComponent(playlist)}`);
                 const data = await response.json();
                 musicPlaylist = data.files || [];
-                console.log('Music playlist loaded:', musicPlaylist.length, 'tracks');
+                musicPlaylists = data.playlists || [];
+
+                console.log('Music playlist loaded:', musicPlaylist.length, 'tracks from playlist', playlist);
+                console.log('Available playlists:', musicPlaylists);
+
+                // Populate playlist dropdown if we have multiple playlists
+                if (musicPlaylists.length > 0) {
+                    musicPlaylistSelect.innerHTML = '';
+                    musicPlaylists.forEach(p => {
+                        const option = document.createElement('option');
+                        option.value = p.id;
+                        option.textContent = p.name;
+                        if (p.id === playlist) option.selected = true;
+                        musicPlaylistSelect.appendChild(option);
+                    });
+                    musicPlaylistSelect.style.display = 'inline-block';
+
+                    // If saved playlist doesn't exist, default to first available (usually "1")
+                    const playlistIds = musicPlaylists.map(p => p.id);
+                    if (!playlistIds.includes(currentPlaylistId)) {
+                        currentPlaylistId = musicPlaylists[0].id;
+                        localStorage.setItem('sender-music-playlist', currentPlaylistId);
+                        // Refetch for the correct playlist
+                        return fetchMusicPlaylist(currentPlaylistId);
+                    }
+                } else {
+                    // No playlist subdirectories, hide the selector
+                    musicPlaylistSelect.style.display = 'none';
+                }
 
                 // Show music controls if tracks available
-                if (musicPlaylist.length > 0) {
+                if (musicPlaylist.length > 0 || musicPlaylists.length > 0) {
                     musicControlsPanel.style.display = 'block';
                 }
 
-                // Add debug timer option if enabled
-                if (data.debugTimer) {
+                // Add debug timer option if enabled (only once)
+                if (data.debugTimer && !musicTimerSelect.querySelector('option[value="1"]')) {
                     const debugOption = document.createElement('option');
                     debugOption.value = '1';
                     debugOption.textContent = '1 min (debug)';
@@ -398,6 +431,21 @@
                 musicPlaylist = [];
             }
         }
+
+        // Handle playlist selection change
+        musicPlaylistSelect.addEventListener('change', () => {
+            currentPlaylistId = musicPlaylistSelect.value;
+            localStorage.setItem('sender-music-playlist', currentPlaylistId);
+            console.log('Switched to playlist:', currentPlaylistId);
+
+            // If music is playing, stop it before switching
+            if (musicPlaying) {
+                stopMusic(true);
+            }
+
+            // Fetch tracks for the new playlist
+            fetchMusicPlaylist(currentPlaylistId);
+        });
 
         // Fisher-Yates shuffle
         function shuffleArray(array) {
@@ -744,8 +792,21 @@
                         break;
 
                     case 'music-start':
-                        console.log('Received music start:', message.timerMinutes, 'minutes');
-                        startMusic(message.timerMinutes);
+                        console.log('Received music start:', message.timerMinutes, 'minutes, playlist:', message.playlist);
+                        // Switch playlist if specified and different
+                        if (message.playlist && message.playlist !== currentPlaylistId) {
+                            currentPlaylistId = message.playlist;
+                            localStorage.setItem('sender-music-playlist', currentPlaylistId);
+                            if (musicPlaylistSelect.value !== currentPlaylistId) {
+                                musicPlaylistSelect.value = currentPlaylistId;
+                            }
+                            // Fetch new playlist then start
+                            fetchMusicPlaylist(currentPlaylistId).then(() => {
+                                startMusic(message.timerMinutes);
+                            });
+                        } else {
+                            startMusic(message.timerMinutes);
+                        }
                         break;
 
                     case 'music-stop':

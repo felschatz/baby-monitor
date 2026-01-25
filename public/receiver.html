@@ -47,6 +47,7 @@
     <div class="music-container" id="musicContainer" style="display: none;">
         <div class="music-controls">
             <button class="music-btn" id="musicBtn">🎵</button>
+            <select class="music-playlist-select" id="musicPlaylistSelect" title="Select playlist"></select>
             <select class="music-timer-select" id="musicTimerSelect">
                 <option value="45">45 min</option>
                 <option value="60">1 hour</option>
@@ -192,31 +193,60 @@
         // Music controls
         const musicContainer = document.getElementById('musicContainer');
         const musicBtn = document.getElementById('musicBtn');
+        const musicPlaylistSelect = document.getElementById('musicPlaylistSelect');
         const musicTimerSelect = document.getElementById('musicTimerSelect');
         const musicResetBtn = document.getElementById('musicResetBtn');
         const musicLabel = document.getElementById('musicLabel');
         const musicStatus = document.getElementById('musicStatus');
         let musicPlaying = false;
         let musicAvailable = false;
+        let musicPlaylists = [];
+        let currentPlaylistId = localStorage.getItem('receiver-music-playlist') || '1'; // Default to playlist 1
 
         // Check music availability
         async function checkMusicAvailability() {
             try {
-                const response = await fetch('/api/music');
+                const response = await fetch(`/api/music?playlist=${encodeURIComponent(currentPlaylistId)}`);
                 const data = await response.json();
+                musicPlaylists = data.playlists || [];
+
+                // Populate playlist dropdown if we have multiple playlists
+                if (musicPlaylists.length > 0) {
+                    musicPlaylistSelect.innerHTML = '';
+                    musicPlaylists.forEach(p => {
+                        const option = document.createElement('option');
+                        option.value = p.id;
+                        option.textContent = p.name;
+                        if (p.id === currentPlaylistId) option.selected = true;
+                        musicPlaylistSelect.appendChild(option);
+                    });
+                    musicPlaylistSelect.style.display = 'inline-block';
+
+                    // If saved playlist doesn't exist, default to first available
+                    const playlistIds = musicPlaylists.map(p => p.id);
+                    if (!playlistIds.includes(currentPlaylistId)) {
+                        currentPlaylistId = musicPlaylists[0].id;
+                        localStorage.setItem('receiver-music-playlist', currentPlaylistId);
+                        musicPlaylistSelect.value = currentPlaylistId;
+                    }
+                } else {
+                    // No playlist subdirectories, hide the selector
+                    musicPlaylistSelect.style.display = 'none';
+                }
 
                 // Add debug timer option if enabled
-                if (data.debugTimer) {
+                if (data.debugTimer && !musicTimerSelect.querySelector('option[value="1"]')) {
                     const debugOption = document.createElement('option');
                     debugOption.value = '1';
                     debugOption.textContent = '1 min (debug)';
                     musicTimerSelect.insertBefore(debugOption, musicTimerSelect.firstChild);
                 }
 
-                if (data.files && data.files.length > 0) {
+                if ((data.files && data.files.length > 0) || musicPlaylists.length > 0) {
                     musicAvailable = true;
                     musicContainer.style.display = 'block';
-                    console.log('Music available:', data.files.length, 'tracks');
+                    console.log('Music available:', data.files?.length || 0, 'tracks in playlist', currentPlaylistId);
+                    console.log('Available playlists:', musicPlaylists);
                 } else {
                     musicContainer.style.display = 'none';
                     console.log('No music files available');
@@ -227,6 +257,13 @@
             }
         }
 
+        // Handle playlist selection change
+        musicPlaylistSelect.addEventListener('change', () => {
+            currentPlaylistId = musicPlaylistSelect.value;
+            localStorage.setItem('receiver-music-playlist', currentPlaylistId);
+            console.log('Switched to playlist:', currentPlaylistId);
+        });
+
         // Toggle music playback
         function toggleMusic() {
             if (!musicAvailable) return;
@@ -235,9 +272,13 @@
                 // Stop music
                 sendSignal({ type: 'music-stop' });
             } else {
-                // Start music
+                // Start music with selected playlist
                 const timerMinutes = parseInt(musicTimerSelect.value);
-                sendSignal({ type: 'music-start', timerMinutes: timerMinutes });
+                sendSignal({
+                    type: 'music-start',
+                    timerMinutes: timerMinutes,
+                    playlist: currentPlaylistId
+                });
             }
         }
 

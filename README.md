@@ -293,11 +293,29 @@ baby-monitor/
 
 ### Lullaby Playback
 
-1. Add MP3 files to the `mp3/` folder on the server
-2. Parent taps 🎵 button and selects timer duration
-3. Sender shuffles playlist and plays through speaker
-4. Music stops automatically when timer expires
-5. Parent can stop manually by tapping the stop button
+1. Add MP3 files to playlist folders under `mp3/` (e.g., `mp3/1/`, `mp3/2/`, etc.)
+2. Select a playlist from the dropdown (both sender and receiver remember your choice)
+3. Parent taps 🎵 button and selects timer duration
+4. Sender shuffles playlist and plays through speaker
+5. Music stops automatically when timer expires
+6. Parent can stop manually by tapping the stop button
+
+**Playlist Structure:**
+```
+mp3/
+├── 1/                    # Playlist 1 (default)
+│   ├── name.txt          # Contains "German Lullabies"
+│   ├── lullaby.mp3
+│   └── twinkle.mp3
+├── 2/                    # Playlist 2
+│   ├── name.txt          # Contains "Lofi Hiphop"
+│   ├── ocean.mp3
+│   └── rain.mp3
+└── 3/                    # Playlist 3
+    └── white_noise.mp3   # No name.txt = "Playlist 3"
+```
+
+Add a `name.txt` file to each folder to give it a custom display name.
 
 ## Privacy & Security
 

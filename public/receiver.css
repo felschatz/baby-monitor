@@ -399,24 +399,50 @@ body.loud-alert-active .controls {
     box-shadow: 0 0 15px rgba(244, 67, 54, 0.5);
 }
 
+.music-playlist-select,
 .music-timer-select {
-    background: rgba(255,255,255,0.2);
-    border: 1px solid rgba(255,255,255,0.3);
+    background: rgba(13, 13, 13, 0.15);
+    border: none;
     color: white;
     padding: 8px 12px;
     border-radius: 8px;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     cursor: pointer;
 }
 
+.music-playlist-select:focus,
+.music-timer-select:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 1px;
+}
+
+.music-playlist-select {
+    min-width: 120px;
+    max-width: 160px;
+}
+
+.music-playlist-select:disabled,
 .music-timer-select:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
+.music-playlist-select option,
 .music-timer-select option {
-    background: #333;
-    color: white;
+    background: #f0f0f0;
+    color: #1a1a2e;
+}
+
+.music-playlist-select option:checked,
+.music-timer-select option:checked {
+    background: #e0e0e0;
+    color: #1a1a2e;
+}
+
+.music-playlist-select option:hover,
+.music-timer-select option:hover {
+    background: #000000 !important;
+    color: white !important;
 }
 
 .music-reset-btn {

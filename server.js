@@ -247,7 +247,11 @@ app.post('/api/signal', (req, res) => {
 
         case 'music-start':
             if (hasSender(sessionName)) {
-                sendToSender(sessionName, { type: 'music-start', timerMinutes: message.timerMinutes });
+                sendToSender(sessionName, {
+                    type: 'music-start',
+                    timerMinutes: message.timerMinutes,
+                    playlist: message.playlist
+                });
             }
             break;
 
@@ -288,22 +292,69 @@ app.post('/api/signal', (req, res) => {
     res.json({ success: true });
 });
 
-// Music API endpoint
+// Music API endpoint - supports playlist subdirectories
 app.get('/api/music', (req, res) => {
     const mp3Dir = path.join(__dirname, 'mp3');
+    const playlist = req.query.playlist || '1'; // Default to playlist 1
+
     try {
         if (!fs.existsSync(mp3Dir)) {
-            return res.json({ files: [], debugTimer: ENABLE_DEBUG_TIMER });
+            return res.json({ files: [], playlists: [], debugTimer: ENABLE_DEBUG_TIMER });
         }
-        const files = fs.readdirSync(mp3Dir)
-            .filter(file => file.toLowerCase().endsWith('.mp3'))
-            .map(file => ({
-                name: file.replace(/\.mp3$/i, ''),
-                url: `/mp3/${encodeURIComponent(file)}`
-            }));
-        res.json({ files, debugTimer: ENABLE_DEBUG_TIMER });
+
+        // Scan for playlist subdirectories (numbered folders like 1/, 2/, etc.)
+        const entries = fs.readdirSync(mp3Dir, { withFileTypes: true });
+        const playlists = entries
+            .filter(entry => entry.isDirectory() && /^\d+$/.test(entry.name))
+            .map(entry => {
+                const playlistPath = path.join(mp3Dir, entry.name);
+                const nameFile = path.join(playlistPath, 'name.txt');
+                let displayName = `Playlist ${entry.name}`;
+
+                // Read custom name from name.txt if it exists
+                if (fs.existsSync(nameFile)) {
+                    try {
+                        displayName = fs.readFileSync(nameFile, 'utf8').trim();
+                    } catch (e) {
+                        // Keep default name on error
+                    }
+                }
+
+                return { id: entry.name, name: displayName };
+            })
+            .sort((a, b) => parseInt(a.id) - parseInt(b.id));
+
+        // Get files from the selected playlist folder
+        let files = [];
+        const playlistDir = path.join(mp3Dir, playlist);
+
+        if (playlists.length > 0 && fs.existsSync(playlistDir)) {
+            // Use playlist subdirectory
+            files = fs.readdirSync(playlistDir)
+                .filter(file => file.toLowerCase().endsWith('.mp3'))
+                .map(file => ({
+                    name: file.replace(/\.mp3$/i, ''),
+                    url: `/mp3/${encodeURIComponent(playlist)}/${encodeURIComponent(file)}`
+                }));
+        } else if (playlists.length === 0) {
+            // Fallback: no subdirectories, use root mp3 folder (backwards compatibility)
+            files = entries
+                .filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.mp3'))
+                .map(entry => ({
+                    name: entry.name.replace(/\.mp3$/i, ''),
+                    url: `/mp3/${encodeURIComponent(entry.name)}`
+                }));
+        }
+
+        res.json({
+            files,
+            playlists,
+            currentPlaylist: playlists.length > 0 ? playlist : null,
+            debugTimer: ENABLE_DEBUG_TIMER
+        });
     } catch (err) {
-        res.json({ files: [], debugTimer: ENABLE_DEBUG_TIMER });
+        console.error('Music API error:', err);
+        res.json({ files: [], playlists: [], debugTimer: ENABLE_DEBUG_TIMER });
     }
 });
 
@@ -364,4 +415,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: A community that builds together, grows together.
+// Wisdom: German lullabies and lofi beats - every baby has their vibe.

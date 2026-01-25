@@ -422,18 +422,43 @@ body.disconnected {
     box-shadow: 0 0 20px rgba(233, 30, 99, 0.5);
 }
 
+.music-playlist-select,
 .music-timer-select {
     padding: 10px 15px;
-    font-size: 1rem;
+    font-size: 0.9rem;
     border: none;
     border-radius: 8px;
-    background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.15);
     color: white;
     cursor: pointer;
 }
 
+.music-playlist-select:focus,
+.music-timer-select:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 1px;
+}
+
+.music-playlist-select {
+    min-width: 140px;
+    max-width: 180px;
+}
+
+.music-playlist-select option,
 .music-timer-select option {
-    background: #333;
+    background: #f0f0f0;
+    color: #1a1a2e;
+}
+
+.music-playlist-select option:checked,
+.music-timer-select option:checked {
+    background: #e0e0e0;
+    color: #1a1a2e;
+}
+
+.music-playlist-select option:hover,
+.music-timer-select option:hover {
+    background: #030306;
     color: white;
 }
 
