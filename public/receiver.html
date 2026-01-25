@@ -37,6 +37,11 @@
         <div class="overlay" id="overlay">
             <p id="overlayText">Waiting for sender to start streaming...</p>
         </div>
+        <div class="audio-only-indicator" id="audioOnlyIndicator">
+            <div class="audio-only-icon">🎤</div>
+            <div class="audio-only-text">Audio Only</div>
+            <div class="audio-only-subtext">Video disabled on sender</div>
+        </div>
     </div>
 
     <div class="ptt-container">
@@ -182,6 +187,10 @@
         const statusText = document.getElementById('statusText');
         const overlay = document.getElementById('overlay');
         const overlayText = document.getElementById('overlayText');
+        const audioOnlyIndicator = document.getElementById('audioOnlyIndicator');
+
+        // Track video availability
+        let hasVideoTrack = false;
         const audioLevel = document.getElementById('audioLevel');
         const volumeSlider = document.getElementById('volume');
         const volumeValue = document.getElementById('volumeValue');
@@ -389,6 +398,8 @@
                 pttBtn.disabled = false;
                 // Save streaming state for auto-resume on refresh
                 sessionStorage.setItem('receiver-streaming', 'true');
+                // Update audio-only indicator based on video availability
+                updateAudioOnlyIndicator();
             } else {
                 document.body.classList.remove('connected');
                 statusDot.classList.remove('connected');
@@ -397,11 +408,14 @@
                 // Disable PTT
                 pttBtn.disabled = true;
                 stopPTT();
+                // Hide audio-only indicator when disconnected
+                audioOnlyIndicator.classList.remove('active');
             }
         }
 
         function setDisconnectedState() {
             isConnected = false;
+            hasVideoTrack = false;
             document.body.classList.remove('connected');
             statusDot.classList.remove('connected');
             statusText.textContent = 'Disconnected!';
@@ -412,6 +426,9 @@
             document.body.classList.remove('soft-alert-active');
             document.body.classList.remove('loud-alert-active');
             disconnectAlert.classList.add('active');
+
+            // Hide audio-only indicator
+            audioOnlyIndicator.classList.remove('active');
 
             // Reset music UI - will sync when reconnected
             resetMusicUI();
@@ -554,7 +571,7 @@
                 // Always update srcObject with the latest stream
                 remoteVideo.srcObject = event.streams[0];
                 console.log('Set video srcObject, tracks in stream:', event.streams[0].getTracks().length);
-                
+
                 // Apply saved volume setting
                 const savedVol = localStorage.getItem('receiver-volume');
                 if (savedVol !== null) {
@@ -568,6 +585,8 @@
                     console.log('Video track readyState:', event.track.readyState);
                     console.log('Video track muted:', event.track.muted);
 
+                    hasVideoTrack = true;
+                    updateAudioOnlyIndicator();
                     setConnectedState(true);
                     info.textContent = 'Streaming';
 
@@ -579,6 +598,13 @@
                             console.log('Play error on track unmute:', err);
                             showPlayOverlay();
                         });
+                    };
+
+                    // Monitor track ended (video disabled mid-stream)
+                    event.track.onended = () => {
+                        console.log('Video track ended');
+                        hasVideoTrack = false;
+                        updateAudioOnlyIndicator();
                     };
 
                     // Force play (muted for autoplay policy)
@@ -607,6 +633,12 @@
                 }
 
                 if (event.track.kind === 'audio') {
+                    // If we only get audio (no video), we're in audio-only mode
+                    if (!hasVideoTrack) {
+                        setConnectedState(true);
+                        info.textContent = 'Streaming (audio only)';
+                        updateAudioOnlyIndicator();
+                    }
                     setupAudioAnalysis(event.streams[0]);
                 }
             };
@@ -699,6 +731,24 @@
             }
         }
 
+        const videoContainer = document.getElementById('videoContainer');
+
+        function updateAudioOnlyIndicator() {
+            console.log('updateAudioOnlyIndicator: hasVideoTrack=', hasVideoTrack, 'isConnected=', isConnected);
+            if (hasVideoTrack) {
+                audioOnlyIndicator.classList.remove('active');
+                videoContainer.classList.remove('audio-only');
+            } else if (isConnected) {
+                // Only show audio-only indicator when connected but no video
+                console.log('Showing audio-only indicator');
+                audioOnlyIndicator.classList.add('active');
+                videoContainer.classList.add('audio-only');
+            } else {
+                audioOnlyIndicator.classList.remove('active');
+                videoContainer.classList.remove('audio-only');
+            }
+        }
+
         function closePeerConnection() {
             if (peerConnection) {
                 peerConnection.close();
@@ -708,6 +758,8 @@
             audioAnalysisRunning = false;
             analyser = null;
             audioStream = null;
+            hasVideoTrack = false;
+            updateAudioOnlyIndicator();
             // Don't close audioContext - it can be reused and is expensive to recreate
         }
 

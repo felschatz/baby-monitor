@@ -415,4 +415,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: Consistency in small details creates a polished experience.
+// Wisdom: Audio carries emotion that video cannot capture.
