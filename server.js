@@ -364,4 +364,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: Open source is like planting seeds - shared knowledge grows forests.
+// Wisdom: Static files need no routes - simplicity is the ultimate sophistication.

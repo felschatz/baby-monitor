@@ -2,8 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Baby Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baby Monitor - Free Open Source WebRTC Baby Monitor</title>
+    <meta name="description" content="Turn any two phones into a baby monitor. Real-time HD video & audio streaming with no app required. Free, open source, and privacy-focused.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -11,281 +15,1216 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --primary: #0d9488;
+            --primary-dark: #0f766e;
+            --secondary: #059669;
+            --accent: #2dd4bf;
+            --success: #10b981;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 1rem 2rem;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        nav.scrolled {
+            padding: 0.75rem 2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .nav-cta {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white !important;
+            padding: 0.6rem 1.5rem;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .nav-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(13, 148, 136, 0.4);
+            color: white !important;
+        }
+
+        /* Hero Section */
+        .hero {
             min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 8rem 2rem 4rem;
+            background: linear-gradient(135deg, rgba(13, 148, 136, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 70%;
+            height: 140%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 50%;
+            opacity: 0.03;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            50% { transform: translate(-30px, 30px) rotate(5deg); }
+        }
+
+        .hero-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .hero-content h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--text) 0%, var(--primary-dark) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-content p {
+            font-size: 1.25rem;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+            max-width: 500px;
+        }
+
+        .hero-badges {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: white;
+            border-radius: 50px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .badge-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(13, 148, 136, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(13, 148, 136, 0.5);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--text);
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            transform: translateY(-3px);
+        }
+
+        .hero-visual {
+            position: relative;
+        }
+
+        .phone-mockup {
+            position: relative;
+            max-width: 100%;
+        }
+
+        .phone-container {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .phone {
+            width: 180px;
+            height: 380px;
+            background: linear-gradient(145deg, #1a1a2e, #16213e);
+            border-radius: 35px;
+            padding: 8px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            border-radius: 28px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .phone-sender .phone-screen {
+            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+        }
+
+        .phone-receiver .phone-screen {
+            background: linear-gradient(180deg, var(--primary) 0%, var(--secondary) 100%);
+        }
+
+        .phone-notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 25px;
+            background: #1a1a2e;
+            border-radius: 0 0 15px 15px;
+            z-index: 10;
+        }
+
+        .phone-content {
+            padding: 40px 15px 15px;
+            height: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-        }
-
-        .container {
-            text-align: center;
-            max-width: 400px;
-            width: 100%;
-        }
-
-        h1 {
             color: white;
-            margin-bottom: 10px;
-            font-size: 2.5rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            text-align: center;
         }
 
-        .subtitle {
-            color: rgba(255,255,255,0.9);
-            margin-bottom: 40px;
-            font-size: 1.1rem;
+        .phone-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            animation: pulse 2s ease-in-out infinite;
         }
 
-        .btn {
-            display: block;
-            width: 100%;
-            padding: 20px 40px;
-            margin: 15px 0;
-            font-size: 1.3rem;
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .phone-label {
+            font-size: 0.875rem;
             font-weight: 600;
-            border: none;
-            border-radius: 15px;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            text-decoration: none;
-            color: white;
+            opacity: 0.9;
         }
 
-        .btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-
-        .btn:active {
-            transform: translateY(-1px);
-        }
-
-        .btn-sender {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-
-        .btn-receiver {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        }
-
-        .icon {
-            font-size: 2rem;
-            margin-bottom: 5px;
-            display: block;
-        }
-
-        .status {
-            margin-top: 30px;
-            padding: 15px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 10px;
-            color: white;
-        }
-
-        .instructions {
-            margin-top: 30px;
-            color: rgba(255,255,255,0.8);
-            font-size: 0.9rem;
-            line-height: 1.6;
-        }
-
-        .session-input-container {
-            margin-bottom: 20px;
-        }
-
-        .session-input-container input {
-            width: 100%;
-            padding: 15px;
-            font-size: 1.1rem;
-            border: none;
-            border-radius: 10px;
-            text-align: center;
-            background: rgba(255,255,255,0.95);
-        }
-
-        .session-input-container input:focus {
-            outline: 3px solid rgba(255,255,255,0.5);
-        }
-
-        .session-input-container input::placeholder {
-            color: #999;
-        }
-
-        .quality-selector {
+        .connection-line {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
             display: flex;
+            align-items: center;
             justify-content: center;
-            gap: 30px;
-            margin-bottom: 20px;
-            color: white;
         }
 
-        .quality-option {
+        .connection-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: signal 1.5s ease-in-out infinite;
+        }
+
+        .connection-dot:nth-child(2) { animation-delay: 0.2s; }
+        .connection-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes signal {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        .phone-receiver {
+            margin-top: 3rem;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 6rem 2rem;
+            background: var(--bg);
+        }
+
+        .section-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+        }
+
+        .section-header p {
+            font-size: 1.125rem;
+            color: var(--text-light);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            padding: 2rem;
+            background: var(--bg-alt);
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(13, 148, 136, 0.2);
+            box-shadow: 0 20px 40px rgba(13, 148, 136, 0.1);
+        }
+
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 15px;
             display: flex;
             align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            font-size: 1.1rem;
+            justify-content: center;
+            font-size: 1.75rem;
+            margin-bottom: 1.5rem;
         }
 
-        .quality-option input[type="radio"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
+        .feature-card h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
         }
 
-        .quality-label {
-            font-size: 0.85rem;
-            color: rgba(255,255,255,0.7);
-            margin-top: -10px;
-            margin-bottom: 15px;
+        .feature-card p {
+            color: var(--text-light);
+            font-size: 0.95rem;
         }
 
-        .github-link {
-            margin-top: 30px;
-            color: rgba(255,255,255,0.7);
-            text-decoration: none;
-            font-size: 0.9rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: color 0.2s;
-        }
-
-        .github-link:hover {
+        /* How It Works */
+        .how-it-works {
+            padding: 6rem 2rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: white;
         }
 
-        .github-link svg {
+        .how-it-works .section-header h2 {
+            color: white;
+        }
+
+        .how-it-works .section-header p {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .step {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .step-number {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin: 0 auto 1.5rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .step h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+
+        .step p {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 0.95rem;
+        }
+
+        /* Tech Stack */
+        .tech-stack {
+            padding: 6rem 2rem;
+            background: var(--bg-alt);
+        }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+
+        .tech-item {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .tech-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        }
+
+        .tech-item-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .tech-item h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .tech-item p {
+            color: var(--text-light);
+            font-size: 0.85rem;
+        }
+
+        /* Open Source */
+        .open-source {
+            padding: 6rem 2rem;
+            background: var(--bg);
+        }
+
+        .open-source-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .open-source-text h2 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+        }
+
+        .open-source-text p {
+            color: var(--text-light);
+            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .open-source-features {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+
+        .open-source-features li {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            font-weight: 500;
+        }
+
+        .open-source-features li::before {
+            content: '✓';
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, var(--success) 0%, var(--secondary) 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .github-card {
+            background: linear-gradient(145deg, #24292e, #1a1e22);
+            border-radius: 20px;
+            padding: 2rem;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .github-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        }
+
+        .github-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .github-logo {
+            width: 48px;
+            height: 48px;
+            fill: white;
+        }
+
+        .github-info h4 {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .github-info p {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.875rem;
+        }
+
+        .github-stats {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .github-stat {
+            text-align: center;
+        }
+
+        .github-stat-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+        }
+
+        .github-stat-label {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .github-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            width: 100%;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .github-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .github-btn svg {
             width: 20px;
             height: 20px;
             fill: currentColor;
         }
+
+        /* CTA Section */
+        .cta {
+            padding: 6rem 2rem;
+            background: linear-gradient(135deg, rgba(13, 148, 136, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%);
+            text-align: center;
+        }
+
+        .cta h2 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+        }
+
+        .cta p {
+            font-size: 1.125rem;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Footer */
+        footer {
+            padding: 3rem 2rem;
+            background: var(--text);
+            color: white;
+        }
+
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+
+        .footer-logo {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: white;
+            text-decoration: none;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: white;
+        }
+
+        .footer-social {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .footer-social a {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .footer-social a:hover {
+            background: var(--primary);
+            transform: translateY(-3px);
+        }
+
+        .footer-social svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        /* Mobile Menu */
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        .mobile-menu-btn span {
+            display: block;
+            width: 25px;
+            height: 3px;
+            background: var(--text);
+            margin: 5px 0;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        /* Responsive */
+        @media (max-width: 968px) {
+            .hero-container {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .hero-content {
+                order: 1;
+            }
+
+            .hero-visual {
+                order: 2;
+            }
+
+            .hero-content h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero-content p {
+                margin: 0 auto 2rem;
+            }
+
+            .hero-badges {
+                justify-content: center;
+            }
+
+            .hero-buttons {
+                justify-content: center;
+            }
+
+            .phone {
+                width: 140px;
+                height: 300px;
+            }
+
+            .open-source-content {
+                grid-template-columns: 1fr;
+            }
+
+            .github-card {
+                max-width: 400px;
+                margin: 0 auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .hero {
+                padding: 6rem 1.5rem 3rem;
+            }
+
+            .hero-content h1 {
+                font-size: 2rem;
+            }
+
+            .section-header h2 {
+                font-size: 2rem;
+            }
+
+            .phone-container {
+                gap: 1rem;
+            }
+
+            .phone {
+                width: 120px;
+                height: 260px;
+            }
+
+            .phone-icon {
+                font-size: 2rem;
+            }
+
+            .phone-receiver {
+                margin-top: 2rem;
+            }
+
+            .footer-container {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Baby Monitor</h1>
-        <p class="subtitle">Real-time audio & video streaming</p>
-
-        <div class="session-input-container">
-            <input type="text" id="sessionInput" placeholder="Enter session name (e.g., felix-baby)" autocomplete="off" autocapitalize="none">
+    <!-- Navigation -->
+    <nav id="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">Baby Monitor</a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#open-source">Open Source</a>
+                <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener">GitHub</a>
+                <a href="/start.html" class="nav-cta">Get Started</a>
+            </div>
+            <button class="mobile-menu-btn" aria-label="Menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
         </div>
+    </nav>
 
-        <div class="quality-selector">
-            <label class="quality-option">
-                <input type="radio" name="quality" value="sd" id="qualitySD">
-                SD (480p)
-            </label>
-            <label class="quality-option">
-                <input type="radio" name="quality" value="hd" id="qualityHD" checked>
-                HD (720p)
-            </label>
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1>Turn Any Two Phones Into a Baby Monitor</h1>
+                <p>Real-time HD video and audio streaming between any two devices. No app downloads, no accounts, no monthly fees. Just open and connect.</p>
+
+                <div class="hero-badges">
+                    <span class="badge">
+                        <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                        Privacy First
+                    </span>
+                    <span class="badge">
+                        <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                        Real-Time
+                    </span>
+                    <span class="badge">
+                        <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                        </svg>
+                        Free & Open Source
+                    </span>
+                </div>
+
+                <div class="hero-buttons">
+                    <a href="/start.html" class="btn btn-primary">
+                        Start Monitoring
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                    <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener" class="btn btn-secondary">
+                        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                        </svg>
+                        View on GitHub
+                    </a>
+                </div>
+            </div>
+
+            <div class="hero-visual">
+                <div class="phone-mockup">
+                    <div class="phone-container">
+                        <div class="phone phone-sender">
+                            <div class="phone-screen">
+                                <div class="phone-notch"></div>
+                                <div class="phone-content">
+                                    <span class="phone-icon">📹</span>
+                                    <span class="phone-label">Baby's Phone</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="connection-line">
+                            <div class="connection-dots">
+                                <span class="connection-dot"></span>
+                                <span class="connection-dot"></span>
+                                <span class="connection-dot"></span>
+                            </div>
+                        </div>
+                        <div class="phone phone-receiver">
+                            <div class="phone-screen">
+                                <div class="phone-notch"></div>
+                                <div class="phone-content">
+                                    <span class="phone-icon">👶</span>
+                                    <span class="phone-label">Parent's Phone</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <p class="quality-label">SD uses less data on slow connections</p>
+    </section>
 
-        <button class="btn btn-sender" id="senderBtn">
-            <span class="icon">📹</span>
-            Baby's Phone (Sender)
-        </button>
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="section-container">
+            <div class="section-header">
+                <h2>Everything You Need, Nothing You Don't</h2>
+                <p>Built with simplicity in mind. No bloat, no unnecessary features - just reliable baby monitoring.</p>
+            </div>
 
-        <button class="btn btn-receiver" id="receiverBtn">
-            <span class="icon">👶</span>
-            Parent's Phone (Receiver)
-        </button>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📺</div>
+                    <h3>HD Video Streaming</h3>
+                    <p>Crystal clear 720p video with adaptive quality. Switch to SD for slower connections - you decide.</p>
+                </div>
 
-        <div class="status" id="status">
-            Checking status...
+                <div class="feature-card">
+                    <div class="feature-icon">🔊</div>
+                    <h3>Loud Sound Alerts</h3>
+                    <p>Instant visual alerts when your baby cries. Adjustable sensitivity slider to match your environment.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🎙️</div>
+                    <h3>Push-to-Talk</h3>
+                    <p>Soothe your baby remotely with two-way audio. Audio ducking automatically reduces baby sounds while you speak.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🎵</div>
+                    <h3>Lullaby Player</h3>
+                    <p>Play soothing music remotely with sleep timers. Add your own MP3s to the server for custom playlists.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔗</div>
+                    <h3>Peer-to-Peer</h3>
+                    <p>Direct WebRTC connection between devices. Your video never touches our servers - maximum privacy.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📱</div>
+                    <h3>Works Everywhere</h3>
+                    <p>Any modern browser on any device. No app store, no downloads, no platform restrictions.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔋</div>
+                    <h3>Battery Optimized</h3>
+                    <p>Screen auto-dims after 5 seconds on sender. Wake Lock keeps the connection alive without draining battery.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🌐</div>
+                    <h3>Multiple Viewers</h3>
+                    <p>One sender, unlimited receivers. Let grandparents watch too - each session supports multiple viewers.</p>
+                </div>
+            </div>
         </div>
+    </section>
 
-        <div class="instructions">
-            <p><strong>Instructions:</strong></p>
-            <p>1. Enter a session name (same for sender &amp; receiver)</p>
-            <p>2. Open "Sender" on the phone near the baby</p>
-            <p>3. Open "Receiver" on your phone</p>
-            <p>4. Bookmark the URL for easy daily access</p>
+    <!-- How It Works -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="section-container">
+            <div class="section-header">
+                <h2>Up and Running in 30 Seconds</h2>
+                <p>No accounts, no setup wizards, no complicated pairing. Just three simple steps.</p>
+            </div>
+
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Create a Session</h3>
+                    <p>Choose any session name - it's your private room. "felix-baby", "nursery-cam", anything works.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Set Up Sender</h3>
+                    <p>Open the sender page on the phone near your baby. Grant camera & microphone access.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Watch & Listen</h3>
+                    <p>Open the receiver on your phone with the same session name. You're connected!</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">⭐</div>
+                    <h3>Bookmark It</h3>
+                    <p>Save the URL for instant access tomorrow. No need to enter the session name again.</p>
+                </div>
+            </div>
         </div>
+    </section>
 
-        <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener" class="github-link">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-            GitHub
-        </a>
-    </div>
+    <!-- Tech Stack -->
+    <section class="tech-stack">
+        <div class="section-container">
+            <div class="section-header">
+                <h2>Built with Modern Web Tech</h2>
+                <p>Minimal dependencies, maximum reliability. No complex frameworks - just battle-tested web standards.</p>
+            </div>
+
+            <div class="tech-grid">
+                <div class="tech-item">
+                    <div class="tech-item-icon">🔌</div>
+                    <h4>WebRTC</h4>
+                    <p>Peer-to-peer streaming</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-item-icon">📡</div>
+                    <h4>Server-Sent Events</h4>
+                    <p>Simple signaling</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-item-icon">🟢</div>
+                    <h4>Node.js</h4>
+                    <p>Lightweight server</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-item-icon">📦</div>
+                    <h4>Express</h4>
+                    <p>Only dependency</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-item-icon">🌐</div>
+                    <h4>Vanilla JS</h4>
+                    <p>No frameworks</p>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-item-icon">🔒</div>
+                    <h4>HTTPS Ready</h4>
+                    <p>Secure by default</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Open Source -->
+    <section class="open-source" id="open-source">
+        <div class="section-container">
+            <div class="open-source-content">
+                <div class="open-source-text">
+                    <h2>Free & Open Source Forever</h2>
+                    <p>This isn't a freemium product with hidden costs. It's a genuine open source project you can run yourself, modify, and share.</p>
+
+                    <ul class="open-source-features">
+                        <li>Self-host on your own server</li>
+                        <li>No tracking or analytics</li>
+                        <li>No accounts required</li>
+                        <li>MIT licensed - do anything</li>
+                        <li>Active community support</li>
+                    </ul>
+
+                    <p>Your data stays between your devices. Video streams peer-to-peer - the server only handles signaling to establish the connection.</p>
+                </div>
+
+                <div class="github-card">
+                    <div class="github-header">
+                        <svg class="github-logo" viewBox="0 0 16 16">
+                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                        </svg>
+                        <div class="github-info">
+                            <h4>felschatz/baby-monitor</h4>
+                            <p>Real-time WebRTC baby monitor</p>
+                        </div>
+                    </div>
+
+                    <div class="github-stats">
+                        <div class="github-stat">
+                            <div class="github-stat-value">1</div>
+                            <div class="github-stat-label">Dependency</div>
+                        </div>
+                        <div class="github-stat">
+                            <div class="github-stat-value">MIT</div>
+                            <div class="github-stat-label">License</div>
+                        </div>
+                        <div class="github-stat">
+                            <div class="github-stat-value">SSE</div>
+                            <div class="github-stat-label">Signaling</div>
+                        </div>
+                    </div>
+
+                    <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener" class="github-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+                        </svg>
+                        View Source Code
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="section-container">
+            <h2>Ready to Get Started?</h2>
+            <p>Set up your baby monitor in under a minute. No signup, no credit card, no catch.</p>
+            <a href="/start.html" class="btn btn-primary">
+                Launch Baby Monitor
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <a href="/" class="footer-logo">Baby Monitor</a>
+
+            <div class="footer-links">
+                <a href="/start.html">Get Started</a>
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener">GitHub</a>
+            </div>
+
+            <div class="footer-social">
+                <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener" aria-label="GitHub">
+                    <svg viewBox="0 0 16 16">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </footer>
 
     <script>
-        const sessionInput = document.getElementById('sessionInput');
-        const senderBtn = document.getElementById('senderBtn');
-        const receiverBtn = document.getElementById('receiverBtn');
-
-        // Pre-fill from localStorage if available
-        const savedSession = localStorage.getItem('babymonitor-session');
-        if (savedSession) {
-            sessionInput.value = savedSession;
-        }
-
-        function navigateToRole(role) {
-            const session = sessionInput.value.trim();
-            // Map role to short URL path
-            const pathMap = { sender: 's', receiver: 'r' };
-            const shortPath = pathMap[role] || role;
-
-            // Get quality setting (only relevant for sender)
-            const quality = document.querySelector('input[name="quality"]:checked').value;
-
-            if (!session) {
-                // Navigate without session - will show prompt on destination
-                if (role === 'sender') {
-                    window.location.href = `/${role}?q=${quality}`;
-                } else {
-                    window.location.href = `/${role}`;
-                }
+        // Navbar scroll effect
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
             } else {
-                // Save to localStorage
-                localStorage.setItem('babymonitor-session', session);
-                // Navigate with session using short path (/s/ or /r/)
-                if (role === 'sender') {
-                    window.location.href = `/${shortPath}/${encodeURIComponent(session)}?q=${quality}`;
-                } else {
-                    window.location.href = `/${shortPath}/${encodeURIComponent(session)}`;
-                }
-            }
-        }
-
-        senderBtn.addEventListener('click', () => navigateToRole('sender'));
-        receiverBtn.addEventListener('click', () => navigateToRole('receiver'));
-
-        // Allow Enter key in session input
-        sessionInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                // Focus on sender button as default action
-                senderBtn.focus();
+                navbar.classList.remove('scrolled');
             }
         });
 
-        async function checkStatus() {
-            try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-                const statusEl = document.getElementById('status');
-
-                if (data.activeSessions > 0) {
-                    statusEl.innerHTML = `<strong>${data.activeSessions} Active Session${data.activeSessions > 1 ? 's' : ''}</strong><br>Total Receivers: ${data.totalReceivers}`;
-                    statusEl.style.background = 'rgba(76, 175, 80, 0.5)';
-                } else {
-                    statusEl.innerHTML = '<strong>No Active Sessions</strong><br>Enter a session name to start';
-                    statusEl.style.background = 'rgba(255,255,255,0.2)';
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
                 }
-            } catch (err) {
-                document.getElementById('status').innerHTML = 'Unable to check status';
-            }
-        }
+            });
+        });
 
-        checkStatus();
-        setInterval(checkStatus, 5000);
+        // Mobile menu (basic toggle - could be enhanced)
+        const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
+        const navLinks = document.querySelector('.nav-links');
+
+        mobileMenuBtn.addEventListener('click', () => {
+            navLinks.style.display = navLinks.style.display === 'flex' ? 'none' : 'flex';
+        });
     </script>
 </body>
 </html>

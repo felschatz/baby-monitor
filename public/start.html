@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Baby Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 20px 40px;
+            margin: 15px 0;
+            font-size: 1.3rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+        }
+
+        .btn-sender {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .btn-receiver {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .icon {
+            font-size: 2rem;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .status {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            color: white;
+        }
+
+        .instructions {
+            margin-top: 30px;
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .session-input-container {
+            margin-bottom: 20px;
+        }
+
+        .session-input-container input {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 10px;
+            text-align: center;
+            background: rgba(255,255,255,0.95);
+        }
+
+        .session-input-container input:focus {
+            outline: 3px solid rgba(255,255,255,0.5);
+        }
+
+        .session-input-container input::placeholder {
+            color: #999;
+        }
+
+        .quality-selector {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .quality-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 1.1rem;
+        }
+
+        .quality-option input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .quality-label {
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.7);
+            margin-top: -10px;
+            margin-bottom: 15px;
+        }
+
+        .github-link {
+            margin-top: 30px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.2s;
+        }
+
+        .github-link:hover {
+            color: white;
+        }
+
+        .github-link svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Baby Monitor</h1>
+        <p class="subtitle">Real-time audio & video streaming</p>
+
+        <div class="session-input-container">
+            <input type="text" id="sessionInput" placeholder="Enter session name (e.g., felix-baby)" autocomplete="off" autocapitalize="none">
+        </div>
+
+        <div class="quality-selector">
+            <label class="quality-option">
+                <input type="radio" name="quality" value="sd" id="qualitySD">
+                SD (480p)
+            </label>
+            <label class="quality-option">
+                <input type="radio" name="quality" value="hd" id="qualityHD" checked>
+                HD (720p)
+            </label>
+        </div>
+        <p class="quality-label">SD uses less data on slow connections</p>
+
+        <button class="btn btn-sender" id="senderBtn">
+            <span class="icon">📹</span>
+            Baby's Phone (Sender)
+        </button>
+
+        <button class="btn btn-receiver" id="receiverBtn">
+            <span class="icon">👶</span>
+            Parent's Phone (Receiver)
+        </button>
+
+        <div class="status" id="status">
+            Checking status...
+        </div>
+
+        <div class="instructions">
+            <p><strong>Instructions:</strong></p>
+            <p>1. Enter a session name (same for sender &amp; receiver)</p>
+            <p>2. Open "Sender" on the phone near the baby</p>
+            <p>3. Open "Receiver" on your phone</p>
+            <p>4. Bookmark the URL for easy daily access</p>
+        </div>
+
+        <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener" class="github-link">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            GitHub
+        </a>
+    </div>
+
+    <script>
+        const sessionInput = document.getElementById('sessionInput');
+        const senderBtn = document.getElementById('senderBtn');
+        const receiverBtn = document.getElementById('receiverBtn');
+
+        // Pre-fill from localStorage if available
+        const savedSession = localStorage.getItem('babymonitor-session');
+        if (savedSession) {
+            sessionInput.value = savedSession;
+        }
+
+        function navigateToRole(role) {
+            const session = sessionInput.value.trim();
+            // Map role to short URL path
+            const pathMap = { sender: 's', receiver: 'r' };
+            const shortPath = pathMap[role] || role;
+
+            // Get quality setting (only relevant for sender)
+            const quality = document.querySelector('input[name="quality"]:checked').value;
+
+            if (!session) {
+                // Navigate without session - will show prompt on destination
+                if (role === 'sender') {
+                    window.location.href = `/${role}?q=${quality}`;
+                } else {
+                    window.location.href = `/${role}`;
+                }
+            } else {
+                // Save to localStorage
+                localStorage.setItem('babymonitor-session', session);
+                // Navigate with session using short path (/s/ or /r/)
+                if (role === 'sender') {
+                    window.location.href = `/${shortPath}/${encodeURIComponent(session)}?q=${quality}`;
+                } else {
+                    window.location.href = `/${shortPath}/${encodeURIComponent(session)}`;
+                }
+            }
+        }
+
+        senderBtn.addEventListener('click', () => navigateToRole('sender'));
+        receiverBtn.addEventListener('click', () => navigateToRole('receiver'));
+
+        // Allow Enter key in session input
+        sessionInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                // Focus on sender button as default action
+                senderBtn.focus();
+            }
+        });
+
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                const statusEl = document.getElementById('status');
+
+                if (data.activeSessions > 0) {
+                    statusEl.innerHTML = `<strong>${data.activeSessions} Active Session${data.activeSessions > 1 ? 's' : ''}</strong><br>Total Receivers: ${data.totalReceivers}`;
+                    statusEl.style.background = 'rgba(76, 175, 80, 0.5)';
+                } else {
+                    statusEl.innerHTML = '<strong>No Active Sessions</strong><br>Enter a session name to start';
+                    statusEl.style.background = 'rgba(255,255,255,0.2)';
+                }
+            } catch (err) {
+                document.getElementById('status').innerHTML = 'Unable to check status';
+            }
+        }
+
+        checkStatus();
+        setInterval(checkStatus, 5000);
+    </script>
+</body>
+</html>
