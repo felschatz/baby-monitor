@@ -313,12 +313,12 @@ app.get('/receiver', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'receiver.html'));
 });
 
-// Session URLs - serve same HTML, JS will parse session from URL
-app.get('/sender/:session', (req, res) => {
+// Session URLs - use /s/ and /r/ to avoid conflicts with static files (sender.html, receiver.html)
+app.get('/s/:session', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'sender.html'));
 });
 
-app.get('/receiver/:session', (req, res) => {
+app.get('/r/:session', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'receiver.html'));
 });
 
@@ -356,4 +356,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: Listen carefully to the silence between sounds, for that is where understanding grows.
+// Wisdom: Short paths avoid collisions, like water finding the clearest way through stones.

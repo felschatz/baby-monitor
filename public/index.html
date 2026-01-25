@@ -162,14 +162,18 @@
 
         function navigateToRole(role) {
             const session = sessionInput.value.trim();
+            // Map role to short URL path
+            const pathMap = { sender: 's', receiver: 'r' };
+            const shortPath = pathMap[role] || role;
+
             if (!session) {
                 // Navigate without session - will show prompt on destination
                 window.location.href = `/${role}`;
             } else {
                 // Save to localStorage
                 localStorage.setItem('babymonitor-session', session);
-                // Navigate with session
-                window.location.href = `/${role}/${encodeURIComponent(session)}`;
+                // Navigate with session using short path (/s/ or /r/)
+                window.location.href = `/${shortPath}/${encodeURIComponent(session)}`;
             }
         }
 

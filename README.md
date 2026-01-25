@@ -70,7 +70,7 @@ npm start
 
 ### 4. Sender Setup (Baby's Device)
 
-1. Navigate to `http://<server-ip>:3000/sender/<session-name>` (or use bookmark)
+1. Navigate to `http://<server-ip>:3000/s/<session-name>` (or use bookmark)
 2. Allow camera and microphone access when prompted
 3. Select video/audio options (both enabled by default)
 4. Streaming auto-starts when connected
@@ -78,7 +78,7 @@ npm start
 
 ### 5. Receiver Setup (Parent's Device)
 
-1. Navigate to `http://<server-ip>:3000/receiver/<session-name>` (or use bookmark)
+1. Navigate to `http://<server-ip>:3000/r/<session-name>` (or use bookmark)
 2. The stream connects automatically when sender is available
 3. **Tap anywhere** to enable audio (required by browser autoplay policies)
 4. Adjust volume and alert sensitivity as needed
@@ -369,9 +369,9 @@ baby-monitor/
 |----------|--------|-------------|
 | `/` | GET | Landing page with session input |
 | `/sender` | GET | Sender page (shows session prompt) |
-| `/sender/:session` | GET | Sender page for specific session |
+| `/s/:session` | GET | Sender page for specific session |
 | `/receiver` | GET | Receiver page (shows session prompt) |
-| `/receiver/:session` | GET | Receiver page for specific session |
+| `/r/:session` | GET | Receiver page for specific session |
 | `/api/status` | GET | Global status (activeSessions, totalReceivers) |
 | `/api/status/:session` | GET | Session status (senderActive, receiverCount) |
 | `/api/sse/sender/:session` | GET | SSE endpoint for sender in session |

@@ -88,8 +88,8 @@
         const sessionInput = document.getElementById('sessionInput');
         const sessionJoinBtn = document.getElementById('sessionJoinBtn');
 
-        // Extract session from URL path: /sender/mysession
-        const pathMatch = window.location.pathname.match(/^\/sender\/(.+)$/);
+        // Extract session from URL path: /s/mysession
+        const pathMatch = window.location.pathname.match(/^\/s\/(.+)$/);
         let sessionName = pathMatch ? decodeURIComponent(pathMatch[1]) : null;
 
         if (!sessionName) {
@@ -119,7 +119,7 @@
                 return;
             }
             // Redirect to session URL
-            window.location.href = `/sender/${encodeURIComponent(name)}`;
+            window.location.href = `/s/${encodeURIComponent(name)}`;
         }
 
         // Don't run the rest of the code if no session

@@ -48,9 +48,10 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 ## URL Structure
 
 - `/sender` - Landing page with session prompt
-- `/sender/{session}` - Sender page for specific session (bookmarkable)
+- `/s/{session}` - Sender page for specific session (bookmarkable)
 - `/receiver` - Landing page with session prompt
-- `/receiver/{session}` - Receiver page for specific session (bookmarkable)
+- `/r/{session}` - Receiver page for specific session (bookmarkable)
+- Short paths (`/s/`, `/r/`) avoid conflicts with static files on some hosting setups
 - Session name stored in `localStorage` for convenience
 
 ## When Making Changes
