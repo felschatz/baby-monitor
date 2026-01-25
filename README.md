@@ -205,8 +205,8 @@ Require valid-user
 
 ```
 baby-monitor/
-├── server.js              # Express server with SSE signaling
-├── package.json           # Project dependencies (Express only)
+├── server.js              # Node.js HTTP server with SSE signaling
+├── package.json           # Project config (no framework dependencies)
 ├── CLAUDE.md              # AI assistant context file
 ├── README.md              # This file
 ├── mp3/                   # Lullaby MP3 files (add your own)
@@ -269,7 +269,7 @@ baby-monitor/
 
 ### Architecture
 
-1. **Signaling Server** - Express.js server uses Server-Sent Events (SSE) for connection setup
+1. **Signaling Server** - Pure Node.js HTTP server uses Server-Sent Events (SSE) for connection setup
 2. **Peer-to-Peer Streaming** - Direct connection between devices for low-latency media
 3. **STUN Servers** - Public servers for NAT traversal (no TURN by default)
 
@@ -375,7 +375,7 @@ Add a `name.txt` file to each folder to give it a custom display name.
 
 ## Technology Stack
 
-- **Backend**: Node.js 21.x, Express 5.x
+- **Backend**: Node.js 21.x (pure http module, no frameworks)
 - **Frontend**: Vanilla JavaScript, WebRTC API
 - **Signaling**: Server-Sent Events (SSE) + HTTP POST
 - **NAT Traversal**: STUN (public servers)
@@ -419,7 +419,7 @@ npm run dev  # Uses nodemon for auto-restart
 
 ### Guidelines
 
-- Keep it simple - this project values minimal dependencies
+- Keep it simple - this project has zero framework dependencies
 - Test on mobile - most users are on phones
 - No WebSockets - we use SSE for signaling
 - Update docs if you change behavior

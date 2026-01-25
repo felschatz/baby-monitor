@@ -11,7 +11,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 ## Tech Stack
 
 - **Runtime**: Node.js 21.7.x
-- **Server**: Express 5.x (single dependency)
+- **Server**: Pure Node.js http module (zero framework dependencies)
 - **Signaling**: Server-Sent Events (SSE) + HTTP POST (no WebSockets)
 - **Streaming**: WebRTC (RTCPeerConnection)
 - **Frontend**: Vanilla JS, no frameworks
@@ -20,7 +20,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 
 | File | Purpose |
 |------|---------|
-| `server.js` | Express server, SSE endpoints, signaling, session management |
+| `server.js` | Node.js HTTP server, SSE endpoints, signaling, session management |
 | `public/sender.html` | Camera/mic capture, WebRTC offer creation, session handling |
 | `public/receiver.html` | Stream playback, PTT, audio analysis, session handling |
 | `public/index.html` | Landing page with session input |
@@ -93,7 +93,7 @@ mp3/
 
 ## When Making Changes
 
-1. Keep it dependency-light (Express only)
+1. Keep it dependency-free (no frameworks, pure Node.js)
 2. No WebSockets - use SSE + HTTP POST
 3. No data storage - everything is peer-to-peer
 4. Test on mobile browsers (Chrome Android recommended)

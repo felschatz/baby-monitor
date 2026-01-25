@@ -6,7 +6,8 @@
       "Bash(timeout 3 node:*)",
       "Bash(timeout:*)",
       "Bash(node -c:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(node:*)"
     ]
   }
 }

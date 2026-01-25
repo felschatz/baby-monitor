@@ -1,18 +1,46 @@
-require('dotenv').config();
-const express = require('express');
+const http = require('http');
 const path = require('path');
 const fs = require('fs');
 
+// Load .env file if it exists (no external dependencies)
+try {
+    const envPath = path.join(__dirname, '.env');
+    if (fs.existsSync(envPath)) {
+        const envFile = fs.readFileSync(envPath, 'utf8');
+        for (const line of envFile.split('\n')) {
+            const trimmed = line.trim();
+            if (trimmed && !trimmed.startsWith('#')) {
+                const [key, ...valueParts] = trimmed.split('=');
+                if (key && valueParts.length > 0) {
+                    process.env[key.trim()] = valueParts.join('=').trim();
+                }
+            }
+        }
+    }
+} catch (e) {
+    // Ignore .env loading errors
+}
+
 const ENABLE_DEBUG_TIMER = process.env.ENABLE_DEBUG_TIMER === 'true';
 
-const app = express();
-
-// Parse JSON bodies
-app.use(express.json());
-
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/mp3', express.static(path.join(__dirname, 'mp3')));
+// MIME types for static file serving
+const MIME_TYPES = {
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf'
+};
 
 // Session-based data structure
 // sessions.get(sessionName) = { sender, senderRes, receivers: Map }
@@ -47,7 +75,7 @@ function cleanupSession(sessionName) {
 
 // Send SSE message to a client
 function sendSSE(res, data) {
-    if (res && !res.finished) {
+    if (res && !res.writableEnded) {
         res.write(`data: ${JSON.stringify(data)}\n\n`);
         return true;
     }
@@ -85,9 +113,80 @@ function hasSender(sessionName) {
     return session && session.sender !== null && session.senderRes !== null;
 }
 
-// SSE endpoint for sender (with session)
-app.get('/api/sse/sender/:session', (req, res) => {
-    const sessionName = req.params.session;
+// Parse JSON body from request
+function parseJsonBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+            // Limit body size to 1MB
+            if (body.length > 1048576) {
+                reject(new Error('Body too large'));
+            }
+        });
+        req.on('end', () => {
+            try {
+                resolve(body ? JSON.parse(body) : {});
+            } catch (e) {
+                reject(new Error('Invalid JSON'));
+            }
+        });
+        req.on('error', reject);
+    });
+}
+
+// Send JSON response
+function sendJson(res, data, statusCode = 200) {
+    res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+}
+
+// Send file response
+function sendFile(res, filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+    fs.readFile(filePath, (err, data) => {
+        if (err) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not Found');
+            return;
+        }
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(data);
+    });
+}
+
+// Match URL pattern with parameters (e.g., /api/sse/sender/:session)
+function matchRoute(pattern, pathname) {
+    const patternParts = pattern.split('/');
+    const pathParts = pathname.split('/');
+
+    if (patternParts.length !== pathParts.length) return null;
+
+    const params = {};
+    for (let i = 0; i < patternParts.length; i++) {
+        if (patternParts[i].startsWith(':')) {
+            params[patternParts[i].slice(1)] = decodeURIComponent(pathParts[i]);
+        } else if (patternParts[i] !== pathParts[i]) {
+            return null;
+        }
+    }
+    return params;
+}
+
+// Setup SSE headers
+function setupSSE(res) {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no' // Disable nginx buffering
+    });
+}
+
+// Handle SSE sender endpoint
+function handleSenderSSE(req, res, sessionName) {
     const id = generateId();
     const session = getSession(sessionName);
 
@@ -95,7 +194,6 @@ app.get('/api/sse/sender/:session', (req, res) => {
     if (session.sender !== null && session.senderRes !== null) {
         console.log('Replacing existing sender in session', sessionName);
         try {
-            // Notify old sender it's being replaced
             sendSSE(session.senderRes, { type: 'replaced', message: 'Another sender connected' });
             session.senderRes.end();
         } catch (e) {
@@ -105,12 +203,7 @@ app.get('/api/sse/sender/:session', (req, res) => {
         session.senderRes = null;
     }
 
-    // Set up SSE
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
-    res.flushHeaders();
+    setupSSE(res);
 
     session.sender = id;
     session.senderRes = res;
@@ -140,20 +233,14 @@ app.get('/api/sse/sender/:session', (req, res) => {
             cleanupSession(sessionName);
         }
     });
-});
+}
 
-// SSE endpoint for receivers (with session)
-app.get('/api/sse/receiver/:session', (req, res) => {
-    const sessionName = req.params.session;
+// Handle SSE receiver endpoint
+function handleReceiverSSE(req, res, sessionName) {
     const id = generateId();
     const session = getSession(sessionName);
 
-    // Set up SSE
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
-    res.flushHeaders();
+    setupSSE(res);
 
     session.receivers.set(id, res);
     console.log('Receiver connected to session', sessionName, ':', id, 'total:', session.receivers.size);
@@ -184,46 +271,44 @@ app.get('/api/sse/receiver/:session', (req, res) => {
         }
         cleanupSession(sessionName);
     });
-});
+}
 
-// Message endpoint (replaces WebSocket messages)
-app.post('/api/signal', (req, res) => {
-    const message = req.body;
+// Handle signal endpoint
+async function handleSignal(req, res) {
+    let message;
+    try {
+        message = await parseJsonBody(req);
+    } catch (e) {
+        return sendJson(res, { error: 'Invalid JSON' }, 400);
+    }
 
     if (!message || !message.type) {
-        return res.status(400).json({ error: 'Invalid message' });
+        return sendJson(res, { error: 'Invalid message' }, 400);
     }
 
-    // Extract session from message (required for routing)
     const sessionName = message.session;
     if (!sessionName) {
-        return res.status(400).json({ error: 'Session required' });
+        return sendJson(res, { error: 'Session required' }, 400);
     }
 
-    // Session name is NEVER forwarded to clients - strip it from the message
-    // This keeps session names private (server-side only for routing)
     console.log('Signal received in session', sessionName, ':', message.type, 'from', message.role || 'unknown');
 
     switch (message.type) {
         case 'request-offer':
-            // Receiver is requesting an offer from sender
             if (hasSender(sessionName)) {
                 sendToSender(sessionName, { type: 'request-offer' });
             }
             break;
 
         case 'offer':
-            // Forward offer from sender to all receivers
             broadcastToReceivers(sessionName, { type: 'offer', offer: message.offer });
             break;
 
         case 'answer':
-            // Forward answer from receiver to sender
             sendToSender(sessionName, { type: 'answer', answer: message.answer });
             break;
 
         case 'ptt-offer':
-            // Forward PTT offer from receiver to sender
             console.log('Forwarding PTT offer to sender in session', sessionName);
             if (hasSender(sessionName)) {
                 sendToSender(sessionName, { type: 'ptt-offer', offer: message.offer });
@@ -231,17 +316,14 @@ app.post('/api/signal', (req, res) => {
             break;
 
         case 'ptt-start':
-            // Forward PTT start from receiver to sender
             sendToSender(sessionName, { type: 'ptt-start' });
             break;
 
         case 'ptt-answer':
-            // Forward PTT answer from sender to receivers
             broadcastToReceivers(sessionName, { type: 'ptt-answer', answer: message.answer });
             break;
 
         case 'ptt-stop':
-            // Forward PTT stop from receiver to sender
             sendToSender(sessionName, { type: 'ptt-stop' });
             break;
 
@@ -277,7 +359,6 @@ app.post('/api/signal', (req, res) => {
             break;
 
         case 'ice-candidate':
-            // Forward ICE candidates
             if (message.role === 'sender') {
                 broadcastToReceivers(sessionName, { type: 'ice-candidate', candidate: message.candidate });
             } else {
@@ -289,20 +370,19 @@ app.post('/api/signal', (req, res) => {
             console.log('Unknown message type:', message.type);
     }
 
-    res.json({ success: true });
-});
+    sendJson(res, { success: true });
+}
 
-// Music API endpoint - supports playlist subdirectories
-app.get('/api/music', (req, res) => {
+// Handle music API endpoint
+function handleMusicApi(res, query) {
     const mp3Dir = path.join(__dirname, 'mp3');
-    const playlist = req.query.playlist || '1'; // Default to playlist 1
+    const playlist = query.playlist || '1';
 
     try {
         if (!fs.existsSync(mp3Dir)) {
-            return res.json({ files: [], playlists: [], debugTimer: ENABLE_DEBUG_TIMER });
+            return sendJson(res, { files: [], playlists: [], debugTimer: ENABLE_DEBUG_TIMER });
         }
 
-        // Scan for playlist subdirectories (numbered folders like 1/, 2/, etc.)
         const entries = fs.readdirSync(mp3Dir, { withFileTypes: true });
         const playlists = entries
             .filter(entry => entry.isDirectory() && /^\d+$/.test(entry.name))
@@ -311,7 +391,6 @@ app.get('/api/music', (req, res) => {
                 const nameFile = path.join(playlistPath, 'name.txt');
                 let displayName = `Playlist ${entry.name}`;
 
-                // Read custom name from name.txt if it exists
                 if (fs.existsSync(nameFile)) {
                     try {
                         displayName = fs.readFileSync(nameFile, 'utf8').trim();
@@ -324,12 +403,10 @@ app.get('/api/music', (req, res) => {
             })
             .sort((a, b) => parseInt(a.id) - parseInt(b.id));
 
-        // Get files from the selected playlist folder
         let files = [];
         const playlistDir = path.join(mp3Dir, playlist);
 
         if (playlists.length > 0 && fs.existsSync(playlistDir)) {
-            // Use playlist subdirectory
             files = fs.readdirSync(playlistDir)
                 .filter(file => file.toLowerCase().endsWith('.mp3'))
                 .map(file => ({
@@ -337,7 +414,6 @@ app.get('/api/music', (req, res) => {
                     url: `/mp3/${encodeURIComponent(playlist)}/${encodeURIComponent(file)}`
                 }));
         } else if (playlists.length === 0) {
-            // Fallback: no subdirectories, use root mp3 folder (backwards compatibility)
             files = entries
                 .filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.mp3'))
                 .map(entry => ({
@@ -346,7 +422,7 @@ app.get('/api/music', (req, res) => {
                 }));
         }
 
-        res.json({
+        sendJson(res, {
             files,
             playlists,
             currentPlaylist: playlists.length > 0 ? playlist : null,
@@ -354,65 +430,176 @@ app.get('/api/music', (req, res) => {
         });
     } catch (err) {
         console.error('Music API error:', err);
-        res.json({ files: [], playlists: [], debugTimer: ENABLE_DEBUG_TIMER });
+        sendJson(res, { files: [], playlists: [], debugTimer: ENABLE_DEBUG_TIMER });
     }
-});
+}
 
-// Routes
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// Serve static files from a directory
+function serveStatic(res, basePath, urlPath) {
+    // Decode URL and prevent directory traversal
+    let decodedPath;
+    try {
+        decodedPath = decodeURIComponent(urlPath);
+    } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        res.end('Bad Request');
+        return;
+    }
 
-// Landing pages (no session - will show session prompt)
-app.get('/sender', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'sender.html'));
-});
+    // Normalize and check for directory traversal
+    const safePath = path.normalize(decodedPath).replace(/^(\.\.[\/\\])+/, '');
+    const filePath = path.join(basePath, safePath);
 
-app.get('/receiver', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'receiver.html'));
-});
+    // Ensure the resolved path is within the base directory
+    if (!filePath.startsWith(basePath)) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('Forbidden');
+        return;
+    }
 
-// Session URLs - use /s/ and /r/ to avoid conflicts with static files (sender.html, receiver.html)
-app.get('/s/:session', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'sender.html'));
-});
-
-app.get('/r/:session', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'receiver.html'));
-});
-
-// API to check status for a specific session
-app.get('/api/status/:session', (req, res) => {
-    const sessionName = req.params.session;
-    const session = sessions.get(sessionName);
-    res.json({
-        senderActive: session ? (session.sender !== null && session.senderRes !== null) : false,
-        receiverCount: session ? session.receivers.size : 0
-    });
-});
-
-// API to check global status (for landing page)
-app.get('/api/status', (req, res) => {
-    // Count total active sessions
-    let activeSessions = 0;
-    let totalReceivers = 0;
-    sessions.forEach((session) => {
-        if (session.sender !== null) {
-            activeSessions++;
+    fs.stat(filePath, (err, stats) => {
+        if (err || !stats.isFile()) {
+            return false; // Signal that file wasn't found
         }
-        totalReceivers += session.receivers.size;
+        sendFile(res, filePath);
     });
-    res.json({
-        activeSessions,
-        totalReceivers
-    });
+
+    return true; // Signal that we're handling this request
+}
+
+// Main request handler
+const server = http.createServer(async (req, res) => {
+    const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const pathname = parsedUrl.pathname;
+    const query = Object.fromEntries(parsedUrl.searchParams);
+    const method = req.method;
+
+    // API Routes
+    if (method === 'GET') {
+        // SSE sender endpoint
+        let params = matchRoute('/api/sse/sender/:session', pathname);
+        if (params) {
+            return handleSenderSSE(req, res, params.session);
+        }
+
+        // SSE receiver endpoint
+        params = matchRoute('/api/sse/receiver/:session', pathname);
+        if (params) {
+            return handleReceiverSSE(req, res, params.session);
+        }
+
+        // Session status endpoint
+        params = matchRoute('/api/status/:session', pathname);
+        if (params) {
+            const session = sessions.get(params.session);
+            return sendJson(res, {
+                senderActive: session ? (session.sender !== null && session.senderRes !== null) : false,
+                receiverCount: session ? session.receivers.size : 0
+            });
+        }
+
+        // Global status endpoint
+        if (pathname === '/api/status') {
+            let activeSessions = 0;
+            let totalReceivers = 0;
+            sessions.forEach((session) => {
+                if (session.sender !== null) {
+                    activeSessions++;
+                }
+                totalReceivers += session.receivers.size;
+            });
+            return sendJson(res, { activeSessions, totalReceivers });
+        }
+
+        // Music API endpoint
+        if (pathname === '/api/music') {
+            return handleMusicApi(res, query);
+        }
+
+        // Page routes
+        if (pathname === '/' || pathname === '/index.html') {
+            return sendFile(res, path.join(__dirname, 'public', 'index.html'));
+        }
+
+        if (pathname === '/sender' || pathname === '/sender.html') {
+            return sendFile(res, path.join(__dirname, 'public', 'sender.html'));
+        }
+
+        if (pathname === '/receiver' || pathname === '/receiver.html') {
+            return sendFile(res, path.join(__dirname, 'public', 'receiver.html'));
+        }
+
+        // Session URLs
+        params = matchRoute('/s/:session', pathname);
+        if (params) {
+            return sendFile(res, path.join(__dirname, 'public', 'sender.html'));
+        }
+
+        params = matchRoute('/r/:session', pathname);
+        if (params) {
+            return sendFile(res, path.join(__dirname, 'public', 'receiver.html'));
+        }
+
+        // Static files from /mp3
+        if (pathname.startsWith('/mp3/')) {
+            const mp3Path = pathname.slice(5); // Remove '/mp3/'
+            const filePath = path.join(__dirname, 'mp3', decodeURIComponent(mp3Path));
+            const mp3Base = path.join(__dirname, 'mp3');
+
+            // Security: ensure path is within mp3 directory
+            const normalizedPath = path.normalize(filePath);
+            if (!normalizedPath.startsWith(mp3Base)) {
+                res.writeHead(403, { 'Content-Type': 'text/plain' });
+                res.end('Forbidden');
+                return;
+            }
+
+            if (fs.existsSync(normalizedPath) && fs.statSync(normalizedPath).isFile()) {
+                return sendFile(res, normalizedPath);
+            }
+        }
+
+        // Static files from /public
+        const publicPath = path.join(__dirname, 'public', pathname);
+        const publicBase = path.join(__dirname, 'public');
+
+        // Security: ensure path is within public directory
+        const normalizedPublicPath = path.normalize(publicPath);
+        if (normalizedPublicPath.startsWith(publicBase) &&
+            fs.existsSync(normalizedPublicPath) &&
+            fs.statSync(normalizedPublicPath).isFile()) {
+            return sendFile(res, normalizedPublicPath);
+        }
+
+        // 404 for unmatched GET requests
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+        return;
+    }
+
+    if (method === 'POST') {
+        // Signal endpoint
+        if (pathname === '/api/signal') {
+            return handleSignal(req, res);
+        }
+
+        // 404 for unmatched POST requests
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+        return;
+    }
+
+    // Method not allowed
+    res.writeHead(405, { 'Content-Type': 'text/plain' });
+    res.end('Method Not Allowed');
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Baby Monitor server running on port ${PORT}`);
     console.log(`Open http://localhost:${PORT} in your browser`);
     console.log('Using SSE for signaling (no WebSockets required)');
+    console.log('Zero external dependencies - pure Node.js');
 });
 
-// Wisdom: Audio carries emotion that video cannot capture.
+// Wisdom: Zero dependencies, zero worries.
