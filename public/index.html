@@ -93,6 +93,28 @@
             font-size: 0.9rem;
             line-height: 1.6;
         }
+
+        .session-input-container {
+            margin-bottom: 20px;
+        }
+
+        .session-input-container input {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 10px;
+            text-align: center;
+            background: rgba(255,255,255,0.95);
+        }
+
+        .session-input-container input:focus {
+            outline: 3px solid rgba(255,255,255,0.5);
+        }
+
+        .session-input-container input::placeholder {
+            color: #999;
+        }
     </style>
 </head>
 <body>
@@ -100,15 +122,19 @@
         <h1>Baby Monitor</h1>
         <p class="subtitle">Real-time audio & video streaming</p>
 
-        <a href="/sender" class="btn btn-sender">
+        <div class="session-input-container">
+            <input type="text" id="sessionInput" placeholder="Enter session name (e.g., felix-baby)" autocomplete="off" autocapitalize="none">
+        </div>
+
+        <button class="btn btn-sender" id="senderBtn">
             <span class="icon">📹</span>
             Baby's Phone (Sender)
-        </a>
+        </button>
 
-        <a href="/receiver" class="btn btn-receiver">
+        <button class="btn btn-receiver" id="receiverBtn">
             <span class="icon">👶</span>
             Parent's Phone (Receiver)
-        </a>
+        </button>
 
         <div class="status" id="status">
             Checking status...
@@ -116,24 +142,59 @@
 
         <div class="instructions">
             <p><strong>Instructions:</strong></p>
-            <p>1. Open "Sender" on the phone near the baby</p>
-            <p>2. Open "Receiver" on your phone</p>
-            <p>3. Start streaming and monitor your baby</p>
+            <p>1. Enter a session name (same for sender &amp; receiver)</p>
+            <p>2. Open "Sender" on the phone near the baby</p>
+            <p>3. Open "Receiver" on your phone</p>
+            <p>4. Bookmark the URL for easy daily access</p>
         </div>
     </div>
 
     <script>
+        const sessionInput = document.getElementById('sessionInput');
+        const senderBtn = document.getElementById('senderBtn');
+        const receiverBtn = document.getElementById('receiverBtn');
+
+        // Pre-fill from localStorage if available
+        const savedSession = localStorage.getItem('babymonitor-session');
+        if (savedSession) {
+            sessionInput.value = savedSession;
+        }
+
+        function navigateToRole(role) {
+            const session = sessionInput.value.trim();
+            if (!session) {
+                // Navigate without session - will show prompt on destination
+                window.location.href = `/${role}`;
+            } else {
+                // Save to localStorage
+                localStorage.setItem('babymonitor-session', session);
+                // Navigate with session
+                window.location.href = `/${role}/${encodeURIComponent(session)}`;
+            }
+        }
+
+        senderBtn.addEventListener('click', () => navigateToRole('sender'));
+        receiverBtn.addEventListener('click', () => navigateToRole('receiver'));
+
+        // Allow Enter key in session input
+        sessionInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                // Focus on sender button as default action
+                senderBtn.focus();
+            }
+        });
+
         async function checkStatus() {
             try {
                 const response = await fetch('/api/status');
                 const data = await response.json();
                 const statusEl = document.getElementById('status');
 
-                if (data.senderActive) {
-                    statusEl.innerHTML = `<strong>Stream Active</strong><br>Sender: Online | Receivers: ${data.receiverCount}`;
+                if (data.activeSessions > 0) {
+                    statusEl.innerHTML = `<strong>${data.activeSessions} Active Session${data.activeSessions > 1 ? 's' : ''}</strong><br>Total Receivers: ${data.totalReceivers}`;
                     statusEl.style.background = 'rgba(76, 175, 80, 0.5)';
                 } else {
-                    statusEl.innerHTML = '<strong>No Active Stream</strong><br>Start by opening the Sender page';
+                    statusEl.innerHTML = '<strong>No Active Sessions</strong><br>Enter a session name to start';
                     statusEl.style.background = 'rgba(255,255,255,0.2)';
                 }
             } catch (err) {

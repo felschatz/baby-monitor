@@ -14,14 +14,35 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/mp3', express.static(path.join(__dirname, 'mp3')));
 
-// Track connected clients using SSE
-let sender = null;
-let senderRes = null;
-let receivers = new Map(); // id -> response object
+// Session-based data structure
+// sessions.get(sessionName) = { sender, senderRes, receivers: Map }
+const sessions = new Map();
 
 // Generate unique IDs
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// Get or create a session
+function getSession(sessionName) {
+    if (!sessions.has(sessionName)) {
+        sessions.set(sessionName, {
+            sender: null,
+            senderRes: null,
+            receivers: new Map()
+        });
+        console.log('Created session:', sessionName);
+    }
+    return sessions.get(sessionName);
+}
+
+// Clean up empty sessions
+function cleanupSession(sessionName) {
+    const session = sessions.get(sessionName);
+    if (session && !session.sender && session.receivers.size === 0) {
+        sessions.delete(sessionName);
+        console.log('Deleted empty session:', sessionName);
+    }
 }
 
 // Send SSE message to a client
@@ -33,39 +54,46 @@ function sendSSE(res, data) {
     return false;
 }
 
-// Broadcast to all receivers
-function broadcastToReceivers(message) {
-    console.log('Broadcasting to receivers:', message.type, 'count:', receivers.size);
-    receivers.forEach((res, id) => {
+// Broadcast to all receivers in a session
+function broadcastToReceivers(sessionName, message) {
+    const session = sessions.get(sessionName);
+    if (!session) return;
+    console.log('Broadcasting to receivers in session', sessionName, ':', message.type, 'count:', session.receivers.size);
+    session.receivers.forEach((res, id) => {
         if (!sendSSE(res, message)) {
-            receivers.delete(id);
+            session.receivers.delete(id);
         }
     });
 }
 
-// Send to sender
-function sendToSender(message) {
-    console.log('Sending to sender:', message.type);
-    if (senderRes) {
-        if (!sendSSE(senderRes, message)) {
-            sender = null;
-            senderRes = null;
+// Send to sender in a session
+function sendToSender(sessionName, message) {
+    const session = sessions.get(sessionName);
+    if (!session) return;
+    console.log('Sending to sender in session', sessionName, ':', message.type);
+    if (session.senderRes) {
+        if (!sendSSE(session.senderRes, message)) {
+            session.sender = null;
+            session.senderRes = null;
         }
     }
 }
 
-// Check if sender is active
-function hasSender() {
-    return sender !== null && senderRes !== null;
+// Check if sender is active in a session
+function hasSender(sessionName) {
+    const session = sessions.get(sessionName);
+    return session && session.sender !== null && session.senderRes !== null;
 }
 
-// SSE endpoint for sender
-app.get('/api/sse/sender', (req, res) => {
+// SSE endpoint for sender (with session)
+app.get('/api/sse/sender/:session', (req, res) => {
+    const sessionName = req.params.session;
     const id = generateId();
-    
-    // Check if sender already exists
-    if (hasSender()) {
-        res.status(409).json({ error: 'Sender already exists' });
+    const session = getSession(sessionName);
+
+    // Check if sender already exists in this session
+    if (session.sender !== null && session.senderRes !== null) {
+        res.status(409).json({ error: 'Sender already exists in this session' });
         return;
     }
 
@@ -76,15 +104,15 @@ app.get('/api/sse/sender', (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
     res.flushHeaders();
 
-    sender = id;
-    senderRes = res;
-    console.log('Sender connected:', id);
+    session.sender = id;
+    session.senderRes = res;
+    console.log('Sender connected to session', sessionName, ':', id);
 
     // Send registration confirmation
     sendSSE(res, { type: 'registered', role: 'sender' });
 
-    // Notify all receivers that sender is available
-    broadcastToReceivers({ type: 'sender-available' });
+    // Notify all receivers in this session that sender is available
+    broadcastToReceivers(sessionName, { type: 'sender-available' });
 
     // Keep connection alive with heartbeat
     const heartbeat = setInterval(() => {
@@ -95,19 +123,22 @@ app.get('/api/sse/sender', (req, res) => {
 
     // Handle disconnect
     req.on('close', () => {
-        console.log('Sender disconnected:', id);
+        console.log('Sender disconnected from session', sessionName, ':', id);
         clearInterval(heartbeat);
-        if (sender === id) {
-            sender = null;
-            senderRes = null;
-            broadcastToReceivers({ type: 'sender-disconnected' });
+        if (session.sender === id) {
+            session.sender = null;
+            session.senderRes = null;
+            broadcastToReceivers(sessionName, { type: 'sender-disconnected' });
+            cleanupSession(sessionName);
         }
     });
 });
 
-// SSE endpoint for receivers
-app.get('/api/sse/receiver', (req, res) => {
+// SSE endpoint for receivers (with session)
+app.get('/api/sse/receiver/:session', (req, res) => {
+    const sessionName = req.params.session;
     const id = generateId();
+    const session = getSession(sessionName);
 
     // Set up SSE
     res.setHeader('Content-Type', 'text/event-stream');
@@ -116,107 +147,116 @@ app.get('/api/sse/receiver', (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
     res.flushHeaders();
 
-    receivers.set(id, res);
-    console.log('Receiver connected:', id, 'total:', receivers.size);
+    session.receivers.set(id, res);
+    console.log('Receiver connected to session', sessionName, ':', id, 'total:', session.receivers.size);
 
     // Send registration confirmation
-    sendSSE(res, { 
-        type: 'registered', 
+    sendSSE(res, {
+        type: 'registered',
         role: 'receiver',
         receiverId: id,
-        senderAvailable: hasSender()
+        senderAvailable: hasSender(sessionName)
     });
 
     // Keep connection alive with heartbeat
     const heartbeat = setInterval(() => {
         if (!sendSSE(res, { type: 'heartbeat' })) {
             clearInterval(heartbeat);
-            receivers.delete(id);
+            session.receivers.delete(id);
         }
     }, 30000);
 
     // Handle disconnect
     req.on('close', () => {
-        console.log('Receiver disconnected:', id, 'remaining:', receivers.size - 1);
+        console.log('Receiver disconnected from session', sessionName, ':', id, 'remaining:', session.receivers.size - 1);
         clearInterval(heartbeat);
-        receivers.delete(id);
-        if (receivers.size === 0) {
-            sendToSender({ type: 'no-receivers' });
+        session.receivers.delete(id);
+        if (session.receivers.size === 0) {
+            sendToSender(sessionName, { type: 'no-receivers' });
         }
+        cleanupSession(sessionName);
     });
 });
 
 // Message endpoint (replaces WebSocket messages)
 app.post('/api/signal', (req, res) => {
     const message = req.body;
-    
+
     if (!message || !message.type) {
         return res.status(400).json({ error: 'Invalid message' });
     }
 
-    console.log('Signal received:', message.type, 'from', message.role || 'unknown');
+    // Extract session from message (required for routing)
+    const sessionName = message.session;
+    if (!sessionName) {
+        return res.status(400).json({ error: 'Session required' });
+    }
+
+    // Session name is NEVER forwarded to clients - strip it from the message
+    // This keeps session names private (server-side only for routing)
+    console.log('Signal received in session', sessionName, ':', message.type, 'from', message.role || 'unknown');
 
     switch (message.type) {
         case 'request-offer':
             // Receiver is requesting an offer from sender
-            if (hasSender()) {
-                sendToSender({ type: 'request-offer' });
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, { type: 'request-offer' });
             }
             break;
 
         case 'offer':
             // Forward offer from sender to all receivers
-            broadcastToReceivers({ type: 'offer', offer: message.offer });
+            broadcastToReceivers(sessionName, { type: 'offer', offer: message.offer });
             break;
 
         case 'answer':
             // Forward answer from receiver to sender
-            sendToSender({ type: 'answer', answer: message.answer });
+            sendToSender(sessionName, { type: 'answer', answer: message.answer });
             break;
 
         case 'ptt-offer':
             // Forward PTT offer from receiver to sender
-            console.log('Forwarding PTT offer to sender');
-            if (hasSender()) {
-                sendToSender({ type: 'ptt-offer', offer: message.offer });
+            console.log('Forwarding PTT offer to sender in session', sessionName);
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, { type: 'ptt-offer', offer: message.offer });
             }
             break;
 
         case 'ptt-start':
             // Forward PTT start from receiver to sender
-            sendToSender({ type: 'ptt-start' });
+            sendToSender(sessionName, { type: 'ptt-start' });
             break;
 
         case 'ptt-answer':
             // Forward PTT answer from sender to receivers
-            broadcastToReceivers({ type: 'ptt-answer', answer: message.answer });
+            broadcastToReceivers(sessionName, { type: 'ptt-answer', answer: message.answer });
             break;
 
         case 'ptt-stop':
             // Forward PTT stop from receiver to sender
-            sendToSender({ type: 'ptt-stop' });
+            sendToSender(sessionName, { type: 'ptt-stop' });
             break;
 
         case 'music-start':
-            if (hasSender()) {
-                sendToSender({ type: 'music-start', timerMinutes: message.timerMinutes });
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, { type: 'music-start', timerMinutes: message.timerMinutes });
             }
             break;
 
         case 'music-stop':
-            if (hasSender()) {
-                sendToSender({ type: 'music-stop' });
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, { type: 'music-stop' });
             }
             break;
 
         case 'music-timer-reset':
-            if (hasSender()) {
-                sendToSender({ type: 'music-timer-reset', timerMinutes: message.timerMinutes });
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, { type: 'music-timer-reset', timerMinutes: message.timerMinutes });
             }
             break;
 
         case 'music-status':
-            broadcastToReceivers({
+            broadcastToReceivers(sessionName, {
                 type: 'music-status',
                 playing: message.playing,
                 currentTrack: message.currentTrack,
@@ -227,9 +267,9 @@ app.post('/api/signal', (req, res) => {
         case 'ice-candidate':
             // Forward ICE candidates
             if (message.role === 'sender') {
-                broadcastToReceivers({ type: 'ice-candidate', candidate: message.candidate });
+                broadcastToReceivers(sessionName, { type: 'ice-candidate', candidate: message.candidate });
             } else {
-                sendToSender({ type: 'ice-candidate', candidate: message.candidate });
+                sendToSender(sessionName, { type: 'ice-candidate', candidate: message.candidate });
             }
             break;
 
@@ -264,6 +304,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Landing pages (no session - will show session prompt)
 app.get('/sender', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'sender.html'));
 });
@@ -272,11 +313,39 @@ app.get('/receiver', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'receiver.html'));
 });
 
-// API to check status
-app.get('/api/status', (req, res) => {
+// Session URLs - serve same HTML, JS will parse session from URL
+app.get('/sender/:session', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'sender.html'));
+});
+
+app.get('/receiver/:session', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'receiver.html'));
+});
+
+// API to check status for a specific session
+app.get('/api/status/:session', (req, res) => {
+    const sessionName = req.params.session;
+    const session = sessions.get(sessionName);
     res.json({
-        senderActive: hasSender(),
-        receiverCount: receivers.size
+        senderActive: session ? (session.sender !== null && session.senderRes !== null) : false,
+        receiverCount: session ? session.receivers.size : 0
+    });
+});
+
+// API to check global status (for landing page)
+app.get('/api/status', (req, res) => {
+    // Count total active sessions
+    let activeSessions = 0;
+    let totalReceivers = 0;
+    sessions.forEach((session) => {
+        if (session.sender !== null) {
+            activeSessions++;
+        }
+        totalReceivers += session.receivers.size;
+    });
+    res.json({
+        activeSessions,
+        totalReceivers
     });
 });
 
@@ -287,4 +356,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: Always reset before you sync, and sync before you trust.
+// Wisdom: Absolute paths find their way home, no matter where you wander.

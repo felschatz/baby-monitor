@@ -4,6 +4,78 @@
     box-sizing: border-box;
 }
 
+/* Session overlay */
+.session-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.session-prompt {
+    background: rgba(255,255,255,0.1);
+    padding: 30px;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 400px;
+    width: 100%;
+}
+
+.session-prompt h2 {
+    color: white;
+    margin-bottom: 10px;
+}
+
+.session-prompt p {
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 20px;
+    font-size: 0.95rem;
+}
+
+.session-prompt input {
+    width: 100%;
+    padding: 15px;
+    font-size: 1.2rem;
+    border: none;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    text-align: center;
+    background: rgba(255,255,255,0.9);
+}
+
+.session-prompt input:focus {
+    outline: 2px solid #4facfe;
+}
+
+.session-prompt .btn {
+    width: 100%;
+    padding: 18px 30px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+}
+
+.session-prompt .btn-start {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+.session-hint {
+    margin-top: 15px;
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.5);
+}
+
 html, body {
     height: 100%;
     width: 100%;

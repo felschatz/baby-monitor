@@ -4,6 +4,8 @@ A real-time baby monitor web application for streaming audio and video between t
 
 ## Features
 
+- **Session-based isolation** - Multiple monitors on one server, each with unique session name
+- **Bookmarkable URLs** - URLs like `/sender/my-session` work every day without prompts
 - **Real-time streaming** - Low-latency peer-to-peer video and audio
 - **Push-to-talk (PTT)** - Talk back to your baby from the parent's phone
 - **Audio ducking** - Automatically lowers baby audio during PTT to prevent echo
@@ -53,17 +55,30 @@ The server runs on `http://localhost:3000` by default.
 npm start
 ```
 
-### 2. Open Sender (Baby's Device)
+### 2. First Time Setup
 
-1. Navigate to `http://<server-ip>:3000/sender`
+1. Navigate to `http://<server-ip>:3000/`
+2. Enter a session name (e.g., "felix-baby") - use the same name for sender and receiver
+3. Click **"Baby's Phone (Sender)"** or **"Parent's Phone (Receiver)"**
+4. **Bookmark the URL** (e.g., `/sender/felix-baby`) for easy daily access
+
+### 3. Daily Use (After Bookmarking)
+
+1. Open your bookmarked sender URL on the baby's phone
+2. Open your bookmarked receiver URL on your phone
+3. Streaming starts automatically - no need to enter session name again
+
+### 4. Sender Setup (Baby's Device)
+
+1. Navigate to `http://<server-ip>:3000/sender/<session-name>` (or use bookmark)
 2. Allow camera and microphone access when prompted
 3. Select video/audio options (both enabled by default)
-4. Click **"Start Streaming"** (auto-starts when connected)
+4. Streaming auto-starts when connected
 5. Screen will dim after 5 seconds of inactivity - tap to wake
 
-### 3. Open Receiver (Parent's Device)
+### 5. Receiver Setup (Parent's Device)
 
-1. Navigate to `http://<server-ip>:3000/receiver`
+1. Navigate to `http://<server-ip>:3000/receiver/<session-name>` (or use bookmark)
 2. The stream connects automatically when sender is available
 3. **Tap anywhere** to enable audio (required by browser autoplay policies)
 4. Adjust volume and alert sensitivity as needed
@@ -71,7 +86,7 @@ npm start
 
 ### Landing Page
 
-Navigate to `http://<server-ip>:3000/` for a status page showing whether a stream is active and links to both sender and receiver pages.
+Navigate to `http://<server-ip>:3000/` for a status page showing active sessions and the session input form.
 
 ## Deployment
 
@@ -140,9 +155,17 @@ server {
 }
 ```
 
-### Password Protection
+### Session Security
 
-**Important:** Since this app streams your baby's video, always password protect it in production!
+Sessions provide access control through secret session names:
+- Session names are never broadcast - only used server-side for routing
+- Unknown session name = cannot access the stream
+- Use a strong session name (8+ random characters) for privacy
+- Sessions are not enumerable - other users can't discover your sessions
+
+### Password Protection (Optional)
+
+For additional security, you can add password protection at the web server level:
 
 #### Nginx
 
@@ -252,13 +275,14 @@ baby-monitor/
 
 ### Connection Flow
 
-1. Sender connects to `/api/sse/sender` (SSE endpoint)
-2. Receiver connects to `/api/sse/receiver` (SSE endpoint)
-3. Receiver requests connection via `/api/signal` (HTTP POST)
-4. Sender creates offer and sends via signal endpoint
-5. Receiver responds with answer
-6. ICE candidates are exchanged
-7. Direct peer-to-peer media connection established
+1. Sender connects to `/api/sse/sender/:session` (SSE endpoint)
+2. Receiver connects to `/api/sse/receiver/:session` (SSE endpoint)
+3. Receiver requests connection via `/api/signal` with `session` in body
+4. Server routes messages only within the same session
+5. Sender creates offer and sends via signal endpoint
+6. Receiver responds with answer
+7. ICE candidates are exchanged
+8. Direct peer-to-peer media connection established
 
 ### Push-to-Talk Flow
 
@@ -343,13 +367,16 @@ baby-monitor/
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/` | GET | Landing page |
-| `/sender` | GET | Sender page (baby's device) |
-| `/receiver` | GET | Receiver page (parent's device) |
-| `/api/status` | GET | JSON status (senderActive, receiverCount) |
-| `/api/sse/sender` | GET | SSE endpoint for sender |
-| `/api/sse/receiver` | GET | SSE endpoint for receivers |
-| `/api/signal` | POST | Signaling (offers, answers, ICE candidates) |
+| `/` | GET | Landing page with session input |
+| `/sender` | GET | Sender page (shows session prompt) |
+| `/sender/:session` | GET | Sender page for specific session |
+| `/receiver` | GET | Receiver page (shows session prompt) |
+| `/receiver/:session` | GET | Receiver page for specific session |
+| `/api/status` | GET | Global status (activeSessions, totalReceivers) |
+| `/api/status/:session` | GET | Session status (senderActive, receiverCount) |
+| `/api/sse/sender/:session` | GET | SSE endpoint for sender in session |
+| `/api/sse/receiver/:session` | GET | SSE endpoint for receivers in session |
+| `/api/signal` | POST | Signaling (requires session in body) |
 | `/api/music` | GET | List available MP3 files and debug timer setting |
 
 ## License

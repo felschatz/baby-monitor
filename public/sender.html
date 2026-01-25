@@ -4,9 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Baby Monitor - Sender</title>
-    <link rel="stylesheet" href="sender.css">
+    <link rel="stylesheet" href="/sender.css">
 </head>
 <body>
+    <!-- Session prompt overlay -->
+    <div class="session-overlay" id="sessionOverlay">
+        <div class="session-prompt">
+            <h2>Enter Session Name</h2>
+            <p>Use a unique name to connect sender and receiver</p>
+            <input type="text" id="sessionInput" placeholder="e.g., felix-baby" autocomplete="off" autocapitalize="none">
+            <button class="btn btn-start" id="sessionJoinBtn">Join Session</button>
+            <p class="session-hint">Bookmark the URL after joining for easy daily access</p>
+        </div>
+    </div>
+
     <!-- Screen off overlay -->
     <div class="screen-off-overlay" id="screenOffOverlay">
         <div class="tap-hint">Tap to wake</div>
@@ -72,6 +83,51 @@
     </div>
 
     <script>
+        // Session handling
+        const sessionOverlay = document.getElementById('sessionOverlay');
+        const sessionInput = document.getElementById('sessionInput');
+        const sessionJoinBtn = document.getElementById('sessionJoinBtn');
+
+        // Extract session from URL path: /sender/mysession
+        const pathMatch = window.location.pathname.match(/^\/sender\/(.+)$/);
+        let sessionName = pathMatch ? decodeURIComponent(pathMatch[1]) : null;
+
+        if (!sessionName) {
+            // No session in URL - show prompt
+            sessionOverlay.style.display = 'flex';
+
+            // Pre-fill from localStorage if available
+            const savedSession = localStorage.getItem('babymonitor-session');
+            if (savedSession) {
+                sessionInput.value = savedSession;
+            }
+
+            sessionJoinBtn.addEventListener('click', joinSession);
+            sessionInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') joinSession();
+            });
+        } else {
+            // Session in URL - save to localStorage and proceed
+            localStorage.setItem('babymonitor-session', sessionName);
+            sessionOverlay.style.display = 'none';
+        }
+
+        function joinSession() {
+            const name = sessionInput.value.trim();
+            if (!name) {
+                sessionInput.focus();
+                return;
+            }
+            // Redirect to session URL
+            window.location.href = `/sender/${encodeURIComponent(name)}`;
+        }
+
+        // Don't run the rest of the code if no session
+        if (!sessionName) {
+            // Stop execution here - user needs to enter session first
+            throw new Error('Session required');
+        }
+
         // Keep screen awake
         let wakeLock = null;
 
@@ -414,6 +470,7 @@
         // Send signal via HTTP POST (replaces WebSocket send)
         async function sendSignal(message) {
             message.role = 'sender';
+            message.session = sessionName; // Include session for routing
             try {
                 const response = await fetch('/api/signal', {
                     method: 'POST',
@@ -454,7 +511,7 @@
                 eventSource.close();
             }
 
-            eventSource = new EventSource('/api/sse/sender');
+            eventSource = new EventSource(`/api/sse/sender/${encodeURIComponent(sessionName)}`);
 
             eventSource.onopen = () => {
                 console.log('SSE connected');

@@ -3,8 +3,10 @@
 ## Project Overview
 
 Real-time baby monitor web app using WebRTC for peer-to-peer streaming between two phones.
-- **Sender** (`/sender`) - Baby's phone with camera/mic
-- **Receiver** (`/receiver`) - Parent's phone viewing stream
+- **Sender** (`/sender/{session}`) - Baby's phone with camera/mic
+- **Receiver** (`/receiver/{session}`) - Parent's phone viewing stream
+
+Sessions isolate multiple monitors on the same server. Session name acts as a shared secret.
 
 ## Tech Stack
 
@@ -18,15 +20,18 @@ Real-time baby monitor web app using WebRTC for peer-to-peer streaming between t
 
 | File | Purpose |
 |------|---------|
-| `server.js` | Express server, SSE endpoints, signaling |
-| `public/sender.html` | Camera/mic capture, WebRTC offer creation |
-| `public/receiver.html` | Stream playback, PTT, audio analysis |
+| `server.js` | Express server, SSE endpoints, signaling, session management |
+| `public/sender.html` | Camera/mic capture, WebRTC offer creation, session handling |
+| `public/receiver.html` | Stream playback, PTT, audio analysis, session handling |
+| `public/index.html` | Landing page with session input |
 | `public/*.css` | Separate stylesheets for sender/receiver |
 
 ## Architecture Notes
 
 - SSE used instead of WebSockets for simpler hosting compatibility
-- Single sender, multiple receivers supported
+- Session-based isolation: each session has its own sender and receivers
+- Session names are server-side only, never broadcast to clients
+- Single sender per session, multiple receivers supported
 - PTT (Push-to-Talk) works via WebRTC renegotiation
 - Audio ducking reduces baby audio to 15% during PTT
 - STUN servers: stunprotocol.org, nextcloud.com, sipgate.net
@@ -52,11 +57,20 @@ Real-time baby monitor web app using WebRTC for peer-to-peer streaming between t
 
 ## API Endpoints
 
-- `GET /api/sse/sender` - SSE stream for sender
-- `GET /api/sse/receiver` - SSE stream for receivers
-- `POST /api/signal` - WebRTC signaling (offers, answers, ICE)
-- `GET /api/status` - JSON: `{senderActive, receiverCount}`
+- `GET /api/sse/sender/:session` - SSE stream for sender in session
+- `GET /api/sse/receiver/:session` - SSE stream for receivers in session
+- `POST /api/signal` - WebRTC signaling (requires `session` in body, stripped before forwarding)
+- `GET /api/status/:session` - JSON: `{senderActive, receiverCount}` for specific session
+- `GET /api/status` - JSON: `{activeSessions, totalReceivers}` for global status
 - `GET /api/music` - JSON: `{files: [{name, url}], debugTimer}`
+
+## URL Structure
+
+- `/sender` - Landing page with session prompt
+- `/sender/{session}` - Sender page for specific session (bookmarkable)
+- `/receiver` - Landing page with session prompt
+- `/receiver/{session}` - Receiver page for specific session (bookmarkable)
+- Session name stored in `localStorage` for convenience
 
 ## When Making Changes
 
