@@ -364,4 +364,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: The lullaby that calms the child also soothes the weary parent.
+// Wisdom: Open source is like planting seeds - shared knowledge grows forests.
