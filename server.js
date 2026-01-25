@@ -364,4 +364,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: The new broom sweeps clean, but the old one knows where the dust hides.
+// Wisdom: The lullaby that calms the child also soothes the weary parent.

@@ -115,6 +115,35 @@
         .session-input-container input::placeholder {
             color: #999;
         }
+
+        .quality-selector {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .quality-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 1.1rem;
+        }
+
+        .quality-option input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .quality-label {
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.7);
+            margin-top: -10px;
+            margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
@@ -125,6 +154,18 @@
         <div class="session-input-container">
             <input type="text" id="sessionInput" placeholder="Enter session name (e.g., felix-baby)" autocomplete="off" autocapitalize="none">
         </div>
+
+        <div class="quality-selector">
+            <label class="quality-option">
+                <input type="radio" name="quality" value="sd" id="qualitySD">
+                SD (480p)
+            </label>
+            <label class="quality-option">
+                <input type="radio" name="quality" value="hd" id="qualityHD" checked>
+                HD (720p)
+            </label>
+        </div>
+        <p class="quality-label">SD uses less data on slow connections</p>
 
         <button class="btn btn-sender" id="senderBtn">
             <span class="icon">📹</span>
@@ -166,14 +207,25 @@
             const pathMap = { sender: 's', receiver: 'r' };
             const shortPath = pathMap[role] || role;
 
+            // Get quality setting (only relevant for sender)
+            const quality = document.querySelector('input[name="quality"]:checked').value;
+
             if (!session) {
                 // Navigate without session - will show prompt on destination
-                window.location.href = `/${role}`;
+                if (role === 'sender') {
+                    window.location.href = `/${role}?q=${quality}`;
+                } else {
+                    window.location.href = `/${role}`;
+                }
             } else {
                 // Save to localStorage
                 localStorage.setItem('babymonitor-session', session);
                 // Navigate with session using short path (/s/ or /r/)
-                window.location.href = `/${shortPath}/${encodeURIComponent(session)}`;
+                if (role === 'sender') {
+                    window.location.href = `/${shortPath}/${encodeURIComponent(session)}?q=${quality}`;
+                } else {
+                    window.location.href = `/${shortPath}/${encodeURIComponent(session)}`;
+                }
             }
         }
 

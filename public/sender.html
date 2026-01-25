@@ -35,6 +35,7 @@
         <div class="status-indicator">
             <div class="status-dot" id="statusDot"></div>
             <span id="statusText">Disconnected</span>
+            <span class="quality-badge" id="qualityBadge"></span>
         </div>
     </div>
 
@@ -57,6 +58,24 @@
 
     <!-- Hidden audio element for music playback -->
     <audio id="musicAudio"></audio>
+
+    <!-- Music controls (local) -->
+    <div class="music-controls-panel" id="musicControlsPanel" style="display: none;">
+        <div class="music-controls-row">
+            <button class="music-btn" id="musicBtn">🎵</button>
+            <select class="music-timer-select" id="musicTimerSelect">
+                <option value="45">45 min</option>
+                <option value="60">1 hour</option>
+            </select>
+            <button class="music-reset-btn" id="musicResetBtn" style="display: none;">Reset</button>
+        </div>
+        <div class="music-volume-row">
+            <span>🔊</span>
+            <input type="range" id="musicVolume" min="0" max="100" value="50">
+            <span id="musicVolumeValue">50%</span>
+        </div>
+        <div class="music-label" id="musicLabel">Play lullabies</div>
+    </div>
 
     <div class="controls">
         <div class="options">
@@ -92,6 +111,10 @@
         const pathMatch = window.location.pathname.match(/^\/s\/(.+)$/);
         let sessionName = pathMatch ? decodeURIComponent(pathMatch[1]) : null;
 
+        // Extract quality setting from URL: ?q=sd or ?q=hd (default: hd)
+        const urlParams = new URLSearchParams(window.location.search);
+        const videoQuality = urlParams.get('q') === 'sd' ? 'sd' : 'hd';
+
         if (!sessionName) {
             // No session in URL - show prompt
             sessionOverlay.style.display = 'flex';
@@ -118,8 +141,8 @@
                 sessionInput.focus();
                 return;
             }
-            // Redirect to session URL
-            window.location.href = `/s/${encodeURIComponent(name)}`;
+            // Redirect to session URL, preserving quality parameter
+            window.location.href = `/s/${encodeURIComponent(name)}?q=${videoQuality}`;
         }
 
         // Don't run the rest of the code if no session
@@ -127,6 +150,11 @@
             // Stop execution here - user needs to enter session first
             throw new Error('Session required');
         }
+
+        // Display quality badge
+        const qualityBadge = document.getElementById('qualityBadge');
+        qualityBadge.textContent = videoQuality.toUpperCase();
+        qualityBadge.classList.add(videoQuality);
 
         // Keep screen awake
         let wakeLock = null;
@@ -274,6 +302,13 @@
         const musicIndicator = document.getElementById('musicIndicator');
         const musicTrackName = document.getElementById('musicTrackName');
         const musicTimerEl = document.getElementById('musicTimer');
+        const musicControlsPanel = document.getElementById('musicControlsPanel');
+        const musicBtn = document.getElementById('musicBtn');
+        const musicTimerSelect = document.getElementById('musicTimerSelect');
+        const musicResetBtn = document.getElementById('musicResetBtn');
+        const musicVolumeSlider = document.getElementById('musicVolume');
+        const musicVolumeValue = document.getElementById('musicVolumeValue');
+        const musicLabel = document.getElementById('musicLabel');
         let musicPlaylist = [];
         let musicShuffled = [];
         let musicCurrentIndex = 0;
@@ -282,6 +317,62 @@
         let musicTimerRemaining = 0;
         let musicStatusInterval = null;
 
+        // Load saved music volume from localStorage
+        const savedMusicVolume = localStorage.getItem('sender-music-volume');
+        if (savedMusicVolume !== null) {
+            musicVolumeSlider.value = savedMusicVolume;
+            musicVolumeValue.textContent = savedMusicVolume + '%';
+            musicAudio.volume = parseInt(savedMusicVolume) / 100;
+        } else {
+            musicAudio.volume = 0.5; // Default 50%
+        }
+
+        // Music volume control
+        musicVolumeSlider.addEventListener('input', () => {
+            const value = musicVolumeSlider.value;
+            musicAudio.volume = value / 100;
+            musicVolumeValue.textContent = value + '%';
+            localStorage.setItem('sender-music-volume', value);
+        });
+
+        // Local music toggle
+        function toggleMusicLocal() {
+            if (musicPlaying) {
+                fadeOutAndStop();
+            } else {
+                const timerMinutes = parseInt(musicTimerSelect.value);
+                startMusic(timerMinutes);
+            }
+        }
+
+        // Update music controls UI
+        function updateMusicControlsUI() {
+            if (musicPlaying) {
+                musicBtn.textContent = '⏹️';
+                musicBtn.classList.add('active');
+                musicLabel.textContent = 'Stop music';
+                musicResetBtn.style.display = 'inline-block';
+            } else {
+                musicBtn.textContent = '🎵';
+                musicBtn.classList.remove('active');
+                musicLabel.textContent = 'Play lullabies';
+                musicResetBtn.style.display = 'none';
+            }
+        }
+
+        // Music button click handler
+        musicBtn.addEventListener('click', toggleMusicLocal);
+
+        // Reset timer button click handler
+        musicResetBtn.addEventListener('click', () => {
+            if (!musicPlaying) return;
+            const timerMinutes = parseInt(musicTimerSelect.value);
+            console.log('Resetting music timer to', timerMinutes, 'minutes');
+            musicTimerRemaining = timerMinutes * 60;
+            updateMusicTimerDisplay();
+            broadcastMusicStatus();
+        });
+
         // Fetch available music files
         async function fetchMusicPlaylist() {
             try {
@@ -289,6 +380,19 @@
                 const data = await response.json();
                 musicPlaylist = data.files || [];
                 console.log('Music playlist loaded:', musicPlaylist.length, 'tracks');
+
+                // Show music controls if tracks available
+                if (musicPlaylist.length > 0) {
+                    musicControlsPanel.style.display = 'block';
+                }
+
+                // Add debug timer option if enabled
+                if (data.debugTimer) {
+                    const debugOption = document.createElement('option');
+                    debugOption.value = '1';
+                    debugOption.textContent = '1 min (debug)';
+                    musicTimerSelect.insertBefore(debugOption, musicTimerSelect.firstChild);
+                }
             } catch (err) {
                 console.error('Failed to fetch music playlist:', err);
                 musicPlaylist = [];
@@ -322,8 +426,12 @@
             // Show indicator
             musicIndicator.classList.add('active');
 
-            // Reset volume to full
-            musicAudio.volume = 1.0;
+            // Update local controls UI
+            updateMusicControlsUI();
+
+            // Apply saved volume (don't reset to full)
+            const savedVol = localStorage.getItem('sender-music-volume');
+            musicAudio.volume = savedVol !== null ? parseInt(savedVol) / 100 : 0.5;
 
             // Start timer countdown
             if (musicTimer) clearInterval(musicTimer);
@@ -385,7 +493,8 @@
             const fadeInterval = 50; // ms between volume steps
             const fadeDuration = 5000; // total fade duration in ms
             const steps = fadeDuration / fadeInterval;
-            const volumeStep = musicAudio.volume / steps;
+            const startVolume = musicAudio.volume;
+            const volumeStep = startVolume / steps;
 
             // Clear the main timer first
             if (musicTimer) {
@@ -393,14 +502,16 @@
                 musicTimer = null;
             }
 
+            let currentVolume = startVolume;
             const fadeTimer = setInterval(() => {
-                if (musicAudio.volume > volumeStep) {
-                    musicAudio.volume -= volumeStep;
+                currentVolume -= volumeStep;
+                if (currentVolume > 0.01) {
+                    musicAudio.volume = currentVolume;
                 } else {
                     clearInterval(fadeTimer);
                     musicAudio.volume = 0;
                     isFadingOut = false;
-                    stopMusic(true); // Always broadcast
+                    stopMusic(true); // Always broadcast (this also restores volume setting)
                 }
             }, fadeInterval);
         }
@@ -411,7 +522,10 @@
             musicPlaying = false;
             musicAudio.pause();
             musicAudio.src = '';
-            musicAudio.volume = 1.0; // Reset volume for next playback
+
+            // Restore volume from saved setting for next playback
+            const savedVol = localStorage.getItem('sender-music-volume');
+            musicAudio.volume = savedVol !== null ? parseInt(savedVol) / 100 : 0.5;
 
             if (musicTimer) {
                 clearInterval(musicTimer);
@@ -425,6 +539,9 @@
 
             musicIndicator.classList.remove('active');
             musicTimerRemaining = 0;
+
+            // Update local controls UI
+            updateMusicControlsUI();
 
             if (broadcast) {
                 broadcastMusicStatus();
@@ -663,11 +780,15 @@
 
         async function startStreaming() {
             try {
+                // Video resolution based on quality setting
+                const videoResolution = videoQuality === 'sd'
+                    ? { width: { ideal: 640 }, height: { ideal: 480 } }
+                    : { width: { ideal: 1280 }, height: { ideal: 720 } };
+
                 const constraints = {
                     video: enableVideo.checked ? {
                         facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
+                        ...videoResolution
                     } : false,
                     audio: enableAudio.checked ? {
                         echoCancellation: true,
