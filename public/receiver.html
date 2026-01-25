@@ -314,6 +314,9 @@
             document.body.classList.remove('soft-alert-active');
             document.body.classList.remove('loud-alert-active');
             disconnectAlert.classList.add('active');
+
+            // Reset music UI - will sync when reconnected
+            resetMusicUI();
         }
 
         function triggerLoudSoundAlert(isSoft = false) {
@@ -362,6 +365,8 @@
                     case 'registered':
                         console.log('Registered as receiver');
                         receiverId = message.receiverId;
+                        // Reset music UI until we get status from sender
+                        resetMusicUI();
                         if (message.senderAvailable) {
                             overlayText.textContent = 'Sender available. Requesting stream...';
                             // Request an offer from the sender

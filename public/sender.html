@@ -475,6 +475,8 @@
                         if (!isStreaming) {
                             setTimeout(() => startStreaming(), 500);
                         }
+                        // Broadcast current music status to sync receivers on reconnect
+                        setTimeout(() => broadcastMusicStatus(), 1000);
                         break;
 
                     case 'error':
@@ -486,6 +488,8 @@
                         console.log('Receiver requesting offer');
                         if (localStream) {
                             await createOffer();
+                            // Send current music status to newly connected receiver
+                            broadcastMusicStatus();
                         } else {
                             console.log('No local stream yet');
                         }

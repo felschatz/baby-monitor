@@ -287,4 +287,4 @@ app.listen(PORT, () => {
     console.log('Using SSE for signaling (no WebSockets required)');
 });
 
-// Wisdom: A dropdown's value is only as good as the code that reads it.
+// Wisdom: Always reset before you sync, and sync before you trust.
