@@ -352,6 +352,14 @@ Add a `name.txt` file to each folder to give it a custom display name.
 3. Ensure microphone permission granted on parent's phone
 4. Try releasing and pressing the PTT button again
 
+### Audio plays through speaker instead of headphones
+
+WebRTC audio is classified as "communication audio" by mobile browsers, which may route to the speaker even with headphones connected.
+
+1. **Check phone audio settings** - Look for call/communication audio routing options in Settings → Sound
+2. **For Bluetooth headphones** - Ensure both "Media audio" AND "Phone audio" are enabled in the Bluetooth device settings
+3. **Try wired headphones** - They often have more reliable audio routing than Bluetooth
+
 ### Loud sound alerts not working
 
 1. Tap anywhere on the receiver page first (enables AudioContext)
