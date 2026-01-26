@@ -527,3 +527,42 @@ body.loud-alert-active .controls {
     font-size: 0.9rem;
     color: rgba(255, 255, 255, 0.6);
 }
+
+/* Echo cancel toggle */
+.echo-cancel-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.echo-cancel-toggle input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.experimental-badge {
+    font-size: 0.65rem;
+    padding: 2px 5px;
+    background: rgba(255, 152, 0, 0.3);
+    color: #ffb74d;
+    border-radius: 4px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.echo-cancel-toggle.active .experimental-badge {
+    background: rgba(76, 175, 80, 0.3);
+    color: #81c784;
+}
+
+.echo-cancel-status {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-left: 22px;
+    margin-top: 2px;
+}

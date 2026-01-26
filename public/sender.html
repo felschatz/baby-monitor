@@ -50,11 +50,7 @@
         🔊 Parent is speaking...
     </div>
 
-    <!-- Audio-only indicator -->
-    <div class="audio-only-mode-indicator" id="audioOnlyIndicator">
-        🎤 Audio only mode
-    </div>
-
+    
     <!-- Music indicator -->
     <div class="music-indicator" id="musicIndicator">
         🎵 <span id="musicTrackName">Playing music...</span>
@@ -84,7 +80,7 @@
     </div>
 
     <div class="controls">
-        <div class="options">
+        <div class="options" id="optionsPanel">
             <label class="option">
                 <input type="checkbox" id="enableVideo" checked>
                 <span>Video</span>
@@ -93,6 +89,11 @@
                 <input type="checkbox" id="enableAudio" checked>
                 <span>Audio</span>
             </label>
+        </div>
+
+        <div class="streaming-status" id="streamingStatus" style="display: none;">
+            <span class="status-label">Sending:</span>
+            <span class="status-value" id="streamingStatusValue">Video + Audio</span>
         </div>
 
         <div class="audio-meter">
@@ -291,7 +292,9 @@
         const enableAudio = document.getElementById('enableAudio');
         const pttAudio = document.getElementById('pttAudio');
         const pttIndicator = document.getElementById('pttIndicator');
-        const audioOnlyIndicator = document.getElementById('audioOnlyIndicator');
+        const optionsPanel = document.getElementById('optionsPanel');
+        const streamingStatus = document.getElementById('streamingStatus');
+        const streamingStatusValue = document.getElementById('streamingStatusValue');
 
         // PTT timeout - fallback to hide indicator if no stop message received
         let pttTimeout = null;
@@ -329,6 +332,22 @@
         let musicTimer = null;
         let musicTimerRemaining = 0;
         let musicStatusInterval = null;
+
+        // Echo cancellation (spectral subtraction) state
+        let echoCancelEnabled = false;  // User preference from receiver
+        let echoCancelActive = false;   // Actually processing
+        let musicMediaSource = null;    // MediaElementSource for music (can only create once)
+        let echoProcessorNode = null;   // ScriptProcessorNode for processing
+        let echoStreamDestination = null; // Output for WebRTC
+        let echoMicAnalyser = null;     // FFT analyzer for mic
+        let echoMusicAnalyser = null;   // FFT analyzer for music
+        let originalAudioTrack = null;  // Original mic track for restore
+        let processedAudioTrack = null; // Processed track for WebRTC
+
+        // Spectral subtraction parameters
+        const SPECTRAL_FFT_SIZE = 2048;
+        const SUBTRACTION_FACTOR = 0.7;     // How aggressively to subtract music
+        const PROCESSOR_BUFFER_SIZE = 4096; // Processing buffer size
 
         // Load saved music volume from localStorage
         const savedMusicVolume = localStorage.getItem('sender-music-volume');
@@ -508,6 +527,16 @@
             // Play first track
             playNextTrack();
 
+            // Activate echo cancellation if enabled
+            if (echoCancelEnabled && audioContext && localStream) {
+                setTimeout(async () => {
+                    if (setupEchoCancellation()) {
+                        await replaceAudioTrack(processedAudioTrack);
+                        broadcastEchoCancelStatus();
+                    }
+                }, 100); // Small delay to ensure music is playing
+            }
+
             // Broadcast initial status
             broadcastMusicStatus();
         }
@@ -597,6 +626,15 @@
             musicIndicator.classList.remove('active');
             musicTimerRemaining = 0;
 
+            // Deactivate echo cancellation and restore original audio track
+            if (echoCancelActive) {
+                teardownEchoCancellation();
+                if (originalAudioTrack) {
+                    replaceAudioTrack(originalAudioTrack);
+                }
+                broadcastEchoCancelStatus();
+            }
+
             // Update local controls UI
             updateMusicControlsUI();
 
@@ -630,6 +668,201 @@
 
         // Fetch playlist on load
         fetchMusicPlaylist();
+
+        // === Echo Cancellation (Spectral Subtraction) ===
+
+        // Setup echo cancellation audio processing pipeline
+        function setupEchoCancellation() {
+            if (!localStream || !audioContext) {
+                console.log('Echo cancel: no stream or audio context');
+                return false;
+            }
+
+            const audioTrack = localStream.getAudioTracks()[0];
+            if (!audioTrack) {
+                console.log('Echo cancel: no audio track');
+                return false;
+            }
+
+            try {
+                console.log('Setting up echo cancellation...');
+
+                // Store original track for later restoration
+                originalAudioTrack = audioTrack;
+
+                // Create analyzers for both mic and music
+                echoMicAnalyser = audioContext.createAnalyser();
+                echoMicAnalyser.fftSize = SPECTRAL_FFT_SIZE;
+                echoMicAnalyser.smoothingTimeConstant = 0.3;
+
+                echoMusicAnalyser = audioContext.createAnalyser();
+                echoMusicAnalyser.fftSize = SPECTRAL_FFT_SIZE;
+                echoMusicAnalyser.smoothingTimeConstant = 0.3;
+
+                // Create mic source and connect to analyzer
+                const micSource = audioContext.createMediaStreamSource(localStream);
+                micSource.connect(echoMicAnalyser);
+
+                // Create music source if not already created
+                // Note: createMediaElementSource can only be called once per element
+                if (!musicMediaSource) {
+                    musicMediaSource = audioContext.createMediaElementSource(musicAudio);
+                    // Reconnect to destination so music still plays
+                    musicMediaSource.connect(audioContext.destination);
+                }
+                // Connect music to analyzer (in parallel with destination)
+                musicMediaSource.connect(echoMusicAnalyser);
+
+                // Create processor node for spectral subtraction
+                echoProcessorNode = audioContext.createScriptProcessor(PROCESSOR_BUFFER_SIZE, 1, 1);
+
+                // Create destination for processed audio
+                echoStreamDestination = audioContext.createMediaStreamDestination();
+
+                // Connect mic analyzer -> processor -> destination
+                echoMicAnalyser.connect(echoProcessorNode);
+                echoProcessorNode.connect(echoStreamDestination);
+
+                // Data arrays for FFT
+                const micFreqData = new Float32Array(echoMicAnalyser.frequencyBinCount);
+                const musicFreqData = new Float32Array(echoMusicAnalyser.frequencyBinCount);
+
+                // Processing function
+                echoProcessorNode.onaudioprocess = (e) => {
+                    const inputBuffer = e.inputBuffer;
+                    const outputBuffer = e.outputBuffer;
+                    const inputData = inputBuffer.getChannelData(0);
+                    const outputData = outputBuffer.getChannelData(0);
+
+                    // If music isn't playing, pass audio through unchanged
+                    if (!musicPlaying) {
+                        for (let i = 0; i < inputData.length; i++) {
+                            outputData[i] = inputData[i];
+                        }
+                        return;
+                    }
+
+                    // Get frequency data from both sources
+                    echoMicAnalyser.getFloatFrequencyData(micFreqData);
+                    echoMusicAnalyser.getFloatFrequencyData(musicFreqData);
+
+                    // Calculate music energy (how much music is present)
+                    let musicEnergy = 0;
+                    for (let i = 0; i < musicFreqData.length; i++) {
+                        // Convert dB to linear and sum
+                        const linear = Math.pow(10, musicFreqData[i] / 20);
+                        musicEnergy += linear;
+                    }
+                    musicEnergy = musicEnergy / musicFreqData.length;
+
+                    // Calculate suppression factor based on music energy
+                    // When music is loud, suppress more; when quiet, suppress less
+                    const suppressionFactor = Math.min(1, musicEnergy * SUBTRACTION_FACTOR * 10);
+
+                    // Apply suppression to time-domain samples
+                    // This is a simplified approach - true spectral subtraction would
+                    // require FFT/IFFT on the time-domain signal
+                    for (let i = 0; i < inputData.length; i++) {
+                        // Reduce signal based on music presence
+                        outputData[i] = inputData[i] * (1 - suppressionFactor * 0.7);
+                    }
+                };
+
+                // Get the processed audio track
+                processedAudioTrack = echoStreamDestination.stream.getAudioTracks()[0];
+
+                echoCancelActive = true;
+                console.log('Echo cancellation setup complete');
+                return true;
+
+            } catch (err) {
+                console.error('Echo cancellation setup error:', err);
+                teardownEchoCancellation();
+                return false;
+            }
+        }
+
+        // Teardown echo cancellation
+        function teardownEchoCancellation() {
+            console.log('Tearing down echo cancellation...');
+
+            if (echoProcessorNode) {
+                echoProcessorNode.disconnect();
+                echoProcessorNode.onaudioprocess = null;
+                echoProcessorNode = null;
+            }
+
+            if (echoMicAnalyser) {
+                echoMicAnalyser.disconnect();
+                echoMicAnalyser = null;
+            }
+
+            // Don't disconnect musicMediaSource - it needs to stay connected for playback
+            // Just disconnect from the echo analyzer
+            if (echoMusicAnalyser) {
+                echoMusicAnalyser.disconnect();
+                echoMusicAnalyser = null;
+            }
+
+            if (echoStreamDestination) {
+                echoStreamDestination = null;
+            }
+
+            processedAudioTrack = null;
+            echoCancelActive = false;
+            console.log('Echo cancellation teardown complete');
+        }
+
+        // Handle echo cancel toggle from receiver
+        async function handleEchoCancelToggle(enabled) {
+            console.log('Echo cancel toggle:', enabled);
+            echoCancelEnabled = enabled;
+
+            if (enabled && musicPlaying) {
+                // Setup and activate echo cancellation
+                if (setupEchoCancellation()) {
+                    // Replace audio track in WebRTC connection
+                    await replaceAudioTrack(processedAudioTrack);
+                }
+            } else {
+                // Teardown and restore original audio
+                teardownEchoCancellation();
+                if (originalAudioTrack) {
+                    await replaceAudioTrack(originalAudioTrack);
+                }
+            }
+
+            // Broadcast status to receivers
+            broadcastEchoCancelStatus();
+        }
+
+        // Replace audio track in peer connection
+        async function replaceAudioTrack(newTrack) {
+            if (!peerConnection || !newTrack) return;
+
+            const senders = peerConnection.getSenders();
+            const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+
+            if (audioSender) {
+                try {
+                    await audioSender.replaceTrack(newTrack);
+                    console.log('Replaced audio track');
+                } catch (err) {
+                    console.error('Failed to replace audio track:', err);
+                }
+            }
+        }
+
+        // Broadcast echo cancel status to receivers
+        function broadcastEchoCancelStatus() {
+            if (!sseConnected) return;
+
+            sendSignal({
+                type: 'echo-cancel-status',
+                enabled: echoCancelEnabled,
+                active: echoCancelActive
+            });
+        }
 
         // Public STUN servers (only used for IP discovery, no media passes through)
         const rtcConfig = {
@@ -709,8 +942,11 @@
                         if (!isStreaming) {
                             setTimeout(() => startStreaming(), 500);
                         }
-                        // Broadcast current music status to sync receivers on reconnect
-                        setTimeout(() => broadcastMusicStatus(), 1000);
+                        // Broadcast current status to sync receivers on reconnect
+                        setTimeout(() => {
+                            broadcastMusicStatus();
+                            broadcastEchoCancelStatus();
+                        }, 1000);
                         break;
 
                     case 'error':
@@ -732,7 +968,7 @@
                         // Update video preference if specified
                         if (message.videoEnabled !== undefined) {
                             receiverWantsVideo = message.videoEnabled;
-                            updateAudioOnlyIndicator();
+                            updateStreamingStatus();
                         }
                         if (localStream) {
                             await createOffer();
@@ -746,7 +982,7 @@
                     case 'video-request':
                         console.log('Receiver video request:', message.enabled);
                         receiverWantsVideo = message.enabled;
-                        updateAudioOnlyIndicator();
+                        updateStreamingStatus();
                         // Renegotiate connection with updated video state
                         if (localStream && peerConnection) {
                             await createOffer();
@@ -847,6 +1083,11 @@
                         }
                         break;
 
+                    case 'echo-cancel-enable':
+                        console.log('Received echo cancel toggle:', message.enabled);
+                        handleEchoCancelToggle(message.enabled);
+                        break;
+
                     case 'heartbeat':
                         // Server heartbeat - connection is alive
                         break;
@@ -900,9 +1141,10 @@
 
                 startBtn.style.display = 'none';
                 stopBtn.style.display = 'block';
-                enableVideo.disabled = true;
-                enableAudio.disabled = true;
+                optionsPanel.style.display = 'none';
+                streamingStatus.style.display = 'flex';
                 isStreaming = true;
+                updateStreamingStatus();
 
                 info.textContent = 'Streaming... Waiting for receivers.';
                 setConnectedState(true);
@@ -1028,6 +1270,11 @@
         }
 
         function stopStreaming() {
+            // Teardown echo cancellation first
+            if (echoCancelActive) {
+                teardownEchoCancellation();
+            }
+
             // Fade out music if playing
             if (musicPlaying) {
                 fadeOutAndStop();
@@ -1047,9 +1294,13 @@
 
             startBtn.style.display = 'block';
             stopBtn.style.display = 'none';
-            enableVideo.disabled = false;
-            enableAudio.disabled = false;
+            optionsPanel.style.display = 'flex';
+            streamingStatus.style.display = 'none';
             isStreaming = false;
+            receiverWantsVideo = true; // Reset for next session
+            echoCancelEnabled = false; // Reset echo cancel state
+            originalAudioTrack = null;
+            processedAudioTrack = null;
 
             setConnectedState(false);
             info.textContent = 'Streaming stopped.';
@@ -1123,12 +1374,25 @@
             }
         }
 
-        // Audio-only indicator
-        function updateAudioOnlyIndicator() {
-            if (receiverWantsVideo) {
-                audioOnlyIndicator.classList.remove('active');
+        // Update streaming status display
+        function updateStreamingStatus() {
+            if (!isStreaming) return;
+
+            const hasVideo = enableVideo.checked && receiverWantsVideo;
+            const hasAudio = enableAudio.checked;
+
+            if (hasVideo && hasAudio) {
+                streamingStatusValue.textContent = 'Video + Audio';
+                streamingStatusValue.className = 'status-value';
+            } else if (hasVideo) {
+                streamingStatusValue.textContent = 'Video only';
+                streamingStatusValue.className = 'status-value';
+            } else if (hasAudio) {
+                streamingStatusValue.textContent = 'Audio only';
+                streamingStatusValue.className = 'status-value audio-only';
             } else {
-                audioOnlyIndicator.classList.add('active');
+                streamingStatusValue.textContent = 'Nothing';
+                streamingStatusValue.className = 'status-value';
             }
         }
 

@@ -273,25 +273,27 @@ body.disconnected {
     }
 }
 
-/* Audio-only mode indicator */
-.audio-only-mode-indicator {
-    position: fixed;
-    bottom: 130px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(100, 100, 100, 0.9);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 10px;
-    font-size: 0.9rem;
-    font-weight: bold;
-    z-index: 100;
-    display: none;
-    text-align: center;
+/* Streaming status */
+.streaming-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
 }
 
-.audio-only-mode-indicator.active {
-    display: block;
+.streaming-status .status-label {
+    opacity: 0.7;
+}
+
+.streaming-status .status-value {
+    font-weight: 600;
+}
+
+.streaming-status .status-value.audio-only {
+    color: #ffb74d;
 }
 
 /* Music indicator */

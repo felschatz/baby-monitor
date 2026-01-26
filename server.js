@@ -364,6 +364,22 @@ async function handleSignal(req, res) {
             });
             break;
 
+        case 'echo-cancel-enable':
+            // Receiver -> Sender: toggle spectral subtraction
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, { type: 'echo-cancel-enable', enabled: message.enabled });
+            }
+            break;
+
+        case 'echo-cancel-status':
+            // Sender -> Receivers: acknowledge state
+            broadcastToReceivers(sessionName, {
+                type: 'echo-cancel-status',
+                enabled: message.enabled,
+                active: message.active
+            });
+            break;
+
         case 'ice-candidate':
             if (message.role === 'sender') {
                 broadcastToReceivers(sessionName, { type: 'ice-candidate', candidate: message.candidate });
@@ -608,4 +624,4 @@ server.listen(PORT, () => {
     console.log('Zero external dependencies - pure Node.js');
 });
 
-// Wisdom: Show what you send, hide what you skip.
+// Wisdom: Experimental features are stepping stones to solid solutions.

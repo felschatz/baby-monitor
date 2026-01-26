@@ -79,6 +79,11 @@
                 <input type="checkbox" id="audioOnlyToggle">
                 <span>Audio only</span>
             </label>
+            <label class="echo-cancel-toggle" id="echoCancelToggleLabel">
+                <input type="checkbox" id="echoCancelToggle">
+                <span>Reduce music echo</span>
+                <span class="experimental-badge">Experimental</span>
+            </label>
             <button class="fullscreen-btn" id="fullscreenBtn">⛶ Fullscreen</button>
         </div>
 
@@ -215,6 +220,30 @@
             // Request video state change from sender
             sendSignal({ type: 'video-request', enabled: !audioOnlyMode });
         });
+
+        // Echo cancellation toggle (experimental)
+        const echoCancelToggle = document.getElementById('echoCancelToggle');
+        const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
+        let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
+        echoCancelToggle.checked = echoCancelEnabled;
+
+        echoCancelToggle.addEventListener('change', () => {
+            echoCancelEnabled = echoCancelToggle.checked;
+            localStorage.setItem('receiver-echo-cancel', echoCancelEnabled);
+            console.log('Echo cancel mode:', echoCancelEnabled);
+            // Send signal to sender to enable/disable spectral subtraction
+            sendSignal({ type: 'echo-cancel-enable', enabled: echoCancelEnabled });
+        });
+
+        // Handle echo cancel status from sender
+        function handleEchoCancelStatus(message) {
+            console.log('Echo cancel status:', message);
+            if (message.active) {
+                echoCancelToggleLabel.classList.add('active');
+            } else {
+                echoCancelToggleLabel.classList.remove('active');
+            }
+        }
 
         // Music controls
         const musicContainer = document.getElementById('musicContainer');
@@ -556,6 +585,11 @@
                     case 'music-status':
                         console.log('Received music status:', message);
                         handleMusicStatus(message);
+                        break;
+
+                    case 'echo-cancel-status':
+                        console.log('Received echo cancel status:', message);
+                        handleEchoCancelStatus(message);
                         break;
 
                     case 'heartbeat':
