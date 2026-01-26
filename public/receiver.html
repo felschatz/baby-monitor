@@ -532,6 +532,10 @@
                             overlayText.textContent = 'Sender available. Requesting stream...';
                             // Request an offer from the sender with video preference
                             sendSignal({ type: 'request-offer', videoEnabled: !audioOnlyMode });
+                            // Send echo cancel preference
+                            if (echoCancelEnabled) {
+                                sendSignal({ type: 'echo-cancel-enable', enabled: true });
+                            }
                         } else {
                             overlayText.textContent = 'Waiting for sender to start streaming...';
                         }
@@ -541,6 +545,10 @@
                         overlayText.textContent = 'Sender started. Requesting stream...';
                         // Request an offer from the sender with video preference
                         sendSignal({ type: 'request-offer', videoEnabled: !audioOnlyMode });
+                        // Send echo cancel preference
+                        if (echoCancelEnabled) {
+                            sendSignal({ type: 'echo-cancel-enable', enabled: true });
+                        }
                         break;
 
                     case 'sender-disconnected':
