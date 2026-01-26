@@ -75,6 +75,10 @@
                 <input type="range" id="volume" min="0" max="100" value="100">
                 <span id="volumeValue">100%</span>
             </div>
+            <label class="audio-only-toggle">
+                <input type="checkbox" id="audioOnlyToggle">
+                <span>Audio only</span>
+            </label>
             <button class="fullscreen-btn" id="fullscreenBtn">⛶ Fullscreen</button>
         </div>
 
@@ -198,6 +202,19 @@
         const sensitivityValue = document.getElementById('sensitivityValue');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
         const info = document.getElementById('info');
+
+        // Audio-only toggle
+        const audioOnlyToggle = document.getElementById('audioOnlyToggle');
+        let audioOnlyMode = localStorage.getItem('receiver-audio-only') === 'true';
+        audioOnlyToggle.checked = audioOnlyMode;
+
+        audioOnlyToggle.addEventListener('change', () => {
+            audioOnlyMode = audioOnlyToggle.checked;
+            localStorage.setItem('receiver-audio-only', audioOnlyMode);
+            console.log('Audio-only mode:', audioOnlyMode);
+            // Request video state change from sender
+            sendSignal({ type: 'video-request', enabled: !audioOnlyMode });
+        });
 
         // Music controls
         const musicContainer = document.getElementById('musicContainer');
@@ -484,8 +501,8 @@
                         resetMusicUI();
                         if (message.senderAvailable) {
                             overlayText.textContent = 'Sender available. Requesting stream...';
-                            // Request an offer from the sender
-                            sendSignal({ type: 'request-offer' });
+                            // Request an offer from the sender with video preference
+                            sendSignal({ type: 'request-offer', videoEnabled: !audioOnlyMode });
                         } else {
                             overlayText.textContent = 'Waiting for sender to start streaming...';
                         }
@@ -493,8 +510,8 @@
 
                     case 'sender-available':
                         overlayText.textContent = 'Sender started. Requesting stream...';
-                        // Request an offer from the sender
-                        sendSignal({ type: 'request-offer' });
+                        // Request an offer from the sender with video preference
+                        sendSignal({ type: 'request-offer', videoEnabled: !audioOnlyMode });
                         break;
 
                     case 'sender-disconnected':
@@ -734,7 +751,8 @@
         const videoContainer = document.getElementById('videoContainer');
 
         function updateAudioOnlyIndicator() {
-            console.log('updateAudioOnlyIndicator: hasVideoTrack=', hasVideoTrack, 'isConnected=', isConnected);
+            console.log('updateAudioOnlyIndicator: hasVideoTrack=', hasVideoTrack, 'isConnected=', isConnected, 'audioOnlyMode=', audioOnlyMode);
+            const subtextEl = audioOnlyIndicator.querySelector('.audio-only-subtext');
             if (hasVideoTrack) {
                 audioOnlyIndicator.classList.remove('active');
                 videoContainer.classList.remove('audio-only');
@@ -743,6 +761,12 @@
                 console.log('Showing audio-only indicator');
                 audioOnlyIndicator.classList.add('active');
                 videoContainer.classList.add('audio-only');
+                // Update subtext based on who disabled video
+                if (audioOnlyMode) {
+                    subtextEl.textContent = 'Saving bandwidth';
+                } else {
+                    subtextEl.textContent = 'Video disabled on sender';
+                }
             } else {
                 audioOnlyIndicator.classList.remove('active');
                 videoContainer.classList.remove('audio-only');

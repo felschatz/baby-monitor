@@ -273,6 +273,27 @@ body.disconnected {
     }
 }
 
+/* Audio-only mode indicator */
+.audio-only-mode-indicator {
+    position: fixed;
+    bottom: 130px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(100, 100, 100, 0.9);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    z-index: 100;
+    display: none;
+    text-align: center;
+}
+
+.audio-only-mode-indicator.active {
+    display: block;
+}
+
 /* Music indicator */
 .music-indicator {
     position: fixed;

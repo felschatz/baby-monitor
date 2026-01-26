@@ -50,6 +50,11 @@
         🔊 Parent is speaking...
     </div>
 
+    <!-- Audio-only indicator -->
+    <div class="audio-only-mode-indicator" id="audioOnlyIndicator">
+        🎤 Audio only mode
+    </div>
+
     <!-- Music indicator -->
     <div class="music-indicator" id="musicIndicator">
         🎵 <span id="musicTrackName">Playing music...</span>
@@ -286,6 +291,7 @@
         const enableAudio = document.getElementById('enableAudio');
         const pttAudio = document.getElementById('pttAudio');
         const pttIndicator = document.getElementById('pttIndicator');
+        const audioOnlyIndicator = document.getElementById('audioOnlyIndicator');
 
         // PTT timeout - fallback to hide indicator if no stop message received
         let pttTimeout = null;
@@ -297,6 +303,9 @@
         // Auto-streaming flags
         let isStreaming = false;
         let sseConnected = false;
+
+        // Video state requested by receiver (for bandwidth saving)
+        let receiverWantsVideo = true;
 
         // Music player state
         const musicAudio = document.getElementById('musicAudio');
@@ -719,13 +728,28 @@
                         break;
 
                     case 'request-offer':
-                        console.log('Receiver requesting offer');
+                        console.log('Receiver requesting offer, videoEnabled:', message.videoEnabled);
+                        // Update video preference if specified
+                        if (message.videoEnabled !== undefined) {
+                            receiverWantsVideo = message.videoEnabled;
+                            updateAudioOnlyIndicator();
+                        }
                         if (localStream) {
                             await createOffer();
                             // Send current music status to newly connected receiver
                             broadcastMusicStatus();
                         } else {
                             console.log('No local stream yet');
+                        }
+                        break;
+
+                    case 'video-request':
+                        console.log('Receiver video request:', message.enabled);
+                        receiverWantsVideo = message.enabled;
+                        updateAudioOnlyIndicator();
+                        // Renegotiate connection with updated video state
+                        if (localStream && peerConnection) {
+                            await createOffer();
                         }
                         break;
 
@@ -908,6 +932,11 @@
             console.log('Created new peer connection');
 
             localStream.getTracks().forEach(track => {
+                // Skip video track if receiver requested audio-only
+                if (track.kind === 'video' && !receiverWantsVideo) {
+                    console.log('Skipping video track (receiver requested audio-only)');
+                    return;
+                }
                 peerConnection.addTrack(track, localStream);
                 console.log('Added track:', track.kind);
             });
@@ -1091,6 +1120,15 @@
                 }
             } catch (err) {
                 console.error('PTT offer error:', err);
+            }
+        }
+
+        // Audio-only indicator
+        function updateAudioOnlyIndicator() {
+            if (receiverWantsVideo) {
+                audioOnlyIndicator.classList.remove('active');
+            } else {
+                audioOnlyIndicator.classList.add('active');
             }
         }
 

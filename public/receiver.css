@@ -313,6 +313,21 @@ body.loud-alert-active .controls {
     cursor: pointer;
 }
 
+.audio-only-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.audio-only-toggle input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
 .ptt-btn {
     background: linear-gradient(135deg, #2196F3, #1976D2);
     border: none;

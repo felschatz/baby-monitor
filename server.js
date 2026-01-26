@@ -296,7 +296,13 @@ async function handleSignal(req, res) {
     switch (message.type) {
         case 'request-offer':
             if (hasSender(sessionName)) {
-                sendToSender(sessionName, { type: 'request-offer' });
+                sendToSender(sessionName, { type: 'request-offer', videoEnabled: message.videoEnabled });
+            }
+            break;
+
+        case 'video-request':
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, { type: 'video-request', enabled: message.enabled });
             }
             break;
 
@@ -602,4 +608,4 @@ server.listen(PORT, () => {
     console.log('Zero external dependencies - pure Node.js');
 });
 
-// Wisdom: Zero dependencies, zero worries.
+// Wisdom: Show what you send, hide what you skip.
