@@ -22,6 +22,7 @@ A real-time baby monitor web application for streaming audio and video between t
 - **Fullscreen mode** - Immersive viewing on receiver
 - **Auto-reconnect** - Automatically reconnects when connection is lost
 - **Lullaby playback** - Play music on baby's phone with configurable sleep timer
+- **Music echo reduction** (Experimental) - Reduces music bleedthrough in the audio stream using spectral subtraction
 - **No WebSocket required** - Uses Server-Sent Events (SSE) for signaling, works with simple hosting
 
 ## Requirements
@@ -255,6 +256,8 @@ baby-monitor/
 | Timer dropdown | Select sleep timer duration (45 min, 1 hour) |
 | Volume slider | Adjust playback volume (saved to localStorage) |
 | Sensitivity slider | Adjust loud sound threshold (saved to localStorage) |
+| Audio only checkbox | Disable video to save bandwidth |
+| Reduce music echo checkbox | Experimental: reduce music in audio stream |
 | ⛶ Fullscreen | Toggle fullscreen mode |
 
 ### Sender (Baby's Phone)
@@ -299,6 +302,18 @@ baby-monitor/
 4. Sender shuffles playlist and plays through speaker
 5. Music stops automatically when timer expires
 6. Parent can stop manually by tapping the stop button
+
+### Music Echo Reduction (Experimental)
+
+When lullabies are playing on the baby's phone, the music can bleed through the microphone into the audio stream. The "Reduce music echo" feature attempts to reduce this:
+
+1. Enable "Reduce music echo" checkbox on receiver
+2. Start music playback
+3. Sender analyzes both the music and microphone audio using FFT
+4. Music frequencies are attenuated from the mic signal before streaming
+5. Baby sounds should still come through while music is reduced
+
+**Note:** This is experimental. Results vary depending on speaker/mic placement and room acoustics. The feature uses ScriptProcessorNode (deprecated but widely supported) for real-time processing.
 
 **Playlist Structure:**
 ```

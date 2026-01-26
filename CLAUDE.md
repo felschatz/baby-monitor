@@ -35,6 +35,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - PTT (Push-to-Talk) works via WebRTC renegotiation
 - Audio ducking reduces baby audio to 15% during PTT
 - STUN servers: stunprotocol.org, nextcloud.com, sipgate.net
+- Experimental spectral subtraction for music echo reduction
 
 ## Visual States
 
@@ -54,6 +55,9 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Sensitivity slider controls threshold (saved to localStorage)
 - Volume control persisted to localStorage
 - Screen dims on sender after 5s inactivity to save battery
+- Echo cancellation uses ScriptProcessorNode for spectral subtraction
+- `createMediaElementSource` is called once per audio element (limitation)
+- `RTCRtpSender.replaceTrack()` swaps between raw/processed audio without renegotiation
 
 ## API Endpoints
 
@@ -63,6 +67,28 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - `GET /api/status/:session` - JSON: `{senderActive, receiverCount}` for specific session
 - `GET /api/status` - JSON: `{activeSessions, totalReceivers}` for global status
 - `GET /api/music?playlist=1` - JSON: `{files: [{name, url}], playlists: ["1","2"], currentPlaylist, debugTimer}`
+
+## Signal Types
+
+Signaling messages sent via `/api/signal`:
+
+| Signal | Direction | Description |
+|--------|-----------|-------------|
+| `request-offer` | Receiver → Sender | Request WebRTC offer |
+| `video-request` | Receiver → Sender | Toggle video on/off |
+| `offer` | Sender → Receivers | WebRTC offer |
+| `answer` | Receiver → Sender | WebRTC answer |
+| `ice-candidate` | Both directions | ICE candidate exchange |
+| `ptt-start` | Receiver → Sender | PTT starting |
+| `ptt-offer` | Receiver → Sender | PTT renegotiation offer |
+| `ptt-answer` | Sender → Receivers | PTT renegotiation answer |
+| `ptt-stop` | Receiver → Sender | PTT stopped |
+| `music-start` | Receiver → Sender | Start music playback |
+| `music-stop` | Receiver → Sender | Stop music playback |
+| `music-timer-reset` | Receiver → Sender | Reset music timer |
+| `music-status` | Sender → Receivers | Music playback status |
+| `echo-cancel-enable` | Receiver → Sender | Toggle spectral subtraction |
+| `echo-cancel-status` | Sender → Receivers | Echo cancel status (enabled, active) |
 
 ## Music/Playlist Structure
 
