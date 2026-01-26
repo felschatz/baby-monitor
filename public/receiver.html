@@ -143,27 +143,126 @@
             throw new Error('Session required');
         }
 
-        // Keep screen awake
+        // ========== ROBUST KEEP-AWAKE SYSTEM ==========
+        // Multiple fallback mechanisms to prevent phone from sleeping
+
         let wakeLock = null;
+        let wakeLockInterval = null;
+        let noSleepVideo = null;
+        let keepAliveAudio = null;
 
         async function requestWakeLock() {
+            // Release existing lock first to avoid leaks
+            if (wakeLock) {
+                try {
+                    await wakeLock.release();
+                } catch (e) {}
+                wakeLock = null;
+            }
+
             try {
                 if ('wakeLock' in navigator) {
                     wakeLock = await navigator.wakeLock.request('screen');
                     console.log('Wake lock acquired');
+
+                    // Listen for release events (OS can release anytime)
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake lock released by system, re-acquiring...');
+                        // Small delay to avoid rapid re-acquisition loops
+                        setTimeout(requestWakeLock, 1000);
+                    });
                 }
             } catch (err) {
-                console.log('Wake lock failed:', err);
+                console.log('Wake lock failed:', err.message);
             }
         }
 
+        // Periodic wake lock refresh (every 30 seconds)
+        function startWakeLockRefresh() {
+            if (wakeLockInterval) clearInterval(wakeLockInterval);
+            wakeLockInterval = setInterval(() => {
+                if (document.visibilityState === 'visible') {
+                    console.log('Periodic wake lock refresh');
+                    requestWakeLock();
+                }
+            }, 30000);
+        }
+
+        // NoSleep.js technique: hidden video that keeps screen awake
+        function createNoSleepVideo() {
+            if (noSleepVideo) return;
+
+            // Tiny webm video (base64 encoded) - just a black frame
+            const webmData = 'data:video/webm;base64,GkXfowEAAAAAAAAfQoaBAUL3gQFC8oEEQvOBCEKChHdlYm1Ch4EEQoWBAhhTgGcBAAAAAAAB9xFNm3RALE27i1OrhBVJqWZTrIHfTbuMU6uEFlSua1OsggEwTbuMU6uEHFO7a1OsggHL';
+
+            noSleepVideo = document.createElement('video');
+            noSleepVideo.setAttribute('playsinline', '');
+            noSleepVideo.setAttribute('muted', '');
+            noSleepVideo.setAttribute('loop', '');
+            noSleepVideo.style.cssText = 'position:fixed;top:-1px;left:-1px;width:1px;height:1px;opacity:0.01;pointer-events:none;';
+            noSleepVideo.src = webmData;
+            document.body.appendChild(noSleepVideo);
+
+            // Try to play (may need user interaction first)
+            noSleepVideo.play().catch(() => {
+                console.log('NoSleep video needs user interaction');
+            });
+        }
+
+        // Silent audio keep-alive (plays inaudible tone)
+        function createKeepAliveAudio() {
+            if (keepAliveAudio) return;
+
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                // Inaudible: 1Hz at zero volume
+                oscillator.frequency.value = 1;
+                gainNode.gain.value = 0.001; // Nearly silent
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+
+                keepAliveAudio = { audioCtx, oscillator, gainNode };
+                console.log('Keep-alive audio started');
+            } catch (err) {
+                console.log('Keep-alive audio failed:', err.message);
+            }
+        }
+
+        // Initialize all keep-awake mechanisms
+        function initKeepAwake() {
+            requestWakeLock();
+            startWakeLockRefresh();
+            createNoSleepVideo();
+            // Audio keep-alive started after user interaction (below)
+        }
+
+        // Re-acquire on visibility change
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
+                console.log('Page visible, refreshing keep-awake');
                 requestWakeLock();
+                if (noSleepVideo) {
+                    noSleepVideo.play().catch(() => {});
+                }
             }
         });
 
-        requestWakeLock();
+        // Start keep-awake on first user interaction (needed for video/audio autoplay)
+        document.addEventListener('click', function initOnInteraction() {
+            createKeepAliveAudio();
+            if (noSleepVideo) {
+                noSleepVideo.play().catch(() => {});
+            }
+            document.removeEventListener('click', initOnInteraction);
+        }, { once: true });
+
+        initKeepAwake();
+        // ========== END KEEP-AWAKE SYSTEM ==========
         
         // Track user interaction for autoplay
         let userHasInteracted = false;

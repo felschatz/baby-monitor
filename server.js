@@ -624,4 +624,4 @@ server.listen(PORT, () => {
     console.log('Zero external dependencies - pure Node.js');
 });
 
-// Wisdom: Experimental features are stepping stones to solid solutions.
+// Wisdom: Good documentation prevents midnight debugging sessions.

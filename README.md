@@ -345,6 +345,40 @@ Add a `name.txt` file to each folder to give it a custom display name.
 
 ## Troubleshooting
 
+### Sender phone turns off or sleeps
+
+The app uses multiple keep-awake mechanisms (Wake Lock API, background video, silent audio), but Android can still kill apps aggressively. For reliable overnight monitoring:
+
+**Required settings on the sender (baby's) phone:**
+
+1. **Disable battery optimization for Chrome**
+   - Settings → Apps → Chrome → Battery → "Unrestricted" (not "Optimized")
+   - This prevents Android from killing Chrome in the background
+
+2. **Disable auto power-off**
+   - Settings → Battery → Auto power off → OFF
+   - Some phones have scheduled shutdown - disable it
+
+3. **Lock the app in recent apps**
+   - Open recent apps (swipe up or square button)
+   - Find Chrome, tap the lock icon or long-press → "Lock"
+   - This prevents the app from being killed when memory is low
+
+4. **Keep the phone plugged in**
+   - Use a reliable charger and cable
+   - Some cheap cables disconnect intermittently
+
+5. **Disable "Adaptive battery"** (optional but recommended)
+   - Settings → Battery → Adaptive battery → OFF
+   - This feature learns to kill "unused" apps
+
+**For Samsung phones:**
+- Also disable "Put unused apps to sleep" in Device Care → Battery
+
+**For Xiaomi/MIUI:**
+- Settings → Battery → App battery saver → Chrome → "No restrictions"
+- Also check Security app → Permissions → Autostart → enable Chrome
+
 ### Camera/Microphone not working
 
 - Ensure you've granted permissions in browser settings
