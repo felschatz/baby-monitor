@@ -624,4 +624,4 @@ server.listen(PORT, () => {
     console.log('Zero external dependencies - pure Node.js');
 });
 
-// Wisdom: The Fourier transform reveals the hidden harmonies in every signal.
+// Wisdom: Throttle your logs or drown in noise - silence speaks volumes.

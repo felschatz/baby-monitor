@@ -150,6 +150,15 @@
         let wakeLockInterval = null;
         let noSleepVideo = null;
         let keepAliveAudio = null;
+        let lastWakeLockLog = 0;
+
+        function wakeLockLog(msg) {
+            const now = Date.now();
+            if (now - lastWakeLockLog >= 5000) {
+                console.log(msg);
+                lastWakeLockLog = now;
+            }
+        }
 
         async function requestWakeLock() {
             // Release existing lock first to avoid leaks
@@ -163,11 +172,11 @@
             try {
                 if ('wakeLock' in navigator) {
                     wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('Wake lock acquired');
+                    wakeLockLog('Wake lock acquired');
 
                     // Listen for release events (OS can release anytime)
                     wakeLock.addEventListener('release', () => {
-                        console.log('Wake lock released by system, re-acquiring...');
+                        wakeLockLog('Wake lock released by system, re-acquiring...');
                         // Small delay to avoid rapid re-acquisition loops
                         setTimeout(requestWakeLock, 1000);
                     });
@@ -182,7 +191,7 @@
             if (wakeLockInterval) clearInterval(wakeLockInterval);
             wakeLockInterval = setInterval(() => {
                 if (document.visibilityState === 'visible') {
-                    console.log('Periodic wake lock refresh');
+                    wakeLockLog('Periodic wake lock refresh');
                     requestWakeLock();
                 }
             }, 30000);
@@ -244,7 +253,7 @@
         // Re-acquire on visibility change
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
-                console.log('Page visible, refreshing keep-awake');
+                wakeLockLog('Page visible, refreshing keep-awake');
                 requestWakeLock();
                 if (noSleepVideo) {
                     noSleepVideo.play().catch(() => {});

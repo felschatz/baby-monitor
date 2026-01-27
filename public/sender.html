@@ -170,6 +170,15 @@
         let wakeLockInterval = null;
         let noSleepVideo = null;
         let keepAliveAudio = null;
+        let lastWakeLockLog = 0;
+
+        function wakeLockLog(msg) {
+            const now = Date.now();
+            if (now - lastWakeLockLog >= 5000) {
+                console.log(msg);
+                lastWakeLockLog = now;
+            }
+        }
 
         async function requestWakeLock() {
             // Release existing lock first to avoid leaks
@@ -183,11 +192,11 @@
             try {
                 if ('wakeLock' in navigator) {
                     wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('Wake lock acquired');
+                    wakeLockLog('Wake lock acquired');
 
                     // Listen for release events (OS can release anytime)
                     wakeLock.addEventListener('release', () => {
-                        console.log('Wake lock released by system, re-acquiring...');
+                        wakeLockLog('Wake lock released by system, re-acquiring...');
                         // Small delay to avoid rapid re-acquisition loops
                         setTimeout(requestWakeLock, 1000);
                     });
@@ -202,7 +211,7 @@
             if (wakeLockInterval) clearInterval(wakeLockInterval);
             wakeLockInterval = setInterval(() => {
                 if (document.visibilityState === 'visible') {
-                    console.log('Periodic wake lock refresh');
+                    wakeLockLog('Periodic wake lock refresh');
                     requestWakeLock();
                 }
             }, 30000);
@@ -264,7 +273,7 @@
         // Re-acquire on visibility change
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
-                console.log('Page visible, refreshing keep-awake');
+                wakeLockLog('Page visible, refreshing keep-awake');
                 requestWakeLock();
                 if (noSleepVideo) {
                     noSleepVideo.play().catch(() => {});
@@ -437,7 +446,7 @@
         let musicMediaSource = null;    // MediaElementSource for music (can only create once)
         let echoProcessorNode = null;   // ScriptProcessorNode for processing
         let echoStreamDestination = null; // Output for WebRTC
-        let echoMicAnalyser = null;     // FFT analyzer for mic
+        let echoMicSource = null;       // Mic source node (must keep reference to prevent GC)
         let echoMusicAnalyser = null;   // FFT analyzer for music
         let originalAudioTrack = null;  // Original mic track for restore
         let processedAudioTrack = null; // Processed track for WebRTC
@@ -871,8 +880,8 @@
                 outputRing: new Float32Array(FFT_SIZE * 2),
                 inputPos: 0,
                 outputReadPos: 0,
-                outputWritePos: 0,
-                samplesAccumulated: 0,
+                outputWritePos: FFT_SIZE,  // Start ahead to provide latency for overlap-add
+                totalSamplesIn: 0,         // Track total input samples for first frame timing
 
                 // FFT working arrays
                 fftReal: new Float32Array(FFT_SIZE),
@@ -921,8 +930,8 @@
                 // Initialize music frequency data array
                 fftState.musicFreqData = new Float32Array(echoMusicAnalyser.frequencyBinCount);
 
-                // Create mic source
-                const micSource = audioContext.createMediaStreamSource(localStream);
+                // Create mic source (store reference to prevent garbage collection)
+                echoMicSource = audioContext.createMediaStreamSource(localStream);
 
                 // Create music source if not already created
                 // Note: createMediaElementSource can only be called once per element
@@ -947,8 +956,11 @@
                 echoStreamDestination = audioContext.createMediaStreamDestination();
 
                 // Connect mic source -> processor -> destination
-                micSource.connect(echoProcessorNode);
+                echoMicSource.connect(echoProcessorNode);
                 echoProcessorNode.connect(echoStreamDestination);
+
+                // Debug counter for logging
+                let debugCounter = 0;
 
                 // FFT-based spectral subtraction processing
                 echoProcessorNode.onaudioprocess = (e) => {
@@ -956,6 +968,18 @@
                     const inputData = e.inputBuffer.getChannelData(0);
                     const outputData = e.outputBuffer.getChannelData(0);
                     const bufferSize = inputData.length;
+
+                    // Debug logging every ~2 seconds (at 48kHz, 4096 buffer = ~12 calls/sec)
+                    debugCounter++;
+                    if (debugCounter % 24 === 1) {
+                        // Calculate RMS of input
+                        let inputRms = 0;
+                        for (let j = 0; j < bufferSize; j++) {
+                            inputRms += inputData[j] * inputData[j];
+                        }
+                        inputRms = Math.sqrt(inputRms / bufferSize);
+                        console.log(`Echo cancel debug: musicPlaying=${musicPlaying}, inputRms=${inputRms.toFixed(6)}, totalSamples=${fftState?.totalSamplesIn || 0}`);
+                    }
 
                     // If music isn't playing, pass audio through unchanged
                     if (!musicPlaying) {
@@ -979,11 +1003,13 @@
                         // Add input sample to ring buffer
                         fftState.inputRing[fftState.inputPos] = inputData[i];
                         fftState.inputPos = (fftState.inputPos + 1) % FFT_SIZE;
-                        fftState.samplesAccumulated++;
+                        fftState.totalSamplesIn++;
 
-                        // Every HOP_SIZE samples, process a frame
-                        if (fftState.samplesAccumulated >= HOP_SIZE) {
-                            fftState.samplesAccumulated = 0;
+                        // Process FFT frame when we have enough samples:
+                        // - First frame triggers at FFT_SIZE samples (need full buffer)
+                        // - Subsequent frames trigger every HOP_SIZE samples after that
+                        if (fftState.totalSamplesIn >= FFT_SIZE &&
+                            (fftState.totalSamplesIn - FFT_SIZE) % HOP_SIZE === 0) {
                             processFFTFrame();
                         }
 
@@ -991,6 +1017,16 @@
                         outputData[i] = fftState.outputRing[fftState.outputReadPos];
                         fftState.outputRing[fftState.outputReadPos] = 0; // Clear after reading
                         fftState.outputReadPos = (fftState.outputReadPos + 1) % (FFT_SIZE * 2);
+                    }
+
+                    // Debug: log output RMS every ~2 seconds
+                    if (debugCounter % 24 === 1) {
+                        let outputRms = 0;
+                        for (let j = 0; j < bufferSize; j++) {
+                            outputRms += outputData[j] * outputData[j];
+                        }
+                        outputRms = Math.sqrt(outputRms / bufferSize);
+                        console.log(`Echo cancel output: outputRms=${outputRms.toFixed(6)}, framesProcessed=${Math.floor((fftState.totalSamplesIn - FFT_SIZE) / HOP_SIZE) + 1}`);
                     }
 
                     // Performance monitoring
@@ -1037,7 +1073,10 @@
             fftInPlace(state.fftReal, state.fftImag);
 
             // Spectral subtraction per frequency bin
+            // Note: AnalyserNode gives FFT_SIZE/2 bins, but FFT has FFT_SIZE/2+1 unique bins
             const numBins = FFT_SIZE / 2 + 1;
+            const musicBins = state.musicFreqData.length; // FFT_SIZE / 2
+
             for (let k = 0; k < numBins; k++) {
                 // Calculate mic magnitude and phase
                 const micMag = Math.sqrt(state.fftReal[k] * state.fftReal[k] + state.fftImag[k] * state.fftImag[k]);
@@ -1045,7 +1084,9 @@
 
                 // Get music magnitude from AnalyserNode (dB) and convert to linear
                 // AnalyserNode returns values in dB, typically -100 to 0
-                const musicDb = state.musicFreqData[k];
+                // Clamp index to avoid accessing beyond array bounds (Nyquist bin)
+                const musicIdx = Math.min(k, musicBins - 1);
+                const musicDb = state.musicFreqData[musicIdx];
                 const musicMag = Math.pow(10, musicDb / 20) * MUSIC_SCALE;
 
                 // Spectral subtraction with over-subtraction and spectral floor
@@ -1108,6 +1149,11 @@
                 echoProcessorNode.disconnect();
                 echoProcessorNode.onaudioprocess = null;
                 echoProcessorNode = null;
+            }
+
+            if (echoMicSource) {
+                echoMicSource.disconnect();
+                echoMicSource = null;
             }
 
             // Don't disconnect musicMediaSource - it needs to stay connected for playback
