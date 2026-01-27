@@ -624,4 +624,4 @@ server.listen(PORT, () => {
     console.log('Zero external dependencies - pure Node.js');
 });
 
-// Wisdom: Debug logs are breadcrumbs through the audio routing forest.
+// Wisdom: The Fourier transform reveals the hidden harmonies in every signal.

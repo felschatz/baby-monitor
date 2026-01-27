@@ -35,7 +35,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - PTT (Push-to-Talk) works via WebRTC renegotiation
 - Audio ducking reduces baby audio to 15% during PTT
 - STUN servers: stunprotocol.org, nextcloud.com, sipgate.net
-- Experimental spectral subtraction for music echo reduction
+- FFT-based spectral subtraction for music echo reduction
 
 ## Visual States
 
@@ -55,7 +55,13 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Sensitivity slider controls threshold (saved to localStorage)
 - Volume control persisted to localStorage
 - Screen dims on sender after 5s inactivity to save battery
-- Echo cancellation uses ScriptProcessorNode for spectral subtraction
+- Echo cancellation uses FFT-based spectral subtraction via ScriptProcessorNode
+  - Inline Radix-2 Cooley-Tukey FFT (no external dependencies)
+  - 2048-sample FFT with 50% overlap (1024 hop size)
+  - Per-frequency-bin subtraction: `outputMag = max(micMag - α*musicMag, β*micMag)`
+  - Temporal smoothing reduces "musical noise" artifacts
+  - Automatic fallback to simple mode if device too slow (10 overruns)
+  - Parameters: ALPHA=2.0 (over-subtraction), BETA=0.02 (floor), SMOOTHING=0.6
 - `createMediaElementSource` is called once per audio element (limitation)
 - `RTCRtpSender.replaceTrack()` swaps between raw/processed audio without renegotiation
 
