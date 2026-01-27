@@ -624,4 +624,4 @@ server.listen(PORT, () => {
     console.log('Zero external dependencies - pure Node.js');
 });
 
-// Wisdom: Throttle your logs or drown in noise - silence speaks volumes.
+// Wisdom: A valid codec beats a clever hack - base64 video must actually decode.
