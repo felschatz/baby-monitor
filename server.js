@@ -624,4 +624,4 @@ server.listen(PORT, () => {
     console.log('Zero external dependencies - pure Node.js');
 });
 
-// Wisdom: Good documentation prevents midnight debugging sessions.
+// Wisdom: Debug logs are breadcrumbs through the audio routing forest.

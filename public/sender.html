@@ -645,6 +645,11 @@
 
             const track = musicShuffled[musicCurrentIndex];
             console.log('Playing track:', track.name);
+            console.log('Audio routing - musicMediaSource exists:', !!musicMediaSource,
+                        ', audioContext exists:', !!audioContext,
+                        ', audioContext state:', audioContext?.state,
+                        ', echoCancelEnabled:', echoCancelEnabled,
+                        ', echoCancelActive:', echoCancelActive);
             musicTrackName.textContent = track.name;
 
             musicAudio.src = track.url;
@@ -805,10 +810,16 @@
                 // Note: createMediaElementSource can only be called once per element
                 if (!musicMediaSource) {
                     musicMediaSource = audioContext.createMediaElementSource(musicAudio);
-                    // Reconnect to destination so music still plays
-                    musicMediaSource.connect(audioContext.destination);
                 }
-                // Connect music to analyzer (in parallel with destination)
+                // Disconnect all outputs and reconnect cleanly to avoid duplicate paths
+                try {
+                    musicMediaSource.disconnect();
+                } catch (e) {
+                    // No existing connections, that's fine
+                }
+                // Reconnect to destination so music still plays
+                musicMediaSource.connect(audioContext.destination);
+                // Connect to analyzer for echo cancellation
                 musicMediaSource.connect(echoMusicAnalyser);
 
                 // Create processor node for spectral subtraction
@@ -1400,12 +1411,21 @@
             originalAudioTrack = null;
             processedAudioTrack = null;
 
+            // NOTE: Don't close audioContext or reset musicMediaSource here!
+            // Once createMediaElementSource() is called on musicAudio, that element
+            // is permanently bound to that context. Closing the context would break
+            // music playback. The context and musicMediaSource must persist.
+
             setConnectedState(false);
             info.textContent = 'Streaming stopped.';
         }
 
         function setupAudioAnalysis(stream) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // Reuse existing audioContext if available (required if musicMediaSource exists)
+            // Once createMediaElementSource() is called, that element is bound to its context
+            if (!audioContext || audioContext.state === 'closed') {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
             analyser = audioContext.createAnalyser();
             const source = audioContext.createMediaStreamSource(stream);
             source.connect(analyser);
