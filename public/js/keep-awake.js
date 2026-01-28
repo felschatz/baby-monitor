@@ -6,7 +6,6 @@
 let wakeLock = null;
 let wakeLockInterval = null;
 let noSleepVideo = null;
-let keepAliveAudio = null;
 let lastWakeLockLog = 0;
 
 /**
@@ -95,33 +94,6 @@ export function getNoSleepVideo() {
     return noSleepVideo;
 }
 
-/**
- * Silent audio keep-alive (plays inaudible tone)
- */
-export function createKeepAliveAudio() {
-    if (keepAliveAudio) return keepAliveAudio;
-
-    try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-
-        // Inaudible: 1Hz at zero volume
-        oscillator.frequency.value = 1;
-        gainNode.gain.value = 0.001; // Nearly silent
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        oscillator.start();
-
-        keepAliveAudio = { audioCtx, oscillator, gainNode };
-        console.log('Keep-alive audio started');
-        return keepAliveAudio;
-    } catch (err) {
-        console.log('Keep-alive audio failed:', err.message);
-        return null;
-    }
-}
 
 /**
  * Initialize all keep-awake mechanisms
@@ -142,9 +114,8 @@ export function initKeepAwake() {
         }
     });
 
-    // Start keep-awake on first user interaction (needed for video/audio autoplay)
+    // Start NoSleep video on first user interaction (needed for autoplay)
     document.addEventListener('click', function initOnInteraction() {
-        createKeepAliveAudio();
         if (noSleepVideo) {
             noSleepVideo.play().catch(() => {});
         }

@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: The best code is no code - but modular code is the next best thing.
+// Wisdom: Silent audio that nobody can hear still tells the phone where to route sound.
