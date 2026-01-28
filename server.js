@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Silent audio that nobody can hear still tells the phone where to route sound.
+// Wisdom: Echo cancellation in browser puts the whole phone in call mode.

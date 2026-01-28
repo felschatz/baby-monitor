@@ -91,8 +91,9 @@ export function getMediaConstraints(options) {
             ...getVideoConstraints(quality)
         } : false,
         audio: audio ? {
-            echoCancellation: true,
-            noiseSuppression: true
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
         } : false
     };
 }

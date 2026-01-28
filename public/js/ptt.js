@@ -69,8 +69,9 @@ export async function startPTT(pttBtn, pttLabel) {
         console.log('PTT: Requesting microphone...');
         pttStream = await navigator.mediaDevices.getUserMedia({
             audio: {
-                echoCancellation: true,
-                noiseSuppression: true
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false
             }
         });
         console.log('PTT: Got microphone');
