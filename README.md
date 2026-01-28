@@ -206,20 +206,43 @@ Require valid-user
 
 ```
 baby-monitor/
-├── server.js              # Node.js HTTP server with SSE signaling
-├── package.json           # Project config (no framework dependencies)
-├── CLAUDE.md              # AI assistant context file
-├── README.md              # This file
-├── mp3/                   # Lullaby MP3 files (add your own)
+├── server.js                  # Thin wrapper, starts the server
+├── server/                    # Server modules (ES6/CommonJS)
+│   ├── index.js               # HTTP server, main router
+│   ├── session-manager.js     # Session state management
+│   ├── sse-manager.js         # SSE setup and broadcast
+│   ├── signal-router.js       # WebRTC signaling handlers
+│   ├── music-api.js           # Playlist scanning
+│   ├── static-server.js       # Static file serving
+│   └── utils.js               # Shared utilities
+├── package.json               # Project config (no framework dependencies)
+├── CLAUDE.md                  # AI assistant context file
+├── README.md                  # This file
+├── mp3/                       # Lullaby MP3 files (add your own)
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml     # GitHub Actions FTPS deployment
+│       └── deploy.yml         # GitHub Actions FTPS deployment
 └── public/
-    ├── index.html         # Landing page with status
-    ├── sender.html        # Baby's phone (camera/mic sender)
-    ├── sender.css         # Sender styles
-    ├── receiver.html      # Parent's phone (viewer)
-    └── receiver.css       # Receiver styles
+    ├── index.html             # Landing page with status
+    ├── sender.html            # Baby's phone UI
+    ├── sender.css             # Sender styles
+    ├── receiver.html          # Parent's phone UI
+    ├── receiver.css           # Receiver styles
+    └── js/                    # Frontend modules (ES6)
+        ├── sender-app.js      # Sender main orchestration
+        ├── receiver-app.js    # Receiver main orchestration
+        ├── keep-awake.js      # Wake lock, NoSleep
+        ├── session.js         # Session handling
+        ├── signaling.js       # SSE connection
+        ├── webrtc.js          # WebRTC utilities
+        ├── screen-dimming.js  # Sender screen dimming
+        ├── music-player.js    # Lullaby playback
+        ├── echo-cancellation.js # FFT spectral subtraction
+        ├── sender-webrtc.js   # Sender WebRTC logic
+        ├── audio-analysis.js  # Volume detection
+        ├── video-playback.js  # Autoplay handling
+        ├── ptt.js             # Push-to-talk
+        └── receiver-webrtc.js # Receiver WebRTC logic
 ```
 
 ## Visual Indicators

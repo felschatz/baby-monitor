@@ -1,4 +1,4 @@
-# Baby Monitor - Copilot Instructions
+# Baby Monitor - Development Context
 
 ## Project Overview
 
@@ -18,11 +18,56 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 
 ## Key Files
 
+### Server Modules (`server/`)
+
+| Module | Purpose |
+|--------|---------|
+| `server.js` | Thin wrapper for backwards compatibility, starts the server |
+| `server/index.js` | HTTP server, main router, env loading |
+| `server/session-manager.js` | Session state (Map), cleanup |
+| `server/sse-manager.js` | SSE setup, broadcast, heartbeats |
+| `server/signal-router.js` | WebRTC signaling message handlers |
+| `server/music-api.js` | Playlist scanning, name.txt parsing |
+| `server/static-server.js` | File serving, MIME types, path security |
+| `server/utils.js` | parseJsonBody, sendJson, matchRoute, generateId |
+
+### Frontend Modules (`public/js/`)
+
+**Shared modules** (used by sender & receiver):
+
+| Module | Purpose |
+|--------|---------|
+| `keep-awake.js` | Wake lock API, NoSleep video, silent audio |
+| `session.js` | URL parsing, localStorage, session prompt |
+| `signaling.js` | SSE connection, sendSignal(), reconnection |
+| `webrtc.js` | STUN config, peer connection utilities |
+
+**Sender modules**:
+
+| Module | Purpose |
+|--------|---------|
+| `screen-dimming.js` | Inactivity timer, dim overlay |
+| `music-player.js` | Playlist loading, shuffle, timer, playback |
+| `echo-cancellation.js` | FFT, spectral subtraction, fallback mode |
+| `sender-webrtc.js` | Offer creation, stream handling, PTT receive |
+| `sender-app.js` | Main orchestration, event wiring |
+
+**Receiver modules**:
+
+| Module | Purpose |
+|--------|---------|
+| `audio-analysis.js` | Volume detection, RMS calculation, alerts |
+| `video-playback.js` | Autoplay handling, track monitoring |
+| `ptt.js` | Push-to-talk, audio ducking, renegotiation |
+| `receiver-webrtc.js` | Answer creation, offer handling |
+| `receiver-app.js` | Main orchestration, event wiring |
+
+### HTML/CSS Files
+
 | File | Purpose |
 |------|---------|
-| `server.js` | Node.js HTTP server, SSE endpoints, signaling, session management |
-| `public/sender.html` | Camera/mic capture, WebRTC offer creation, session handling |
-| `public/receiver.html` | Stream playback, PTT, audio analysis, session handling |
+| `public/sender.html` | Sender page structure, loads `sender-app.js` module |
+| `public/receiver.html` | Receiver page structure, loads `receiver-app.js` module |
 | `public/index.html` | Landing page with session input |
 | `public/*.css` | Separate stylesheets for sender/receiver |
 
@@ -35,7 +80,18 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - PTT (Push-to-Talk) works via WebRTC renegotiation
 - Audio ducking reduces baby audio to 15% during PTT
 - STUN servers: stunprotocol.org, nextcloud.com, sipgate.net
-- Experimental spectral subtraction for music echo reduction
+- FFT-based spectral subtraction for music echo reduction
+
+## Visual States
+
+| State | Sender | Receiver |
+|-------|--------|----------|
+| Connected | Green background | Green background |
+| Disconnected | Red/black blink | Red/black overlay "CONNECTION LOST" |
+| Loud sound | - | Red/black overlay "LOUD SOUND DETECTED" |
+| PTT active | Blue pulsing "Parent is speaking..." | - |
+| Music playing | Purple pulsing "🎵 [track name]" | Track name + timer |
+| Screen dim | Black overlay after 5s | - |
 
 ## Implementation Details
 
@@ -44,7 +100,13 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Sensitivity slider controls threshold (saved to localStorage)
 - Volume control persisted to localStorage
 - Screen dims on sender after 5s inactivity to save battery
-- Echo cancellation uses ScriptProcessorNode for spectral subtraction
+- Echo cancellation uses FFT-based spectral subtraction via ScriptProcessorNode
+  - Inline Radix-2 Cooley-Tukey FFT (no external dependencies)
+  - 2048-sample FFT with 50% overlap (1024 hop size)
+  - Per-frequency-bin subtraction: `outputMag = max(micMag - α*musicMag, β*micMag)`
+  - Temporal smoothing reduces "musical noise" artifacts
+  - Automatic fallback to simple mode if device too slow (10 overruns)
+  - Parameters: ALPHA=2.0 (over-subtraction), BETA=0.02 (floor), SMOOTHING=0.6
 - `createMediaElementSource` is called once per audio element (limitation)
 - `RTCRtpSender.replaceTrack()` swaps between raw/processed audio without renegotiation
 
@@ -115,7 +177,7 @@ mp3/
 5. HTTPS required for camera/mic in production
 6. CSS is in separate files, not inline
 7. **Update documentation on significant changes:**
-   - `CLAUDE.md` - Update for dev context changes
+   - `CLAUDE.md` - Update this file for dev context changes
    - `.github/copilot-instructions.md` - Keep in sync with CLAUDE.md
    - `README.md` - Update for user-facing feature changes
 8. **Trigger server restart:** After making changes, update the `// Wisdom:` comment at the end of `server.js` with a new random sentence of wisdom. This triggers nodemon to restart the server.

@@ -7,7 +7,11 @@
       "Bash(timeout:*)",
       "Bash(node -c:*)",
       "Bash(node -e:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(for file in *.js)",
+      "Bash(do echo \"Checking $file...\")",
+      "Bash(echo:*)",
+      "Bash(done)"
     ]
   }
 }
