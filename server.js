@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Status speaks softly from the edge, not shouting from the center.
+// Wisdom: A new stream flows fresh; never drink from the well of stale connections.

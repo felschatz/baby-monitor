@@ -33,6 +33,15 @@ export function initAudioAnalysis(callbacks) {
  */
 export function setupAudioAnalysis(stream, audioLevelElement) {
     console.log('setupAudioAnalysis called, stream active:', stream?.active);
+
+    // If we're getting a new stream, reset the analysis state
+    // This happens when video mode is toggled and a new peer connection is created
+    if (stream !== audioStream) {
+        console.log('New audio stream detected, resetting analysis');
+        audioAnalysisRunning = false;
+        analyser = null;
+    }
+
     audioStream = stream;
     tryStartAudioAnalysis(audioLevelElement);
 }
