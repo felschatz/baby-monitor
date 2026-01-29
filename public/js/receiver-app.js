@@ -30,10 +30,8 @@ import {
 } from './video-playback.js';
 import {
     initPTT,
-    setPeerConnection,
     startPTT,
     stopPTT,
-    handlePTTAnswer,
     setupPTTButton
 } from './ptt.js';
 import {
@@ -43,7 +41,8 @@ import {
     closePeerConnection,
     getPeerConnection,
     restartIceIfNeeded,
-    requestOffer
+    requestOffer,
+    getPTTAudioSender
 } from './receiver-webrtc.js';
 
 // DOM elements
@@ -376,7 +375,8 @@ initVideoPlayback(
 initPTT({
     remoteVideo,
     sendSignal: signaling.sendSignal,
-    getIsConnected: () => isConnected
+    getIsConnected: () => isConnected,
+    getPTTAudioSender
 });
 
 initReceiverWebRTC({
@@ -472,7 +472,6 @@ async function handleMessage(message) {
         case 'offer':
             console.log('Received offer');
             await handleOffer(message.offer);
-            setPeerConnection(getPeerConnection());
             break;
 
         case 'ice-candidate':
@@ -482,7 +481,8 @@ async function handleMessage(message) {
             break;
 
         case 'ptt-answer':
-            await handlePTTAnswer(message.answer);
+            // No longer needed - PTT uses replaceTrack instead of renegotiation
+            console.log('Received ptt-answer (ignored - using replaceTrack)');
             break;
 
         case 'music-status':

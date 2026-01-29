@@ -8,6 +8,7 @@ import { rtcConfig, addIceCandidates } from './webrtc.js';
 // State
 let peerConnection = null;
 let pendingCandidates = [];
+let pttAudioSender = null; // Pre-negotiated sender for PTT audio
 
 // Callbacks
 let sendSignal = null;
@@ -77,6 +78,20 @@ export async function handleOffer(offer) {
     try {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
         console.log('Set remote description');
+
+        // Set up bidirectional audio for PTT (pre-negotiate so no renegotiation needed later)
+        const transceivers = peerConnection.getTransceivers();
+        const audioTransceiver = transceivers.find(t => t.receiver.track?.kind === 'audio');
+        if (audioTransceiver) {
+            audioTransceiver.direction = 'sendrecv';
+            pttAudioSender = audioTransceiver.sender;
+            console.log('Set audio transceiver to sendrecv for PTT');
+        } else {
+            // No audio transceiver from sender, create one
+            const transceiver = peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
+            pttAudioSender = transceiver.sender;
+            console.log('Added audio transceiver for PTT');
+        }
 
         console.log('Processing', pendingCandidates.length, 'queued ICE candidates');
         await addIceCandidates(peerConnection, pendingCandidates);
@@ -150,4 +165,12 @@ export function requestOffer(videoEnabled = true) {
     if (sendSignal) {
         sendSignal({ type: 'request-offer', videoEnabled });
     }
+}
+
+/**
+ * Get the pre-negotiated PTT audio sender
+ * Use replaceTrack() on this sender for instant PTT without renegotiation
+ */
+export function getPTTAudioSender() {
+    return pttAudioSender;
 }

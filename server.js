@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Dark forest buttons let musical notes dance in the moonlight.
+// Wisdom: Instant PTT flows like water through pre-negotiated channels.

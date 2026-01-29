@@ -8,15 +8,14 @@ const DUCKING_VOLUME = 0.15;
 
 // State
 let pttStream = null;
-let pttSender = null;
 let pttActive = false;
 let preDuckVolume = null;
 
 // Dependencies
-let peerConnection = null;
 let remoteVideo = null;
 let sendSignal = null;
 let getIsConnected = null;
+let getPTTAudioSender = null;
 
 /**
  * Initialize PTT module
@@ -26,13 +25,7 @@ export function initPTT(deps) {
     remoteVideo = deps.remoteVideo;
     sendSignal = deps.sendSignal;
     getIsConnected = deps.getIsConnected;
-}
-
-/**
- * Set the peer connection (call when connection changes)
- */
-export function setPeerConnection(pc) {
-    peerConnection = pc;
+    getPTTAudioSender = deps.getPTTAudioSender;
 }
 
 /**
@@ -45,8 +38,14 @@ export async function startPTT(pttBtn, pttLabel) {
         console.log('PTT: Already active');
         return;
     }
-    if (!peerConnection || !getIsConnected()) {
-        console.log('PTT: No peer connection or not connected');
+    if (!getIsConnected()) {
+        console.log('PTT: Not connected');
+        return;
+    }
+
+    const pttSender = getPTTAudioSender?.();
+    if (!pttSender) {
+        console.log('PTT: No audio sender available (connection not ready)');
         return;
     }
 
@@ -61,7 +60,7 @@ export async function startPTT(pttBtn, pttLabel) {
         remoteVideo.volume = Math.min(remoteVideo.volume, DUCKING_VOLUME);
         console.log('PTT: Ducked audio from', preDuckVolume, 'to', remoteVideo.volume);
 
-        // Immediately notify sender that PTT is starting
+        // Notify sender that PTT is starting
         sendSignal({ type: 'ptt-start' });
         console.log('PTT: Sent start notification');
 
@@ -76,26 +75,11 @@ export async function startPTT(pttBtn, pttLabel) {
         });
         console.log('PTT: Got microphone');
 
-        // Add audio track to peer connection
+        // Use replaceTrack for instant audio - no renegotiation needed!
         const audioTrack = pttStream.getAudioTracks()[0];
-        pttSender = peerConnection.addTrack(audioTrack, pttStream);
-        console.log('PTT: Added track to peer connection');
+        await pttSender.replaceTrack(audioTrack);
+        console.log('PTT: Replaced track - audio now flowing');
 
-        // Renegotiate connection
-        console.log('PTT: Creating offer, signaling state:', peerConnection.signalingState);
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        console.log('PTT: Offer created');
-
-        const message = {
-            type: 'ptt-offer',
-            offer: peerConnection.localDescription
-        };
-        console.log('PTT: Sending to server:', message.type);
-        sendSignal(message);
-        console.log('PTT: Sent to server');
-
-        console.log('PTT: Started, waiting for answer...');
     } catch (err) {
         console.error('PTT error:', err);
         pttLabel.textContent = 'Mic access denied';
@@ -108,7 +92,7 @@ export async function startPTT(pttBtn, pttLabel) {
  * @param {HTMLElement} pttBtn
  * @param {HTMLElement} pttLabel
  */
-export function stopPTT(pttBtn, pttLabel) {
+export async function stopPTT(pttBtn, pttLabel) {
     if (!pttActive) return;
     pttActive = false;
 
@@ -127,6 +111,17 @@ export function stopPTT(pttBtn, pttLabel) {
     sendSignal({ type: 'ptt-stop' });
     console.log('PTT: Sent stop notification');
 
+    // Clear the track from the sender (no renegotiation needed)
+    const pttSender = getPTTAudioSender?.();
+    if (pttSender) {
+        try {
+            await pttSender.replaceTrack(null);
+            console.log('PTT: Cleared track from sender');
+        } catch (e) {
+            console.log('PTT: Could not clear track:', e);
+        }
+    }
+
     // Stop microphone
     if (pttStream) {
         pttStream.getTracks().forEach(track => track.stop());
@@ -134,34 +129,7 @@ export function stopPTT(pttBtn, pttLabel) {
         console.log('PTT: Microphone stopped');
     }
 
-    // Remove track from peer connection
-    if (pttSender && peerConnection) {
-        try {
-            peerConnection.removeTrack(pttSender);
-            console.log('PTT: Track removed from peer connection');
-        } catch (e) {
-            console.log('PTT: Could not remove track:', e);
-        }
-        pttSender = null;
-    }
-
     console.log('PTT: Stopped');
-}
-
-/**
- * Handle PTT answer from sender
- * @param {RTCSessionDescriptionInit} answer
- */
-export async function handlePTTAnswer(answer) {
-    console.log('Received PTT answer');
-    if (peerConnection) {
-        try {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-            console.log('PTT renegotiation complete');
-        } catch (err) {
-            console.error('PTT answer error:', err);
-        }
-    }
 }
 
 /**
