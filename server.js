@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A well-encoded video speaks louder than a thousand silent frames.
+// Wisdom: Even the brightest screen must sometimes sleep, but silence speaks loudly.

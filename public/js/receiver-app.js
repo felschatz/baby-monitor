@@ -24,7 +24,9 @@ import {
     setHasVideoTrack,
     getAudioOnlyMode,
     setAudioOnlyMode,
-    getRemoteVideo
+    getRemoteVideo,
+    setupAudioTrackMuteDetection,
+    resetMediaMutedState
 } from './video-playback.js';
 import {
     initPTT,
@@ -94,6 +96,7 @@ if (!sessionName) {
 
 // State
 let isConnected = false;
+let isMediaMuted = false;
 let musicPlaying = false;
 let musicAvailable = false;
 let musicPlaylists = [];
@@ -148,6 +151,7 @@ function setConnectedState(connected) {
 
 function setDisconnectedState() {
     isConnected = false;
+    isMediaMuted = false;
     setHasVideoTrack(false);
     document.body.classList.remove('connected');
     statusDot.classList.remove('connected');
@@ -161,6 +165,28 @@ function setDisconnectedState() {
 
     audioOnlyIndicator.classList.remove('active');
     resetMusicUI();
+}
+
+function setMediaMutedState(muted) {
+    if (!isConnected) return;
+
+    isMediaMuted = muted;
+
+    if (muted) {
+        // Show red alert - media stopped flowing (sender screen likely off)
+        statusText.textContent = 'Media paused';
+        overlayText.textContent = 'Sender screen off? Waiting for media...';
+        overlay.classList.remove('hidden');
+
+        document.body.classList.remove('soft-alert-active');
+        document.body.classList.remove('loud-alert-active');
+        disconnectAlert.classList.add('active');
+    } else {
+        // Media resumed - restore connected state
+        statusText.textContent = 'Connected';
+        overlay.classList.add('hidden');
+        disconnectAlert.classList.remove('active');
+    }
 }
 
 function triggerLoudSoundAlert(isSoft = false) {
@@ -330,7 +356,8 @@ initVideoPlayback(
         onUserInteraction: () => {
             ensureAudioContext(audioLevel);
         },
-        getIsConnected: () => isConnected
+        getIsConnected: () => isConnected,
+        onMediaMuted: setMediaMutedState
     }
 );
 
@@ -389,6 +416,7 @@ initReceiverWebRTC({
                 updateAudioOnlyIndicator();
             }
             setupAudioAnalysis(event.streams[0], audioLevel);
+            setupAudioTrackMuteDetection(event.track);
         }
     }
 });
@@ -424,6 +452,7 @@ async function handleMessage(message) {
             setDisconnectedState();
             closePeerConnection();
             resetAudioAnalysis();
+            resetMediaMutedState();
             setHasVideoTrack(false);
             updateAudioOnlyIndicator();
             break;

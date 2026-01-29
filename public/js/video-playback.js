@@ -18,6 +18,12 @@ let videoContainer = null;
 // Callbacks
 let onUserInteraction = null;
 let getIsConnected = null;
+let onMediaMuted = null;
+
+// Track mute state
+let videoTrackMuted = false;
+let audioTrackMuted = false;
+let mediaMutedTimeout = null;
 
 /**
  * Initialize video playback module
@@ -33,6 +39,7 @@ export function initVideoPlayback(elements, callbacks) {
 
     onUserInteraction = callbacks.onUserInteraction;
     getIsConnected = callbacks.getIsConnected;
+    onMediaMuted = callbacks.onMediaMuted;
 
     // Debug video events
     remoteVideo.addEventListener('loadeddata', () => {
@@ -63,6 +70,40 @@ export function initVideoPlayback(elements, callbacks) {
             }).catch(e => console.log('Overlay play error:', e));
         }
     });
+}
+
+/**
+ * Check and report media muted state
+ * Uses a short delay to avoid false positives during renegotiation
+ */
+function checkMediaMutedState() {
+    clearTimeout(mediaMutedTimeout);
+
+    const isMuted = (hasVideoTrack && videoTrackMuted) || audioTrackMuted;
+
+    if (isMuted && getIsConnected()) {
+        // Delay before reporting muted to avoid transient states
+        mediaMutedTimeout = setTimeout(() => {
+            if (onMediaMuted) {
+                console.log('Media muted - sender screen likely off');
+                onMediaMuted(true);
+            }
+        }, 1000);
+    } else if (!isMuted) {
+        if (onMediaMuted) {
+            console.log('Media unmuted - sender screen likely back on');
+            onMediaMuted(false);
+        }
+    }
+}
+
+/**
+ * Reset media muted state (call when connection closes)
+ */
+export function resetMediaMutedState() {
+    clearTimeout(mediaMutedTimeout);
+    videoTrackMuted = false;
+    audioTrackMuted = false;
 }
 
 /**
@@ -168,9 +209,18 @@ export function handleVideoTrack(track, savedVolume) {
         remoteVideo.volume = parseInt(savedVolume) / 100;
     }
 
-    // Monitor track for unmute
+    // Monitor track for mute (sender screen off)
+    track.onmute = () => {
+        console.log('Video track muted - sender may have screen off');
+        videoTrackMuted = true;
+        checkMediaMutedState();
+    };
+
+    // Monitor track for unmute (data flowing again)
     track.onunmute = () => {
         console.log('Video track unmuted - data flowing');
+        videoTrackMuted = false;
+        checkMediaMutedState();
         remoteVideo.play().catch(err => {
             console.log('Play error on track unmute:', err);
             showPlayOverlay();
@@ -181,6 +231,7 @@ export function handleVideoTrack(track, savedVolume) {
     track.onended = () => {
         console.log('Video track ended');
         hasVideoTrack = false;
+        videoTrackMuted = false;
         updateAudioOnlyIndicator();
     };
 
@@ -206,6 +257,31 @@ export function handleVideoTrack(track, savedVolume) {
         console.log('Video check - readyState:', remoteVideo.readyState);
         console.log('Stream active:', remoteVideo.srcObject?.active);
     }, 2000);
+}
+
+/**
+ * Set up audio track mute detection
+ * @param {MediaStreamTrack} track - Audio track to monitor
+ */
+export function setupAudioTrackMuteDetection(track) {
+    console.log('Setting up audio track mute detection');
+
+    track.onmute = () => {
+        console.log('Audio track muted - sender may have screen off');
+        audioTrackMuted = true;
+        checkMediaMutedState();
+    };
+
+    track.onunmute = () => {
+        console.log('Audio track unmuted - data flowing');
+        audioTrackMuted = false;
+        checkMediaMutedState();
+    };
+
+    track.onended = () => {
+        console.log('Audio track ended');
+        audioTrackMuted = false;
+    };
 }
 
 // Getters and setters
