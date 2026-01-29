@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Debug logs illuminate the path through streaming darkness.
+// Wisdom: Consistent Web Audio routing keeps music quality pristine.

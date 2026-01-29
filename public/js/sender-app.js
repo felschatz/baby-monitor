@@ -26,7 +26,8 @@ import {
     isEchoCancelActive,
     setEchoCancelEnabled,
     getOriginalAudioTrack,
-    getProcessedAudioTrack
+    getProcessedAudioTrack,
+    initMusicWebAudio
 } from './echo-cancellation.js';
 import {
     initSenderWebRTC,
@@ -387,6 +388,9 @@ async function handleMessage(message) {
             if (message.playlist) {
                 await switchPlaylist(message.playlist);
             }
+            // Initialize Web Audio routing for music on first play
+            // This ensures consistent audio quality regardless of echo cancel state
+            initMusicWebAudio();
             startMusic(message.timerMinutes, isEchoCancelEnabled());
             break;
 

@@ -17,6 +17,7 @@ const MAX_OVERRUNS = 10;            // Fallback to simple mode after this many
 let echoCancelEnabled = false;
 let echoCancelActive = false;
 let musicMediaSource = null;
+let musicMediaSourceInitialized = false;
 let echoProcessorNode = null;
 let echoStreamDestination = null;
 let echoMicSource = null;
@@ -30,6 +31,33 @@ let audioContext = null;
 let getMusicPlaying = null;
 let getMusicAudio = null;
 let getLocalStream = null;
+
+/**
+ * Initialize music audio routing through Web Audio API
+ * Call this when music first starts to ensure consistent audio path
+ */
+export function initMusicWebAudio() {
+    if (musicMediaSourceInitialized) return;
+
+    const ctx = audioContext?.();
+    const musicAudio = getMusicAudio?.();
+
+    if (!ctx || !musicAudio) {
+        console.log('Cannot init music Web Audio: missing context or audio element');
+        return;
+    }
+
+    try {
+        if (!musicMediaSource) {
+            musicMediaSource = ctx.createMediaElementSource(musicAudio);
+            musicMediaSource.connect(ctx.destination);
+            musicMediaSourceInitialized = true;
+            console.log('Music audio routed through Web Audio API');
+        }
+    } catch (e) {
+        console.log('Music Web Audio init error:', e.message);
+    }
+}
 
 /**
  * Initialize echo cancellation module
@@ -370,6 +398,19 @@ export function teardownEchoCancellation() {
         echoMusicAnalyser = null;
     }
 
+    // Ensure music still plays through Web Audio API after teardown
+    // (once createMediaElementSource is called, we must route through Web Audio)
+    if (musicMediaSource) {
+        const ctx = audioContext();
+        if (ctx) {
+            try {
+                musicMediaSource.disconnect();
+            } catch (e) {}
+            musicMediaSource.connect(ctx.destination);
+            console.log('Reconnected music to destination after teardown');
+        }
+    }
+
     if (echoStreamDestination) {
         echoStreamDestination = null;
     }
@@ -389,3 +430,4 @@ export function setEchoCancelEnabled(value) { echoCancelEnabled = value; }
 export function getOriginalAudioTrack() { return originalAudioTrack; }
 export function getProcessedAudioTrack() { return processedAudioTrack; }
 export function getMusicMediaSource() { return musicMediaSource; }
+export function isMusicWebAudioInitialized() { return musicMediaSourceInitialized; }
