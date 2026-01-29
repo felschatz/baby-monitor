@@ -78,8 +78,15 @@ const musicBtn = document.getElementById('musicBtn');
 const musicPlaylistSelect = document.getElementById('musicPlaylistSelect');
 const musicTimerSelect = document.getElementById('musicTimerSelect');
 const musicResetBtn = document.getElementById('musicResetBtn');
-const musicLabel = document.getElementById('musicLabel');
 const musicStatus = document.getElementById('musicStatus');
+
+// Drawer elements
+const drawerToggle = document.getElementById('drawerToggle');
+const controlsDrawer = document.getElementById('controlsDrawer');
+const volumeDisplay = document.getElementById('volumeDisplay');
+const sensitivityDisplay = document.getElementById('sensitivityDisplay');
+const musicInfoItem = document.getElementById('musicInfoItem');
+const musicStatusDisplay = document.getElementById('musicStatusDisplay');
 
 // Initialize session
 const sessionName = initSession({
@@ -116,10 +123,12 @@ const savedSensitivity = localStorage.getItem('receiver-sensitivity');
 if (savedVolume !== null) {
     volumeSlider.value = savedVolume;
     volumeValue.textContent = savedVolume + '%';
+    volumeDisplay.textContent = savedVolume + '%';
 }
 if (savedSensitivity !== null) {
     sensitivitySlider.value = savedSensitivity;
     sensitivityValue.textContent = savedSensitivity;
+    sensitivityDisplay.textContent = savedSensitivity;
 }
 
 // Initialize audio-only toggle
@@ -287,16 +296,17 @@ function updateMusicUI() {
     if (musicPlaying) {
         musicBtn.textContent = '⏹️';
         musicBtn.classList.add('active');
-        musicLabel.textContent = 'Stop music';
         musicTimerSelect.disabled = false;
         musicResetBtn.style.display = 'inline-block';
+        musicInfoItem.style.display = 'flex';
     } else {
         musicBtn.textContent = '🎵';
         musicBtn.classList.remove('active');
-        musicLabel.textContent = 'Play lullabies';
         musicTimerSelect.disabled = false;
         musicResetBtn.style.display = 'none';
         musicStatus.textContent = '';
+        musicInfoItem.style.display = 'none';
+        musicStatusDisplay.textContent = '—';
     }
 }
 
@@ -312,7 +322,9 @@ function handleMusicStatus(message) {
     if (message.playing && message.currentTrack) {
         const mins = Math.floor(message.timerRemaining / 60);
         const secs = message.timerRemaining % 60;
-        musicStatus.textContent = `♪ ${message.currentTrack} • ${mins}:${secs.toString().padStart(2, '0')}`;
+        const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+        musicStatus.textContent = `${message.currentTrack} • ${timeStr}`;
+        musicStatusDisplay.textContent = timeStr;
     }
 }
 
@@ -507,12 +519,14 @@ volumeSlider.addEventListener('input', () => {
     remoteVideo.volume = value;
     remoteVideo.muted = false;
     volumeValue.textContent = volumeSlider.value + '%';
+    volumeDisplay.textContent = volumeSlider.value + '%';
     overlay.classList.add('hidden');
     localStorage.setItem('receiver-volume', volumeSlider.value);
 });
 
 sensitivitySlider.addEventListener('input', () => {
     updateThresholdMarker();
+    sensitivityDisplay.textContent = sensitivitySlider.value;
     localStorage.setItem('receiver-sensitivity', sensitivitySlider.value);
 });
 
@@ -574,6 +588,24 @@ document.addEventListener('touchstart', () => {
     ensureAudioContext(audioLevel);
 }, { passive: true });
 document.addEventListener('keydown', () => handleUserInteraction(), { passive: true });
+
+// Drawer toggle
+drawerToggle.addEventListener('click', () => {
+    const isOpen = controlsDrawer.classList.toggle('open');
+    drawerToggle.classList.toggle('active', isOpen);
+    document.body.classList.toggle('drawer-open', isOpen);
+});
+
+// Close drawer when clicking outside
+document.addEventListener('click', (e) => {
+    if (controlsDrawer.classList.contains('open') &&
+        !controlsDrawer.contains(e.target) &&
+        !drawerToggle.contains(e.target)) {
+        controlsDrawer.classList.remove('open');
+        drawerToggle.classList.remove('active');
+        document.body.classList.remove('drawer-open');
+    }
+}, { passive: true });
 
 // Initialize
 updateThresholdMarker();

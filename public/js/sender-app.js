@@ -64,7 +64,7 @@ const audioLevel = document.getElementById('audioLevel');
 const enableVideo = document.getElementById('enableVideo');
 const enableAudio = document.getElementById('enableAudio');
 const pttAudio = document.getElementById('pttAudio');
-const pttIndicator = document.getElementById('pttIndicator');
+const pttStatus = document.getElementById('pttStatus');
 const optionsPanel = document.getElementById('optionsPanel');
 const streamingStatus = document.getElementById('streamingStatus');
 const streamingStatusValue = document.getElementById('streamingStatusValue');
@@ -72,7 +72,7 @@ const qualityBadge = document.getElementById('qualityBadge');
 
 // Music elements
 const musicAudio = document.getElementById('musicAudio');
-const musicIndicator = document.getElementById('musicIndicator');
+const musicStatusBar = document.getElementById('musicStatusBar');
 const musicTrackName = document.getElementById('musicTrackName');
 const musicTimerEl = document.getElementById('musicTimer');
 const musicControlsPanel = document.getElementById('musicControlsPanel');
@@ -215,7 +215,7 @@ initEchoCancellation({
 initMusicPlayer(
     {
         musicAudio,
-        musicIndicator,
+        musicIndicator: musicStatusBar,
         musicTrackName,
         musicTimerEl,
         musicControlsPanel,
@@ -353,19 +353,19 @@ async function handleMessage(message) {
         case 'ptt-start':
             console.log('Received PTT start from parent');
             setPttActive(true);
-            showPTTIndicator(pttIndicator);
+            showPTTIndicator(pttStatus);
             break;
 
         case 'ptt-offer':
             console.log('Received PTT offer from parent');
-            showPTTIndicator(pttIndicator);
+            showPTTIndicator(pttStatus);
             await handlePTTOffer(message.offer);
             break;
 
         case 'ptt-stop':
             console.log('Received PTT stop from parent');
             setPttActive(false);
-            hidePTTIndicator(pttIndicator);
+            hidePTTIndicator(pttStatus);
             break;
 
         case 'music-start':

@@ -39,22 +39,23 @@
         </div>
     </div>
 
+    <!-- Status bar for PTT and Music -->
+    <div class="status-bar" id="statusBar">
+        <div class="status-bar-item ptt-status" id="pttStatus">
+            <span class="status-bar-icon">🔊</span>
+            <span class="status-bar-text">Parent speaking</span>
+        </div>
+        <div class="status-bar-item music-status" id="musicStatusBar">
+            <span class="status-bar-icon">🎵</span>
+            <span class="status-bar-text" id="musicTrackName">Playing...</span>
+            <span class="status-bar-timer" id="musicTimer"></span>
+        </div>
+    </div>
+
     <div class="video-container">
         <video id="localVideo" autoplay muted playsinline></video>
         <!-- Hidden audio element for PTT playback -->
         <audio id="pttAudio" autoplay></audio>
-    </div>
-
-    <!-- PTT indicator -->
-    <div class="ptt-indicator" id="pttIndicator">
-        🔊 Parent is speaking...
-    </div>
-
-    
-    <!-- Music indicator -->
-    <div class="music-indicator" id="musicIndicator">
-        🎵 <span id="musicTrackName">Playing music...</span>
-        <div class="music-timer" id="musicTimer"></div>
     </div>
 
     <!-- Hidden audio element for music playback -->

@@ -4,6 +4,22 @@
     box-sizing: border-box;
 }
 
+:root {
+    --bg-dark: #0f0f14;
+    --bg-surface: rgba(20, 20, 28, 0.95);
+    --bg-elevated: rgba(30, 30, 42, 0.98);
+    --accent-blue: #3b82f6;
+    --accent-purple: #a855f7;
+    --accent-green: #22c55e;
+    --accent-red: #ef4444;
+    --accent-orange: #f97316;
+    --text-primary: #f8fafc;
+    --text-secondary: rgba(248, 250, 252, 0.6);
+    --text-muted: rgba(248, 250, 252, 0.4);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --drawer-height: 0px;
+}
+
 /* Session overlay */
 .session-overlay {
     position: fixed;
@@ -11,7 +27,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: linear-gradient(135deg, #0f0f14 0%, #1a1a2e 100%);
     z-index: 10000;
     display: none;
     align-items: center;
@@ -20,44 +36,54 @@
 }
 
 .session-prompt {
-    background: rgba(255,255,255,0.1);
-    padding: 30px;
-    border-radius: 20px;
+    background: var(--bg-elevated);
+    padding: 32px;
+    border-radius: 24px;
     text-align: center;
     max-width: 400px;
     width: 100%;
+    border: 1px solid var(--border-subtle);
 }
 
 .session-prompt h2 {
-    color: white;
-    margin-bottom: 10px;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 1.4rem;
 }
 
 .session-prompt p {
-    color: rgba(255,255,255,0.7);
-    margin-bottom: 20px;
-    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    font-size: 0.9rem;
 }
 
 .session-prompt input {
     width: 100%;
-    padding: 15px;
-    font-size: 1.2rem;
-    border: none;
-    border-radius: 10px;
-    margin-bottom: 15px;
+    padding: 16px;
+    font-size: 1.1rem;
+    border: 2px solid var(--border-subtle);
+    border-radius: 12px;
+    margin-bottom: 16px;
     text-align: center;
-    background: rgba(255,255,255,0.9);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    transition: border-color 0.2s;
 }
 
 .session-prompt input:focus {
-    outline: 2px solid #4facfe;
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.session-prompt input::placeholder {
+    color: var(--text-muted);
 }
 
 .session-prompt .btn {
     width: 100%;
-    padding: 18px 30px;
-    font-size: 1.2rem;
+    padding: 16px 24px;
+    font-size: 1.1rem;
     font-weight: 600;
     border: none;
     border-radius: 12px;
@@ -66,14 +92,14 @@
 }
 
 .session-prompt .btn-start {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    background: linear-gradient(135deg, var(--accent-blue), #2563eb);
     color: white;
 }
 
 .session-hint {
-    margin-top: 15px;
-    font-size: 0.8rem;
-    color: rgba(255,255,255,0.5);
+    margin-top: 16px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
 }
 
 html, body {
@@ -88,14 +114,14 @@ body {
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: #1a1a2e;
-    color: white;
+    background: var(--bg-dark);
+    color: var(--text-primary);
     overflow: hidden;
-    transition: background-color 0.1s;
+    transition: background-color 0.3s;
 }
 
 body.connected {
-    background: #1b5e20;
+    background: linear-gradient(180deg, #0a1f0a 0%, #0f0f14 100%);
 }
 
 /* Alert overlays */
@@ -109,10 +135,11 @@ body.connected {
     display: none;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
-    font-weight: bold;
+    font-size: 1.8rem;
+    font-weight: 700;
     text-align: center;
     pointer-events: none;
+    letter-spacing: 0.05em;
 }
 
 .alert-overlay.active {
@@ -120,29 +147,35 @@ body.connected {
 }
 
 .disconnect-alert {
-    background: rgba(180, 0, 0, 1);
+    background: rgba(180, 0, 0, 0.95);
     color: white;
     animation: disconnectBlink 0.5s infinite;
 }
 
 @keyframes disconnectBlink {
     0%, 50% {
-        background: rgba(180, 0, 0, 1);
+        background: rgba(180, 0, 0, 0.95);
         color: white;
     }
     51%, 100% {
-        background: rgba(0, 0, 0, 1);
-        color: red;
+        background: rgba(0, 0, 0, 0.95);
+        color: var(--accent-red);
     }
 }
 
 .header {
-    padding: 15px;
-    background: rgba(0,0,0,0.3);
+    padding: 12px 16px;
+    background: var(--bg-surface);
     display: flex;
     justify-content: space-between;
     align-items: center;
     z-index: 10;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.header h2 {
+    font-size: 1rem;
+    font-weight: 500;
 }
 
 .status-indicator {
@@ -152,15 +185,20 @@ body.connected {
 }
 
 .status-dot {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
-    background: #f44336;
+    background: var(--accent-red);
 }
 
 .status-dot.connected {
-    background: #4caf50;
+    background: var(--accent-green);
     animation: pulse 2s infinite;
+}
+
+#statusText {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
 }
 
 @keyframes pulse {
@@ -175,49 +213,39 @@ body.connected {
     justify-content: center;
     background: #000;
     position: relative;
-    min-height: 0; /* Important for flex shrinking */
+    min-height: 0;
     overflow: hidden;
 }
 
-/* Soft alert - orange pulsing on everything except video */
+/* Soft alert - orange pulsing on UI elements */
 body.soft-alert-active .header,
-body.soft-alert-active .ptt-container,
-body.soft-alert-active .music-container,
-body.soft-alert-active .controls {
+body.soft-alert-active .bottom-bar,
+body.soft-alert-active .info-strip {
     animation: softPulse 1.5s ease-in-out infinite;
 }
 
 @keyframes softPulse {
-    0%, 100% {
-        background: rgba(255, 152, 0, 0.3);
-    }
-    50% {
-        background: rgba(255, 193, 7, 0.5);
-    }
+    0%, 100% { background: rgba(249, 115, 22, 0.3); }
+    50% { background: rgba(251, 191, 36, 0.4); }
 }
 
-/* Loud alert - red blinking on everything except video */
+/* Loud alert - red blinking on UI elements */
 body.loud-alert-active .header,
-body.loud-alert-active .ptt-container,
-body.loud-alert-active .music-container,
-body.loud-alert-active .controls {
+body.loud-alert-active .bottom-bar,
+body.loud-alert-active .info-strip {
     animation: loudPulse 0.3s infinite;
 }
 
 @keyframes loudPulse {
-    0%, 50% {
-        background: rgba(255, 0, 0, 0.7);
-    }
-    51%, 100% {
-        background: rgba(0, 0, 0, 0.8);
-    }
+    0%, 50% { background: rgba(239, 68, 68, 0.7); }
+    51%, 100% { background: rgba(0, 0, 0, 0.8); }
 }
 
 #remoteVideo {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    background: #222;
+    background: #111;
 }
 
 .overlay {
@@ -226,38 +254,241 @@ body.loud-alert-active .controls {
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
-    padding: 20px;
-    background: rgba(0,0,0,0.7);
-    border-radius: 15px;
+    padding: 24px 32px;
+    background: var(--bg-elevated);
+    border-radius: 16px;
+    border: 1px solid var(--border-subtle);
 }
 
 .overlay.hidden {
     display: none;
 }
 
-.controls {
-    padding: 15px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    background: rgba(0,0,0,0.3);
-    position: relative;
-    z-index: 10000; /* Above alert overlays */
+/* Audio only indicator */
+.audio-only-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    padding: 40px 48px;
+    background: var(--bg-elevated);
+    border-radius: 24px;
+    display: none;
+    z-index: 10;
+    border: 1px solid var(--border-subtle);
 }
 
+.audio-only-indicator.active {
+    display: block;
+}
+
+.video-container.audio-only #remoteVideo {
+    display: none;
+}
+
+.audio-only-icon {
+    font-size: 3.5rem;
+    margin-bottom: 16px;
+}
+
+.audio-only-text {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.audio-only-subtext {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.back-link {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 1.3rem;
+    padding: 4px 8px;
+    transition: color 0.2s;
+}
+
+.back-link:hover {
+    color: var(--text-primary);
+}
+
+/* ========================================
+   BOTTOM BAR - Always visible with PTT
+   ======================================== */
+.bottom-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border-subtle);
+    z-index: 10001;
+    gap: 16px;
+}
+
+.ptt-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.ptt-btn {
+    background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+    border: none;
+    color: white;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    font-size: 1.6rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s, box-shadow 0.15s;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    flex-shrink: 0;
+}
+
+.ptt-btn:active, .ptt-btn.active {
+    background: linear-gradient(135deg, var(--accent-red), #dc2626);
+    transform: scale(1.08);
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.5);
+}
+
+.ptt-btn:disabled {
+    background: rgba(100, 100, 120, 0.5);
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ptt-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.drawer-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 18px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.drawer-toggle:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-primary);
+}
+
+.drawer-toggle.active {
+    background: var(--accent-blue);
+    border-color: var(--accent-blue);
+    color: white;
+}
+
+.drawer-toggle-icon {
+    font-size: 1.1rem;
+    transition: transform 0.3s;
+}
+
+.drawer-toggle.active .drawer-toggle-icon {
+    transform: rotate(90deg);
+}
+
+/* ========================================
+   INFO STRIP - Compact status indicators
+   ======================================== */
+.info-strip {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 16px;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border-subtle);
+    font-size: 0.8rem;
+    z-index: 10000;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+}
+
+.info-icon {
+    font-size: 0.9rem;
+}
+
+.info-status {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.music-info {
+    color: var(--accent-purple);
+}
+
+/* ========================================
+   CONTROLS DRAWER - Collapsible panel
+   ======================================== */
+.controls-drawer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border-subtle);
+    z-index: 9999;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 70vh;
+    overflow-y: auto;
+    border-radius: 20px 20px 0 0;
+}
+
+.controls-drawer.open {
+    transform: translateY(0);
+}
+
+.drawer-content {
+    padding: 24px 20px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Audio meter */
 .audio-meter {
-    height: 15px;
-    background: #333;
-    border-radius: 8px;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
     overflow: hidden;
     position: relative;
 }
 
 .audio-level {
     height: 100%;
-    background: linear-gradient(90deg, #4caf50, #ffeb3b, #f44336);
+    background: linear-gradient(90deg, var(--accent-green), #fbbf24, var(--accent-red));
     width: 0%;
     transition: width 0.05s;
+    border-radius: 6px;
 }
 
 .threshold-marker {
@@ -266,174 +497,124 @@ body.loud-alert-active .controls {
     bottom: 0;
     width: 3px;
     background: white;
-    opacity: 0.8;
+    opacity: 0.9;
     transition: left 0.2s;
+    border-radius: 2px;
 }
 
-.info-row {
+/* Control sections */
+.control-section {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.9rem;
-}
-
-.volume-control {
-    display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 10px;
 }
 
-.volume-control input {
-    width: 100px;
-}
-
-.back-link {
-    color: white;
-    text-decoration: none;
-    font-size: 1.5rem;
-}
-
-.sensitivity-control {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 0.85rem;
-}
-
-.sensitivity-control input {
-    width: 80px;
-}
-
-.fullscreen-btn {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    color: white;
-    padding: 8px 15px;
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-.audio-only-toggle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    user-select: none;
-}
-
-.audio-only-toggle input {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-}
-
-.ptt-btn {
-    background: linear-gradient(135deg, #2196F3, #1976D2);
-    border: none;
-    color: white;
-    padding: 20px;
-    border-radius: 50%;
-    width: 80px;
-    height: 80px;
-    font-size: 2rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto;
-    transition: transform 0.1s, box-shadow 0.1s;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
-}
-
-.ptt-btn:active, .ptt-btn.active {
-    background: linear-gradient(135deg, #f44336, #d32f2f);
-    transform: scale(1.1);
-    box-shadow: 0 0 20px rgba(244, 67, 54, 0.5);
-}
-
-.ptt-btn:disabled {
-    background: #666;
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.ptt-container {
-    text-align: center;
-    padding: 10px;
-    background: rgba(0,0,0,0.3);
-    position: relative;
-    z-index: 10001; /* Above alert overlays */
-}
-
-.ptt-label {
+.control-label {
     font-size: 0.8rem;
-    margin-top: 8px;
-    opacity: 0.8;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
-/* Music controls */
-.music-container {
-    text-align: center;
-    padding: 10px;
-    background: rgba(0,0,0,0.3);
-    position: relative;
-    z-index: 10001;
+.control-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.slider-input {
+    flex: 1;
+    height: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    outline: none;
+}
+
+.slider-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+.slider-input::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+.slider-value {
+    min-width: 48px;
+    text-align: right;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Music section */
+.music-section .control-label {
+    color: var(--accent-purple);
 }
 
 .music-controls {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 15px;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
 .music-btn {
-    background: linear-gradient(135deg, #9c27b0, #7b1fa2);
+    background: linear-gradient(135deg, var(--accent-purple), #9333ea);
     border: none;
     color: white;
-    padding: 15px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    width: 60px;
-    height: 60px;
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.1s, box-shadow 0.1s;
-    user-select: none;
-    -webkit-user-select: none;
+    transition: transform 0.15s, box-shadow 0.15s;
+    flex-shrink: 0;
 }
 
 .music-btn:active, .music-btn.active {
-    background: linear-gradient(135deg, #f44336, #d32f2f);
+    background: linear-gradient(135deg, var(--accent-red), #dc2626);
     transform: scale(1.05);
-    box-shadow: 0 0 15px rgba(244, 67, 54, 0.5);
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.5);
 }
 
 .music-playlist-select,
 .music-timer-select {
-    background: rgba(13, 13, 13, 0.15);
-    border: none;
-    color: white;
-    padding: 8px 12px;
-    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    padding: 10px 14px;
+    border-radius: 10px;
     font-size: 0.85rem;
     cursor: pointer;
 }
 
 .music-playlist-select:focus,
 .music-timer-select:focus {
-    outline: 2px solid rgba(255, 255, 255, 0.5);
-    outline-offset: 1px;
+    outline: none;
+    border-color: var(--accent-purple);
 }
 
 .music-playlist-select {
-    min-width: 120px;
-    max-width: 160px;
+    min-width: 110px;
+    max-width: 150px;
 }
 
 .music-playlist-select:disabled,
@@ -448,121 +629,100 @@ body.loud-alert-active .controls {
     color: #1a1a2e;
 }
 
-.music-playlist-select option:checked,
-.music-timer-select option:checked {
-    background: #e0e0e0;
-    color: #1a1a2e;
-}
-
-.music-playlist-select option:hover,
-.music-timer-select option:hover {
-    background: #000000 !important;
-    color: white !important;
-}
-
 .music-reset-btn {
-    background: rgba(255,255,255,0.2);
-    border: 1px solid rgba(255,255,255,0.3);
-    color: white;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 0.85rem;
     cursor: pointer;
     transition: background 0.2s;
 }
 
 .music-reset-btn:active {
-    background: rgba(255,255,255,0.4);
-}
-
-.music-label {
-    font-size: 0.8rem;
-    margin-top: 8px;
-    opacity: 0.8;
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .music-status {
-    font-size: 0.75rem;
-    margin-top: 5px;
-    color: #ce93d8;
-    min-height: 1em;
+    font-size: 0.8rem;
+    color: var(--accent-purple);
+    min-height: 1.2em;
 }
 
-/* Audio only indicator */
-.audio-only-indicator {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    padding: 30px 40px;
-    background: rgba(30, 30, 50, 0.95);
-    border-radius: 20px;
-    display: none;
-    z-index: 10;
+/* Toggles section */
+.toggles-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
 }
 
-.audio-only-indicator.active {
-    display: block;
-}
-
-/* Hide video element when in audio-only mode */
-.video-container.audio-only #remoteVideo {
-    display: none;
-}
-
-.audio-only-icon {
-    font-size: 4rem;
-    margin-bottom: 15px;
-}
-
-.audio-only-text {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: white;
-    margin-bottom: 8px;
-}
-
-.audio-only-subtext {
-    font-size: 0.9rem;
-    color: rgba(255, 255, 255, 0.6);
-}
-
-/* Echo cancel toggle */
-.echo-cancel-toggle {
+.toggle-option {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 0.85rem;
+    gap: 12px;
     cursor: pointer;
     user-select: none;
+    padding: 8px 0;
 }
 
-.echo-cancel-toggle input {
-    width: 16px;
-    height: 16px;
+.toggle-option input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
     cursor: pointer;
+    accent-color: var(--accent-blue);
+}
+
+.toggle-option span {
+    font-size: 0.9rem;
+    color: var(--text-primary);
 }
 
 .experimental-badge {
     font-size: 0.65rem;
-    padding: 2px 5px;
-    background: rgba(255, 152, 0, 0.3);
-    color: #ffb74d;
-    border-radius: 4px;
-    margin-left: 4px;
+    padding: 3px 8px;
+    background: rgba(249, 115, 22, 0.2);
+    color: var(--accent-orange);
+    border-radius: 6px;
     text-transform: uppercase;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: 0.03em;
 }
 
 .echo-cancel-toggle.active .experimental-badge {
-    background: rgba(76, 175, 80, 0.3);
-    color: #81c784;
+    background: rgba(34, 197, 94, 0.2);
+    color: var(--accent-green);
 }
 
+/* Fullscreen button */
+.fullscreen-btn {
+    width: 100%;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.fullscreen-btn:active {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Adjust body padding when drawer is open */
+body.drawer-open .bottom-bar,
+body.drawer-open .info-strip {
+    position: relative;
+    z-index: 10002;
+}
+
+/* Echo cancel status text */
 .echo-cancel-status {
     font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.5);
-    margin-left: 22px;
-    margin-top: 2px;
+    color: var(--text-muted);
+    margin-left: 32px;
+    margin-top: 4px;
 }

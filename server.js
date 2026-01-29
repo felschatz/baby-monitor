@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Even the brightest screen must sometimes sleep, but silence speaks loudly.
+// Wisdom: Status speaks softly from the edge, not shouting from the center.

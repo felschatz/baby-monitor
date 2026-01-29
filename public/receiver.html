@@ -44,56 +44,87 @@
         </div>
     </div>
 
-    <div class="ptt-container">
-        <button class="ptt-btn" id="pttBtn" disabled>🎤</button>
-        <div class="ptt-label" id="pttLabel">Hold to talk to baby</div>
-    </div>
-
-    <div class="music-container" id="musicContainer" style="display: none;">
-        <div class="music-controls">
-            <button class="music-btn" id="musicBtn">🎵</button>
-            <select class="music-playlist-select" id="musicPlaylistSelect" title="Select playlist"></select>
-            <select class="music-timer-select" id="musicTimerSelect">
-                <option value="45">45 min</option>
-                <option value="60">1 hour</option>
-            </select>
-            <button class="music-reset-btn" id="musicResetBtn" style="display: none;">Reset Timer</button>
-        </div>
-        <div class="music-label" id="musicLabel">Play lullabies</div>
-        <div class="music-status" id="musicStatus"></div>
-    </div>
-
-    <div class="controls">
-        <div class="audio-meter">
-            <div class="audio-level" id="audioLevel"></div>
-            <div class="threshold-marker" id="thresholdMarker"></div>
+    <!-- Always-visible bottom bar with PTT and drawer toggle -->
+    <div class="bottom-bar">
+        <div class="ptt-container">
+            <button class="ptt-btn" id="pttBtn" disabled>🎤</button>
+            <div class="ptt-label" id="pttLabel">Hold to talk</div>
         </div>
 
-        <div class="info-row">
-            <div class="volume-control">
-                <span>🔊</span>
-                <input type="range" id="volume" min="0" max="100" value="100">
-                <span id="volumeValue">100%</span>
+        <button class="drawer-toggle" id="drawerToggle">
+            <span class="drawer-toggle-icon">⚙</span>
+            <span class="drawer-toggle-text">Controls</span>
+        </button>
+    </div>
+
+    <!-- Info strip - always visible, shows current status -->
+    <div class="info-strip">
+        <div class="info-item">
+            <span class="info-icon">🔊</span>
+            <span id="volumeDisplay">100%</span>
+        </div>
+        <div class="info-item">
+            <span class="info-icon">📊</span>
+            <span id="sensitivityDisplay">50</span>
+        </div>
+        <div class="info-item music-info" id="musicInfoItem" style="display: none;">
+            <span class="info-icon">🎵</span>
+            <span id="musicStatusDisplay">—</span>
+        </div>
+        <span class="info-status" id="info">Waiting...</span>
+    </div>
+
+    <!-- Collapsible controls drawer -->
+    <div class="controls-drawer" id="controlsDrawer">
+        <div class="drawer-content">
+            <div class="audio-meter">
+                <div class="audio-level" id="audioLevel"></div>
+                <div class="threshold-marker" id="thresholdMarker"></div>
             </div>
-            <label class="audio-only-toggle">
-                <input type="checkbox" id="audioOnlyToggle">
-                <span>Audio only</span>
-            </label>
-            <label class="echo-cancel-toggle" id="echoCancelToggleLabel">
-                <input type="checkbox" id="echoCancelToggle">
-                <span>Reduce music echo</span>
-                <span class="experimental-badge">Experimental</span>
-            </label>
+
+            <div class="control-section">
+                <label class="control-label">Volume</label>
+                <div class="control-row">
+                    <input type="range" id="volume" min="0" max="100" value="100" class="slider-input">
+                    <span id="volumeValue" class="slider-value">100%</span>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <label class="control-label">Alert Sensitivity</label>
+                <div class="control-row">
+                    <input type="range" id="sensitivity" min="10" max="100" value="50" class="slider-input">
+                    <span id="sensitivityValue" class="slider-value">50</span>
+                </div>
+            </div>
+
+            <div class="control-section music-section" id="musicContainer" style="display: none;">
+                <label class="control-label">Music</label>
+                <div class="music-controls">
+                    <button class="music-btn" id="musicBtn">🎵</button>
+                    <select class="music-playlist-select" id="musicPlaylistSelect" title="Select playlist"></select>
+                    <select class="music-timer-select" id="musicTimerSelect">
+                        <option value="45">45 min</option>
+                        <option value="60">1 hour</option>
+                    </select>
+                    <button class="music-reset-btn" id="musicResetBtn" style="display: none;">Reset</button>
+                </div>
+                <div class="music-status" id="musicStatus"></div>
+            </div>
+
+            <div class="control-section toggles-section">
+                <label class="toggle-option">
+                    <input type="checkbox" id="audioOnlyToggle">
+                    <span>Audio only mode</span>
+                </label>
+                <label class="toggle-option" id="echoCancelToggleLabel">
+                    <input type="checkbox" id="echoCancelToggle">
+                    <span>Reduce music echo</span>
+                    <span class="experimental-badge">Beta</span>
+                </label>
+            </div>
+
             <button class="fullscreen-btn" id="fullscreenBtn">⛶ Fullscreen</button>
-        </div>
-
-        <div class="info-row">
-            <div class="sensitivity-control">
-                <span>Alert sensitivity:</span>
-                <input type="range" id="sensitivity" min="10" max="100" value="50">
-                <span id="sensitivityValue">50</span>
-            </div>
-            <span id="info">Waiting...</span>
         </div>
     </div>
 
