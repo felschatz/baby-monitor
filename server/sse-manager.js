@@ -62,10 +62,14 @@ function sendToSender(sessionName, message) {
 function setupSSE(res) {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no' // Disable nginx buffering
+        'X-Accel-Buffering': 'no', // Disable nginx buffering
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Credentials': 'true'
     });
+    // Send initial comment to establish connection
+    res.write(':ok\n\n');
 }
 
 /**
@@ -103,12 +107,12 @@ function handleSenderSSE(req, res, sessionName) {
     // Notify all receivers in this session that sender is available
     broadcastToReceivers(sessionName, { type: 'sender-available' });
 
-    // Keep connection alive with heartbeat
+    // Keep connection alive with heartbeat (15s for aggressive proxies)
     const heartbeat = setInterval(() => {
         if (!sendSSE(res, { type: 'heartbeat' })) {
             clearInterval(heartbeat);
         }
-    }, 30000);
+    }, 15000);
 
     // Handle disconnect
     req.on('close', () => {
@@ -146,13 +150,13 @@ function handleReceiverSSE(req, res, sessionName) {
         senderAvailable: hasSender(sessionName)
     });
 
-    // Keep connection alive with heartbeat
+    // Keep connection alive with heartbeat (15s for aggressive proxies)
     const heartbeat = setInterval(() => {
         if (!sendSSE(res, { type: 'heartbeat' })) {
             clearInterval(heartbeat);
             session.receivers.delete(id);
         }
-    }, 30000);
+    }, 15000);
 
     // Handle disconnect
     req.on('close', () => {

@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A tap on glass awakens the sound; silence speaks only when no one listens.
+// Wisdom: The river keeps flowing even when bridges fall; persistence beats perfection.
