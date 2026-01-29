@@ -60,14 +60,26 @@ export function initVideoPlayback(elements, callbacks) {
 
     remoteVideo.addEventListener('loadedmetadata', tryPlayVideo);
 
-    // Handle overlay click
+    // Handle overlay click - always retry play regardless of previous interaction state
     overlay.addEventListener('click', () => {
-        handleUserInteraction();
+        console.log('Overlay tapped, attempting to play');
+        userHasInteracted = true;
+        if (onUserInteraction) onUserInteraction();
+
         if (remoteVideo.srcObject) {
             remoteVideo.muted = false;
             remoteVideo.play().then(() => {
+                console.log('Play succeeded after overlay tap');
                 overlay.classList.add('hidden');
-            }).catch(e => console.log('Overlay play error:', e));
+            }).catch(e => {
+                console.log('Overlay play error:', e);
+                // Try one more time with a slight delay
+                setTimeout(() => {
+                    remoteVideo.play().catch(e2 => console.log('Retry play also failed:', e2));
+                }, 100);
+            });
+        } else {
+            console.log('No srcObject yet, waiting for stream');
         }
     });
 }

@@ -250,14 +250,24 @@ body.loud-alert-active .info-strip {
 
 .overlay {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    cursor: pointer;
+}
+
+.overlay-content {
     text-align: center;
     padding: 24px 32px;
     background: var(--bg-elevated);
     border-radius: 16px;
     border: 1px solid var(--border-subtle);
+    pointer-events: none;
 }
 
 .overlay.hidden {

@@ -249,7 +249,9 @@ export function startMusic(timerMinutes, echoCancelEnabled = false) {
     musicCurrentIndex = 0;
     musicTimerRemaining = timerMinutes * 60;
 
-    musicIndicator.classList.add('active');
+    if (musicIndicator) {
+        musicIndicator.classList.add('active');
+    }
     updateMusicControlsUI();
 
     const savedVol = localStorage.getItem('sender-music-volume');
@@ -356,7 +358,9 @@ export function stopMusic(broadcast = true) {
         musicStatusInterval = null;
     }
 
-    musicIndicator.classList.remove('active');
+    if (musicIndicator) {
+        musicIndicator.classList.remove('active');
+    }
     musicTimerRemaining = 0;
 
     if (onEchoCancelTeardown) {
