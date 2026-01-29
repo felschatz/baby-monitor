@@ -40,6 +40,20 @@ export async function handleOffer(offer) {
 
     peerConnection.ontrack = (event) => {
         console.log('Received track:', event.track.kind, event.streams);
+
+        // Minimize jitter buffer for low latency playback
+        // playoutDelayHint is in seconds - 0 means minimum possible delay
+        if (event.receiver && 'playoutDelayHint' in event.receiver) {
+            event.receiver.playoutDelayHint = 0;
+            console.log('Set playoutDelayHint to 0 for low latency');
+        }
+
+        // Also try jitterBufferTarget if available (newer API)
+        if (event.receiver && 'jitterBufferTarget' in event.receiver) {
+            event.receiver.jitterBufferTarget = 0;
+            console.log('Set jitterBufferTarget to 0');
+        }
+
         if (onTrack) onTrack(event);
     };
 
@@ -81,16 +95,20 @@ export async function handleOffer(offer) {
 
         // Set up bidirectional audio for PTT (pre-negotiate so no renegotiation needed later)
         const transceivers = peerConnection.getTransceivers();
-        const audioTransceiver = transceivers.find(t => t.receiver.track?.kind === 'audio');
+        console.log('Transceivers after setRemoteDescription:', transceivers.length);
+
+        // Find audio transceiver by checking receiver.track.kind
+        let audioTransceiver = transceivers.find(t => t.receiver?.track?.kind === 'audio');
+
         if (audioTransceiver) {
             audioTransceiver.direction = 'sendrecv';
             pttAudioSender = audioTransceiver.sender;
             console.log('Set audio transceiver to sendrecv for PTT');
         } else {
-            // No audio transceiver from sender, create one
+            // Fallback: create a new audio transceiver for PTT
+            console.log('No audio transceiver found, creating one for PTT');
             const transceiver = peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
             pttAudioSender = transceiver.sender;
-            console.log('Added audio transceiver for PTT');
         }
 
         console.log('Processing', pendingCandidates.length, 'queued ICE candidates');
@@ -139,6 +157,8 @@ export function closePeerConnection() {
         peerConnection.close();
         peerConnection = null;
     }
+    pttAudioSender = null;
+    pendingCandidates = [];
 }
 
 /**

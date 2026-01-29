@@ -288,11 +288,17 @@ async function handleEchoCancelToggle(enabled) {
 async function handleMessage(message) {
     switch (message.type) {
         case 'registered':
-            console.log('Registered as sender');
+            console.log('Registered as sender, isStreaming:', isStreaming);
             signaling.setConnected(true);
             info.textContent = 'Connected to server. Auto-starting stream...';
             if (!isStreaming) {
-                setTimeout(() => startStreamingHandler(), 500);
+                console.log('Scheduling auto-start in 500ms');
+                setTimeout(() => {
+                    console.log('Auto-start triggered, calling startStreamingHandler');
+                    startStreamingHandler();
+                }, 500);
+            } else {
+                console.log('Already streaming, skipping auto-start');
             }
             setTimeout(() => {
                 broadcastMusicStatus();
@@ -354,6 +360,14 @@ async function handleMessage(message) {
             console.log('Received PTT start from parent');
             setPttActive(true);
             showPTTIndicator(pttStatus);
+            // Try to play PTT audio (it should have srcObject set from connection)
+            if (pttAudio.srcObject) {
+                pttAudio.play().then(() => {
+                    console.log('PTT audio started on ptt-start signal');
+                }).catch(e => console.log('PTT play on start:', e.message));
+            } else {
+                console.log('PTT audio srcObject not yet set');
+            }
             break;
 
         case 'ptt-offer':
@@ -398,13 +412,16 @@ async function handleMessage(message) {
 
 // Start streaming handler
 async function startStreamingHandler() {
+    console.log('startStreamingHandler called, video:', enableVideo.checked, 'audio:', enableAudio.checked);
     try {
+        console.log('Calling startStreaming...');
         await startStreaming({
             video: enableVideo.checked,
             audio: enableAudio.checked,
             quality: videoQuality,
             videoElement: localVideo
         });
+        console.log('startStreaming completed');
 
         if (enableAudio.checked) {
             setupAudioAnalysis(getLocalStream(), audioLevel);
@@ -422,7 +439,9 @@ async function startStreamingHandler() {
 
         enableAudioPlayback();
 
+        console.log('Creating offer...');
         await createOffer(pttAudio);
+        console.log('Offer created');
     } catch (err) {
         console.error('Error starting stream:', err);
         alert('Failed to access camera/microphone: ' + err.message);

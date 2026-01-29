@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Instant PTT flows like water through pre-negotiated channels.
+// Wisdom: Debug logs illuminate the path through streaming darkness.

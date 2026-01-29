@@ -93,7 +93,38 @@ export function getMediaConstraints(options) {
         audio: audio ? {
             echoCancellation: false,
             noiseSuppression: false,
-            autoGainControl: false
+            autoGainControl: false,
+            // Request low-latency audio capture
+            latency: 0,
+            channelCount: 1  // Mono is faster to encode
         } : false
     };
+}
+
+/**
+ * Optimize SDP for low latency
+ * - Sets Opus to use lowest delay mode
+ * - Reduces jitter buffer requirements
+ * @param {string} sdp
+ * @returns {string}
+ */
+export function optimizeSdpForLowLatency(sdp) {
+    // Modify Opus parameters for lower latency
+    // useinbandfec=0 disables forward error correction (reduces latency)
+    // stereo=0 forces mono (faster)
+    // maxplaybackrate=16000 reduces bandwidth/processing for voice
+    // sprop-maxcapturerate=16000 hints at capture rate
+    // minptime=10 allows smaller audio packets
+    let optimized = sdp.replace(
+        /a=fmtp:111 minptime=10;useinbandfec=1/g,
+        'a=fmtp:111 minptime=10;useinbandfec=0;stereo=0;maxplaybackrate=24000;sprop-maxcapturerate=24000'
+    );
+
+    // Also try the simpler format some browsers use
+    optimized = optimized.replace(
+        /a=fmtp:111 minptime=10/g,
+        'a=fmtp:111 minptime=10;useinbandfec=0;stereo=0;maxplaybackrate=24000'
+    );
+
+    return optimized;
 }

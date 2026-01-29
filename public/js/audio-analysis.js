@@ -26,13 +26,20 @@ export function initAudioAnalysis(callbacks) {
     getIsConnected = callbacks.getIsConnected;
 }
 
+// Additional audio level elements (inline meter)
+let audioLevelElements = [];
+
 /**
  * Setup audio analysis for a stream
  * @param {MediaStream} stream
  * @param {HTMLElement} audioLevelElement
+ * @param {HTMLElement} [inlineAudioLevelElement] - Optional inline meter
  */
-export function setupAudioAnalysis(stream, audioLevelElement) {
+export function setupAudioAnalysis(stream, audioLevelElement, inlineAudioLevelElement) {
     console.log('setupAudioAnalysis called, stream active:', stream?.active);
+
+    // Store all audio level elements
+    audioLevelElements = [audioLevelElement, inlineAudioLevelElement].filter(Boolean);
 
     // If we're getting a new stream, reset the analysis state
     // This happens when video mode is toggled and a new peer connection is created
@@ -97,9 +104,10 @@ export async function tryStartAudioAnalysis(audioLevelElement) {
             const rms = Math.sqrt(sum / dataArray.length);
             const percentage = Math.min(100, (rms / 128) * 100);
 
-            if (audioLevelElement) {
-                audioLevelElement.style.width = percentage + '%';
-            }
+            // Update all audio level elements (drawer + inline)
+            audioLevelElements.forEach(el => {
+                if (el) el.style.width = percentage + '%';
+            });
 
             // Check for loud sounds based on sensitivity
             const baseThreshold = 100 - getSensitivity();

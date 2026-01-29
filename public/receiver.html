@@ -46,11 +46,19 @@
         </div>
     </div>
 
-    <!-- Always-visible bottom bar with PTT and drawer toggle -->
+    <!-- Always-visible bottom bar with PTT, audio meter, and drawer toggle -->
     <div class="bottom-bar">
         <div class="ptt-container">
             <button class="ptt-btn" id="pttBtn" disabled>🎤</button>
             <div class="ptt-label" id="pttLabel">Hold to talk</div>
+        </div>
+
+        <div class="audio-meter-inline">
+            <span class="audio-meter-icon">👶</span>
+            <div class="audio-meter-bar">
+                <div class="audio-meter-level" id="audioLevelInline"></div>
+                <div class="audio-meter-threshold" id="thresholdMarkerInline"></div>
+            </div>
         </div>
 
         <button class="drawer-toggle" id="drawerToggle">

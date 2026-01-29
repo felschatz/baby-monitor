@@ -3,7 +3,7 @@
  * Handles offer creation, stream handling, and PTT receive
  */
 
-import { rtcConfig, waitForStableState, addIceCandidates, getMediaConstraints } from './webrtc.js';
+import { rtcConfig, waitForStableState, addIceCandidates, getMediaConstraints, optimizeSdpForLowLatency } from './webrtc.js';
 
 // State
 let peerConnection = null;
@@ -110,8 +110,25 @@ export async function createOffer(pttAudio) {
             console.log('Skipping video track (receiver requested audio-only)');
             return;
         }
-        peerConnection.addTrack(track, localStream);
+        const sender = peerConnection.addTrack(track, localStream);
         console.log('Added track:', track.kind);
+
+        // Configure audio sender for low latency
+        if (track.kind === 'audio' && sender.getParameters) {
+            try {
+                const params = sender.getParameters();
+                if (params.encodings && params.encodings.length > 0) {
+                    // Set priority to high for lower queuing delay
+                    params.encodings[0].priority = 'high';
+                    params.encodings[0].networkPriority = 'high';
+                    sender.setParameters(params).then(() => {
+                        console.log('Set audio encoding priority to high');
+                    }).catch(e => console.log('Could not set audio priority:', e.message));
+                }
+            } catch (e) {
+                console.log('Could not configure audio sender:', e.message);
+            }
+        }
     });
 
     peerConnection.onicecandidate = (event) => {
@@ -135,43 +152,72 @@ export async function createOffer(pttAudio) {
         }
     };
 
+    // Store PTT audio stream reference for reuse
+    let pttMediaStream = null;
+
     // Handle incoming audio from parent (PTT)
     peerConnection.ontrack = (event) => {
-        console.log('Received track from parent:', event.track.kind, event.streams, 'pttActive:', pttActive);
-        if (event.track.kind === 'audio' && event.streams[0] !== localStream) {
-            console.log('PTT audio track received, setting up playback');
-            pttAudio.srcObject = event.streams[0];
+        console.log('Received track from parent:', event.track.kind, 'streams:', event.streams.length, 'muted:', event.track.muted, 'readyState:', event.track.readyState);
 
-            pttAudio.play().then(() => {
-                console.log('PTT audio playing');
-            }).catch(err => {
-                console.error('PTT audio play error:', err);
-                setTimeout(() => pttAudio.play().catch(() => {}), 100);
-            });
+        // Minimize jitter buffer for low latency PTT playback
+        if (event.receiver && 'playoutDelayHint' in event.receiver) {
+            event.receiver.playoutDelayHint = 0;
+            console.log('Set PTT playoutDelayHint to 0');
+        }
+
+        // Check if this is an audio track (PTT from parent)
+        if (event.track.kind === 'audio') {
+            // With replaceTrack/pre-negotiated tracks, streams may be empty
+            // Create a MediaStream from the track if needed
+            pttMediaStream = event.streams[0] || new MediaStream([event.track]);
+
+            console.log('PTT audio track received, setting up playback. Track muted:', event.track.muted);
+            pttAudio.srcObject = pttMediaStream;
+
+            // Function to try playing audio
+            const tryPlay = () => {
+                if (!pttAudio.srcObject) return;
+                pttAudio.play().then(() => {
+                    console.log('PTT audio playing successfully');
+                }).catch(err => {
+                    console.log('PTT audio play error (will retry on unmute):', err.message);
+                });
+            };
+
+            // Try to play if track is not muted
+            if (!event.track.muted) {
+                tryPlay();
+            }
 
             event.track.onended = () => {
                 console.log('PTT track ended');
                 pttActive = false;
-                pttAudio.srcObject = null;
             };
 
             event.track.onmute = () => {
-                console.log('PTT track muted');
+                console.log('PTT track muted (parent stopped talking)');
             };
 
             event.track.onunmute = () => {
-                console.log('PTT track unmuted, pttActive:', pttActive);
-                if (pttActive) {
-                    pttAudio.play().catch(e => console.log('Play on unmute error:', e));
-                }
+                console.log('PTT track unmuted (parent started talking), pttActive:', pttActive);
+                // Audio started flowing - this is the key moment for pre-negotiated tracks!
+                tryPlay();
             };
         }
     };
 
     try {
         const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        console.log('Created and set local offer');
+
+        // Optimize SDP for low latency audio
+        const optimizedSdp = optimizeSdpForLowLatency(offer.sdp);
+        const optimizedOffer = new RTCSessionDescription({
+            type: offer.type,
+            sdp: optimizedSdp
+        });
+
+        await peerConnection.setLocalDescription(optimizedOffer);
+        console.log('Created and set local offer (low-latency optimized)');
 
         if (sendSignal) {
             sendSignal({

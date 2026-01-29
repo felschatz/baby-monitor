@@ -384,6 +384,69 @@ body.loud-alert-active .info-strip {
     font-weight: 500;
 }
 
+/* Inline audio meter - always visible baby sound level */
+.audio-meter-inline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.audio-meter-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+
+.audio-meter-bar {
+    flex: 1;
+    height: 14px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 7px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.audio-meter-level {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #22c55e 0%, #fbbf24 60%, #ef4444 100%);
+    border-radius: 7px;
+    transition: width 0.05s ease-out;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+}
+
+.audio-meter-threshold {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: white;
+    border-radius: 2px;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+    transition: left 0.2s;
+}
+
+/* Alert state - meter glows */
+.audio-meter-inline.alert .audio-meter-bar {
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 12px rgba(239, 68, 68, 0.6);
+}
+
+.audio-meter-inline.alert {
+    border-color: rgba(239, 68, 68, 0.5);
+    animation: meterPulse 0.5s ease-in-out infinite;
+}
+
+@keyframes meterPulse {
+    0%, 100% { border-color: rgba(239, 68, 68, 0.5); }
+    50% { border-color: rgba(239, 68, 68, 0.9); }
+}
+
 .drawer-toggle {
     display: flex;
     align-items: center;
@@ -420,28 +483,62 @@ body.loud-alert-active .info-strip {
 }
 
 /* ========================================
-   INFO STRIP - Compact status indicators
+   INFO STRIP - Always-visible status indicators
    ======================================== */
 .info-strip {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 8px 16px;
-    background: var(--bg-surface);
-    border-top: 1px solid var(--border-subtle);
-    font-size: 0.8rem;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.85rem;
     z-index: 10000;
 }
 
 .info-item {
     display: flex;
     align-items: center;
-    gap: 6px;
-    color: var(--text-secondary);
+    gap: 8px;
+    color: var(--text-primary);
+    background: rgba(0, 0, 0, 0.5);
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.info-icon {
-    font-size: 0.9rem;
+.info-item .info-icon {
+    font-size: 1.1rem;
+}
+
+.info-item span:not(.info-icon) {
+    font-weight: 700;
+    font-size: 1rem;
+    min-width: 40px;
+    text-align: center;
+}
+
+/* Volume indicator styling */
+.info-item:first-child {
+    background: rgba(34, 197, 94, 0.25);
+    border-color: rgba(34, 197, 94, 0.5);
+}
+
+.info-item:first-child span:not(.info-icon) {
+    color: #4ade80;
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+/* Sensitivity indicator styling */
+.info-item:nth-child(2) {
+    background: rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+.info-item:nth-child(2) span:not(.info-icon) {
+    color: #60a5fa;
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
 }
 
 .info-status {
@@ -451,30 +548,46 @@ body.loud-alert-active .info-strip {
 }
 
 .music-info {
-    color: var(--accent-purple);
+    background: rgba(168, 85, 247, 0.25) !important;
+    border-color: rgba(168, 85, 247, 0.5) !important;
+}
+
+.music-info span:not(.info-icon) {
+    color: #c084fc !important;
+    text-shadow: 0 0 10px rgba(168, 85, 247, 0.5) !important;
 }
 
 /* ========================================
-   CONTROLS DRAWER - Slides down from bottom bar
+   CONTROLS DRAWER - Slides up from bottom bar
    ======================================== */
 .controls-drawer {
     position: fixed;
     left: 0;
     right: 0;
-    top: var(--drawer-anchor-top, 50%);
+    /* Anchor to bottom of screen, then offset by bottom bar height */
+    bottom: var(--drawer-anchor-bottom, 140px);
     background: var(--bg-elevated);
-    border-bottom: 1px solid var(--border-subtle);
+    border-top: 1px solid var(--border-subtle);
     z-index: 9998;
-    transform: translateY(-100%);
+    transform: translateY(100%);
     transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     max-height: 60vh;
     overflow-y: auto;
-    border-radius: 0 0 20px 20px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .controls-drawer.open {
     transform: translateY(0);
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Hide drawer completely when closed */
+.controls-drawer:not(.open) {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .drawer-content {

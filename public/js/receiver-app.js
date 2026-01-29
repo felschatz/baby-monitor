@@ -87,6 +87,11 @@ const sensitivityDisplay = document.getElementById('sensitivityDisplay');
 const musicInfoItem = document.getElementById('musicInfoItem');
 const musicStatusDisplay = document.getElementById('musicStatusDisplay');
 
+// Inline audio meter elements
+const audioLevelInline = document.getElementById('audioLevelInline');
+const thresholdMarkerInline = document.getElementById('thresholdMarkerInline');
+const audioMeterInline = document.querySelector('.audio-meter-inline');
+
 // Initialize session
 const sessionName = initSession({
     pathPrefix: '/r/',
@@ -206,12 +211,20 @@ function triggerLoudSoundAlert(isSoft = false) {
         document.body.classList.add('loud-alert-active');
     }
 
+    // Add alert state to inline meter
+    if (audioMeterInline) {
+        audioMeterInline.classList.add('alert');
+    }
+
     loudSoundCooldown = true;
 
     clearTimeout(loudSoundTimeout);
     loudSoundTimeout = setTimeout(() => {
         document.body.classList.remove('soft-alert-active');
         document.body.classList.remove('loud-alert-active');
+        if (audioMeterInline) {
+            audioMeterInline.classList.remove('alert');
+        }
         setTimeout(() => {
             loudSoundCooldown = false;
         }, 2000);
@@ -221,6 +234,7 @@ function triggerLoudSoundAlert(isSoft = false) {
 function updateThresholdMarker() {
     const threshold = 100 - parseInt(sensitivitySlider.value);
     thresholdMarker.style.left = threshold + '%';
+    if (thresholdMarkerInline) thresholdMarkerInline.style.left = threshold + '%';
     sensitivityValue.textContent = sensitivitySlider.value;
 }
 
@@ -412,13 +426,7 @@ initReceiverWebRTC({
             handleVideoTrack(event.track, savedVol);
             setConnectedState(true);
             info.textContent = 'Streaming';
-
-            // Unmute based on user interaction
-            remoteVideo.muted = !hasUserInteracted();
-            remoteVideo.play().catch(e => {
-                console.log('Play on ICE connect:', e);
-                showPlayOverlay();
-            });
+            // Note: handleVideoTrack already calls play(), no need to call it again
         }
 
         if (event.track.kind === 'audio') {
@@ -427,7 +435,7 @@ initReceiverWebRTC({
                 info.textContent = 'Streaming (audio only)';
                 updateAudioOnlyIndicator();
             }
-            setupAudioAnalysis(event.streams[0], audioLevel);
+            setupAudioAnalysis(event.streams[0], audioLevel, audioLevelInline);
             setupAudioTrackMuteDetection(event.track);
         }
     }
@@ -467,6 +475,8 @@ async function handleMessage(message) {
             resetMediaMutedState();
             setHasVideoTrack(false);
             updateAudioOnlyIndicator();
+            // Clear video element to prepare for reconnection
+            remoteVideo.srcObject = null;
             break;
 
         case 'offer':
@@ -514,15 +524,19 @@ echoCancelToggle.addEventListener('change', () => {
     signaling.sendSignal({ type: 'echo-cancel-enable', enabled: echoCancelEnabled });
 });
 
-volumeSlider.addEventListener('input', () => {
-    const value = volumeSlider.value / 100;
-    remoteVideo.volume = value;
+// Shared volume update function
+function updateVolume(value) {
+    const numValue = parseInt(value);
+    remoteVideo.volume = numValue / 100;
     remoteVideo.muted = false;
-    volumeValue.textContent = volumeSlider.value + '%';
-    volumeDisplay.textContent = volumeSlider.value + '%';
+    volumeSlider.value = numValue;
+    volumeValue.textContent = numValue + '%';
+    volumeDisplay.textContent = numValue + '%';
     overlay.classList.add('hidden');
-    localStorage.setItem('receiver-volume', volumeSlider.value);
-});
+    localStorage.setItem('receiver-volume', numValue);
+}
+
+volumeSlider.addEventListener('input', () => updateVolume(volumeSlider.value));
 
 sensitivitySlider.addEventListener('input', () => {
     updateThresholdMarker();
@@ -592,9 +606,16 @@ document.addEventListener('keydown', () => handleUserInteraction(), { passive: t
 // Drawer toggle - position drawer above bottom bar
 function updateDrawerPosition() {
     const bottomBar = document.querySelector('.bottom-bar');
-    const rect = bottomBar.getBoundingClientRect();
-    document.documentElement.style.setProperty('--drawer-anchor-top', `${rect.top}px`);
+    const infoStrip = document.querySelector('.info-strip');
+    // Calculate total height of bottom bar + info strip
+    const bottomBarHeight = bottomBar ? bottomBar.offsetHeight : 0;
+    const infoStripHeight = infoStrip ? infoStrip.offsetHeight : 0;
+    const totalBottomHeight = bottomBarHeight + infoStripHeight;
+    document.documentElement.style.setProperty('--drawer-anchor-bottom', `${totalBottomHeight}px`);
 }
+
+// Calculate initial position on load
+updateDrawerPosition();
 
 drawerToggle.addEventListener('click', () => {
     updateDrawerPosition();
@@ -605,9 +626,7 @@ drawerToggle.addEventListener('click', () => {
 
 // Update drawer position on resize
 window.addEventListener('resize', () => {
-    if (controlsDrawer.classList.contains('open')) {
-        updateDrawerPosition();
-    }
+    updateDrawerPosition();
 }, { passive: true });
 
 // Close drawer when clicking outside
