@@ -589,12 +589,26 @@ document.addEventListener('touchstart', () => {
 }, { passive: true });
 document.addEventListener('keydown', () => handleUserInteraction(), { passive: true });
 
-// Drawer toggle
+// Drawer toggle - position drawer above bottom bar
+function updateDrawerPosition() {
+    const bottomBar = document.querySelector('.bottom-bar');
+    const rect = bottomBar.getBoundingClientRect();
+    document.documentElement.style.setProperty('--drawer-anchor-top', `${rect.top}px`);
+}
+
 drawerToggle.addEventListener('click', () => {
+    updateDrawerPosition();
     const isOpen = controlsDrawer.classList.toggle('open');
     drawerToggle.classList.toggle('active', isOpen);
     document.body.classList.toggle('drawer-open', isOpen);
 });
+
+// Update drawer position on resize
+window.addEventListener('resize', () => {
+    if (controlsDrawer.classList.contains('open')) {
+        updateDrawerPosition();
+    }
+}, { passive: true });
 
 // Close drawer when clicking outside
 document.addEventListener('click', (e) => {

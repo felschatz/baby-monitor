@@ -455,21 +455,22 @@ body.loud-alert-active .info-strip {
 }
 
 /* ========================================
-   CONTROLS DRAWER - Collapsible panel
+   CONTROLS DRAWER - Slides down from bottom bar
    ======================================== */
 .controls-drawer {
     position: fixed;
-    bottom: 0;
     left: 0;
     right: 0;
+    top: var(--drawer-anchor-top, 50%);
     background: var(--bg-elevated);
-    border-top: 1px solid var(--border-subtle);
-    z-index: 9999;
-    transform: translateY(100%);
+    border-bottom: 1px solid var(--border-subtle);
+    z-index: 9998;
+    transform: translateY(-100%);
     transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-    max-height: 70vh;
+    max-height: 60vh;
     overflow-y: auto;
-    border-radius: 20px 20px 0 0;
+    border-radius: 0 0 20px 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .controls-drawer.open {
@@ -477,8 +478,7 @@ body.loud-alert-active .info-strip {
 }
 
 .drawer-content {
-    padding: 24px 20px;
-    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    padding: 20px;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -722,11 +722,24 @@ body.loud-alert-active .info-strip {
     background: rgba(255, 255, 255, 0.15);
 }
 
-/* Adjust body padding when drawer is open */
+/* Ensure bottom elements stay above drawer */
 body.drawer-open .bottom-bar,
 body.drawer-open .info-strip {
     position: relative;
     z-index: 10002;
+}
+
+/* Subtle backdrop when drawer is open */
+body.drawer-open::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 9997;
+    pointer-events: none;
 }
 
 /* Echo cancel status text */
