@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Echo cancellation in browser puts the whole phone in call mode.
+// Wisdom: Hidden treasures reveal themselves to those with patience.

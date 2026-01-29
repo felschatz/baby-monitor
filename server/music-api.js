@@ -39,7 +39,8 @@ function handleMusicApi(res, query, baseDir, debugTimer = false) {
                     }
                 }
 
-                return { id: entry.name, name: displayName };
+                const hidden = entry.name === '1' || entry.name === '2';
+                return { id: entry.name, name: displayName, hidden };
             })
             .sort((a, b) => parseInt(a.id) - parseInt(b.id));
 

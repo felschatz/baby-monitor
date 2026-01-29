@@ -7,6 +7,7 @@
 let musicPlaylist = [];
 let musicPlaylists = [];
 let currentPlaylistId = localStorage.getItem('sender-music-playlist') || '1';
+let playlistsUnlocked = localStorage.getItem('sender-playlists-unlocked') === 'true';
 let musicShuffled = [];
 let musicCurrentIndex = 0;
 let musicPlaying = false;
@@ -108,6 +109,31 @@ export function initMusicPlayer(elements, callbacks) {
         }
     });
 
+    // Long-press on playlist dropdown to unlock hidden playlists
+    let longPressTimer = null;
+    const startLongPress = () => {
+        longPressTimer = setTimeout(() => {
+            if (!playlistsUnlocked) {
+                playlistsUnlocked = true;
+                localStorage.setItem('sender-playlists-unlocked', 'true');
+                console.log('Playlists unlocked!');
+                fetchMusicPlaylist();
+            }
+        }, 3000);
+    };
+    const cancelLongPress = () => {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+    };
+    musicPlaylistSelect.addEventListener('mousedown', startLongPress);
+    musicPlaylistSelect.addEventListener('touchstart', startLongPress);
+    musicPlaylistSelect.addEventListener('mouseup', cancelLongPress);
+    musicPlaylistSelect.addEventListener('mouseleave', cancelLongPress);
+    musicPlaylistSelect.addEventListener('touchend', cancelLongPress);
+    musicPlaylistSelect.addEventListener('touchcancel', cancelLongPress);
+
     // Fetch playlist on load
     fetchMusicPlaylist();
 }
@@ -133,10 +159,13 @@ export async function fetchMusicPlaylist(playlistId = null) {
         const response = await fetch(`/api/music?playlist=${encodeURIComponent(playlist)}`);
         const data = await response.json();
         musicPlaylist = data.files || [];
-        musicPlaylists = data.playlists || [];
+        const allPlaylists = data.playlists || [];
+        musicPlaylists = playlistsUnlocked
+            ? allPlaylists
+            : allPlaylists.filter(p => !p.hidden);
 
         console.log('Music playlist loaded:', musicPlaylist.length, 'tracks from playlist', playlist);
-        console.log('Available playlists:', musicPlaylists);
+        console.log('Available playlists:', musicPlaylists, playlistsUnlocked ? '(unlocked)' : '(locked)');
 
         if (musicPlaylists.length > 0) {
             musicPlaylistSelect.innerHTML = '';

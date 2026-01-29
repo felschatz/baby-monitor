@@ -98,6 +98,7 @@ let musicPlaying = false;
 let musicAvailable = false;
 let musicPlaylists = [];
 let currentPlaylistId = localStorage.getItem('receiver-music-playlist') || '1';
+let playlistsUnlocked = localStorage.getItem('receiver-playlists-unlocked') === 'true';
 let loudSoundTimeout = null;
 let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
@@ -194,7 +195,10 @@ async function checkMusicAvailability() {
     try {
         const response = await fetch(`/api/music?playlist=${encodeURIComponent(currentPlaylistId)}`);
         const data = await response.json();
-        musicPlaylists = data.playlists || [];
+        const allPlaylists = data.playlists || [];
+        musicPlaylists = playlistsUnlocked
+            ? allPlaylists
+            : allPlaylists.filter(p => !p.hidden);
 
         if (musicPlaylists.length > 0) {
             musicPlaylistSelect.innerHTML = '';
@@ -505,6 +509,31 @@ musicPlaylistSelect.addEventListener('change', () => {
     localStorage.setItem('receiver-music-playlist', currentPlaylistId);
     console.log('Switched to playlist:', currentPlaylistId);
 });
+
+// Long-press on playlist dropdown to unlock hidden playlists
+let longPressTimer = null;
+const startLongPress = () => {
+    longPressTimer = setTimeout(() => {
+        if (!playlistsUnlocked) {
+            playlistsUnlocked = true;
+            localStorage.setItem('receiver-playlists-unlocked', 'true');
+            console.log('Playlists unlocked!');
+            checkMusicAvailability();
+        }
+    }, 3000);
+};
+const cancelLongPress = () => {
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+};
+musicPlaylistSelect.addEventListener('mousedown', startLongPress);
+musicPlaylistSelect.addEventListener('touchstart', startLongPress);
+musicPlaylistSelect.addEventListener('mouseup', cancelLongPress);
+musicPlaylistSelect.addEventListener('mouseleave', cancelLongPress);
+musicPlaylistSelect.addEventListener('touchend', cancelLongPress);
+musicPlaylistSelect.addEventListener('touchcancel', cancelLongPress);
 
 // User interaction handlers for audio context
 document.addEventListener('click', () => {
