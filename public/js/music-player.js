@@ -36,6 +36,30 @@ let onEchoCancelSetup = null;
 let onEchoCancelTeardown = null;
 
 /**
+ * Convert slider value (0-100) to volume (0-1)
+ * Logarithmic below 50%, linear above 50%
+ * - 10% slider → ~0.1% volume
+ * - 50% slider → 50% volume
+ * - 90% slider → 90% volume
+ */
+function sliderToVolume(sliderValue) {
+    const v = parseFloat(sliderValue);
+    if (v <= 50) {
+        // Logarithmic curve for lower half: 0-50 slider maps to 0-50 volume with compression
+        // Uses power of 4 to compress low values (10% → 0.08%)
+        return 0.5 * Math.pow(v / 50, 4);
+    } else {
+        // Linear for upper half: 50-100 slider maps to 50-100 volume
+        return v / 100;
+    }
+}
+
+/**
+ * Default volume slider value
+ */
+const DEFAULT_VOLUME_SLIDER = 50;
+
+/**
  * Initialize music player
  * @param {object} elements - DOM elements
  * @param {object} callbacks - Callback functions
@@ -63,15 +87,17 @@ export function initMusicPlayer(elements, callbacks) {
     if (savedMusicVolume !== null) {
         musicVolumeSlider.value = savedMusicVolume;
         musicVolumeValue.textContent = savedMusicVolume + '%';
-        musicAudio.volume = parseInt(savedMusicVolume) / 100;
+        musicAudio.volume = sliderToVolume(parseInt(savedMusicVolume));
     } else {
-        musicAudio.volume = 0.5;
+        musicVolumeSlider.value = DEFAULT_VOLUME_SLIDER;
+        musicVolumeValue.textContent = DEFAULT_VOLUME_SLIDER + '%';
+        musicAudio.volume = sliderToVolume(DEFAULT_VOLUME_SLIDER);
     }
 
-    // Music volume control
+    // Music volume control (logarithmic for better low-volume control)
     musicVolumeSlider.addEventListener('input', () => {
         const value = musicVolumeSlider.value;
-        musicAudio.volume = value / 100;
+        musicAudio.volume = sliderToVolume(value);
         musicVolumeValue.textContent = value + '%';
         localStorage.setItem('sender-music-volume', value);
     });
@@ -255,7 +281,7 @@ export function startMusic(timerMinutes, echoCancelEnabled = false) {
     updateMusicControlsUI();
 
     const savedVol = localStorage.getItem('sender-music-volume');
-    musicAudio.volume = savedVol !== null ? parseInt(savedVol) / 100 : 0.5;
+    musicAudio.volume = savedVol !== null ? sliderToVolume(parseInt(savedVol)) : sliderToVolume(DEFAULT_VOLUME_SLIDER);
 
     if (musicTimer) clearInterval(musicTimer);
     musicTimer = setInterval(() => {
@@ -346,7 +372,7 @@ export function stopMusic(broadcast = true) {
     musicAudio.src = '';
 
     const savedVol = localStorage.getItem('sender-music-volume');
-    musicAudio.volume = savedVol !== null ? parseInt(savedVol) / 100 : 0.5;
+    musicAudio.volume = savedVol !== null ? sliderToVolume(parseInt(savedVol)) : sliderToVolume(DEFAULT_VOLUME_SLIDER);
 
     if (musicTimer) {
         clearInterval(musicTimer);

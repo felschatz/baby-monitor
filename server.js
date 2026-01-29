@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Consistent Web Audio routing keeps music quality pristine.
+// Wisdom: Half logarithmic, half linear - the best of both worlds.
