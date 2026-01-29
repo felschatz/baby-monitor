@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Hidden treasures reveal themselves to those with patience.
+// Wisdom: A well-encoded video speaks louder than a thousand silent frames.
