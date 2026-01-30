@@ -1,6 +1,6 @@
 /**
  * Audio Analysis for receiver
- * Volume detection, RMS calculation, and loud sound alerts
+ * Volume detection, RMS calculation, loud sound alerts, and noise gate
  */
 
 // State
@@ -9,11 +9,20 @@ let analyser = null;
 let audioStream = null;
 let audioAnalysisRunning = false;
 
+// Noise gate state
+let noiseGateGain = null;
+let volumeGain = null;
+let noiseGateThreshold = 0;
+let isGating = false;
+let noiseGateSource = null;
+let videoElementSource = null;
+
 // Callbacks
 let onLoudSound = null;
 let getSensitivity = null;
 let getMusicPlaying = null;
 let getIsConnected = null;
+let onGatingChange = null;
 
 /**
  * Initialize audio analysis module
@@ -24,6 +33,7 @@ export function initAudioAnalysis(callbacks) {
     getSensitivity = callbacks.getSensitivity;
     getMusicPlaying = callbacks.getMusicPlaying;
     getIsConnected = callbacks.getIsConnected;
+    onGatingChange = callbacks.onGatingChange;
 }
 
 // Additional audio level elements (inline meter)
@@ -109,6 +119,18 @@ export async function tryStartAudioAnalysis(audioLevelElement) {
                 if (el) el.style.width = percentage + '%';
             });
 
+            // Apply noise gate if threshold is set
+            if (noiseGateGain && noiseGateThreshold > 0) {
+                const shouldGate = percentage < noiseGateThreshold;
+                if (shouldGate !== isGating) {
+                    isGating = shouldGate;
+                    // Smooth transition to avoid clicks
+                    const targetGain = shouldGate ? 0 : 1;
+                    noiseGateGain.gain.setTargetAtTime(targetGain, audioContext.currentTime, 0.01);
+                    if (onGatingChange) onGatingChange(shouldGate);
+                }
+            }
+
             // Check for loud sounds based on sensitivity
             const baseThreshold = 100 - getSensitivity();
             const isConnected = getIsConnected();
@@ -182,4 +204,98 @@ export function resetAudioAnalysis() {
  */
 export function getAudioContext() {
     return audioContext;
+}
+
+/**
+ * Set noise gate threshold
+ * @param {number} threshold - Percentage threshold (0-50), 0 = off
+ */
+export function setNoiseGateThreshold(threshold) {
+    noiseGateThreshold = threshold;
+    console.log('Noise gate threshold set to:', threshold);
+
+    // If threshold is 0, ensure gate is open
+    if (threshold === 0 && noiseGateGain) {
+        noiseGateGain.gain.setTargetAtTime(1, audioContext.currentTime, 0.01);
+        if (isGating) {
+            isGating = false;
+            if (onGatingChange) onGatingChange(false);
+        }
+    }
+}
+
+/**
+ * Get current noise gate threshold
+ */
+export function getNoiseGateThreshold() {
+    return noiseGateThreshold;
+}
+
+/**
+ * Set up noise gate for video element audio
+ * Routes video audio through Web Audio API with gain nodes for gating and volume
+ * @param {HTMLVideoElement} videoElement - The video element to gate audio for
+ * @param {number} initialVolume - Initial volume (0-1)
+ */
+export function setupNoiseGate(videoElement, initialVolume = 1) {
+    if (!audioContext) {
+        console.log('AudioContext not ready, cannot setup noise gate');
+        return;
+    }
+
+    // Only create the source once per video element
+    if (videoElementSource) {
+        console.log('Noise gate already set up');
+        return;
+    }
+
+    try {
+        // Create media element source (can only be done once per element)
+        videoElementSource = audioContext.createMediaElementSource(videoElement);
+
+        // Create gain node for noise gating
+        noiseGateGain = audioContext.createGain();
+        noiseGateGain.gain.value = 1;
+
+        // Create gain node for volume control
+        // (video.volume no longer works after createMediaElementSource)
+        volumeGain = audioContext.createGain();
+        volumeGain.gain.value = initialVolume;
+
+        // Connect: video -> noiseGate -> volume -> destination
+        videoElementSource.connect(noiseGateGain);
+        noiseGateGain.connect(volumeGain);
+        volumeGain.connect(audioContext.destination);
+
+        console.log('Noise gate set up for video element, initial volume:', initialVolume);
+    } catch (err) {
+        console.error('Error setting up noise gate:', err);
+    }
+}
+
+/**
+ * Set playback volume (used when audio is routed through Web Audio API)
+ * @param {number} volume - Volume level (0-1)
+ */
+export function setPlaybackVolume(volume) {
+    if (volumeGain) {
+        volumeGain.gain.setTargetAtTime(volume, audioContext.currentTime, 0.01);
+    }
+}
+
+/**
+ * Check if noise gate is currently gating (muting)
+ */
+export function isNoiseGateActive() {
+    return isGating;
+}
+
+/**
+ * Reset noise gate state
+ */
+export function resetNoiseGate() {
+    isGating = false;
+    if (noiseGateGain) {
+        noiseGateGain.gain.value = 1;
+    }
 }

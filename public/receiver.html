@@ -52,6 +52,7 @@
         <div class="audio-meter-bar">
             <div class="audio-meter-level" id="audioLevelInline"></div>
             <div class="audio-meter-threshold" id="thresholdMarkerInline"></div>
+            <div class="audio-meter-noise-gate" id="noiseGateMarkerInline" style="display: none;"></div>
         </div>
         <span class="audio-meter-label">Baby</span>
     </div>
@@ -79,6 +80,10 @@
             <span class="info-icon">📊</span>
             <span id="sensitivityDisplay">50</span>
         </div>
+        <div class="info-item noise-gate-info" id="noiseGateInfoItem" style="display: none;">
+            <span class="info-icon">🔇</span>
+            <span id="noiseGateDisplay">0</span>
+        </div>
         <div class="info-item music-info" id="musicInfoItem" style="display: none;">
             <span class="info-icon">🎵</span>
             <span id="musicStatusDisplay">—</span>
@@ -92,6 +97,7 @@
             <div class="audio-meter">
                 <div class="audio-level" id="audioLevel"></div>
                 <div class="threshold-marker" id="thresholdMarker"></div>
+                <div class="noise-gate-marker" id="noiseGateMarker"></div>
             </div>
 
             <div class="control-section">
@@ -108,6 +114,15 @@
                     <input type="range" id="sensitivity" min="10" max="100" value="50" class="slider-input">
                     <span id="sensitivityValue" class="slider-value">50</span>
                 </div>
+            </div>
+
+            <div class="control-section">
+                <label class="control-label">Noise Gate</label>
+                <div class="control-row">
+                    <input type="range" id="noiseGate" min="0" max="50" value="0" class="slider-input">
+                    <span id="noiseGateValue" class="slider-value">Off</span>
+                </div>
+                <div class="control-hint" id="noiseGateHint">Mutes audio below threshold level</div>
             </div>
 
             <div class="control-section music-section" id="musicContainer" style="display: none;">

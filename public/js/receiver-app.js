@@ -10,7 +10,10 @@ import {
     initAudioAnalysis,
     setupAudioAnalysis,
     ensureAudioContext,
-    resetAudioAnalysis
+    resetAudioAnalysis,
+    setNoiseGateThreshold,
+    setupNoiseGate,
+    setPlaybackVolume
 } from './audio-analysis.js';
 import {
     initVideoPlayback,
@@ -64,6 +67,12 @@ const volumeSlider = document.getElementById('volume');
 const volumeValue = document.getElementById('volumeValue');
 const sensitivitySlider = document.getElementById('sensitivity');
 const sensitivityValue = document.getElementById('sensitivityValue');
+const noiseGateSlider = document.getElementById('noiseGate');
+const noiseGateValue = document.getElementById('noiseGateValue');
+const noiseGateHint = document.getElementById('noiseGateHint');
+const noiseGateInfoItem = document.getElementById('noiseGateInfoItem');
+const noiseGateDisplay = document.getElementById('noiseGateDisplay');
+const noiseGateMarker = document.getElementById('noiseGateMarker');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 const info = document.getElementById('info');
 const thresholdMarker = document.getElementById('thresholdMarker');
@@ -90,6 +99,7 @@ const musicStatusDisplay = document.getElementById('musicStatusDisplay');
 // Audio meter row elements
 const audioLevelInline = document.getElementById('audioLevelInline');
 const thresholdMarkerInline = document.getElementById('thresholdMarkerInline');
+const noiseGateMarkerInline = document.getElementById('noiseGateMarkerInline');
 const audioMeterRow = document.querySelector('.audio-meter-row');
 
 // Initialize session
@@ -123,6 +133,7 @@ initKeepAwake();
 // Load saved settings
 const savedVolume = localStorage.getItem('receiver-volume');
 const savedSensitivity = localStorage.getItem('receiver-sensitivity');
+const savedNoiseGate = localStorage.getItem('receiver-noise-gate');
 
 if (savedVolume !== null) {
     volumeSlider.value = savedVolume;
@@ -133,6 +144,10 @@ if (savedSensitivity !== null) {
     sensitivitySlider.value = savedSensitivity;
     sensitivityValue.textContent = savedSensitivity;
     sensitivityDisplay.textContent = savedSensitivity;
+}
+if (savedNoiseGate !== null) {
+    noiseGateSlider.value = savedNoiseGate;
+    updateNoiseGateDisplay(parseInt(savedNoiseGate));
 }
 
 // Initialize audio-only toggle
@@ -236,6 +251,36 @@ function updateThresholdMarker() {
     thresholdMarker.style.left = threshold + '%';
     if (thresholdMarkerInline) thresholdMarkerInline.style.left = threshold + '%';
     sensitivityValue.textContent = sensitivitySlider.value;
+}
+
+function updateNoiseGateDisplay(value) {
+    // Update markers on both audio meters
+    if (noiseGateMarker) noiseGateMarker.style.width = value + '%';
+    if (noiseGateMarkerInline) {
+        noiseGateMarkerInline.style.display = value > 0 ? 'block' : 'none';
+        noiseGateMarkerInline.style.width = value + '%';
+    }
+
+    if (value === 0) {
+        noiseGateValue.textContent = 'Off';
+        noiseGateHint.textContent = 'Mutes audio below threshold level';
+        noiseGateHint.classList.remove('active');
+        noiseGateInfoItem.style.display = 'none';
+    } else {
+        noiseGateValue.textContent = value + '%';
+        noiseGateHint.textContent = 'Audio below ' + value + '% will be muted';
+        noiseGateHint.classList.add('active');
+        noiseGateInfoItem.style.display = 'flex';
+        noiseGateDisplay.textContent = value + '%';
+    }
+}
+
+function handleGatingChange(isGating) {
+    if (isGating) {
+        noiseGateInfoItem.classList.add('gating');
+    } else {
+        noiseGateInfoItem.classList.remove('gating');
+    }
 }
 
 // Music functions
@@ -366,7 +411,8 @@ initAudioAnalysis({
     onLoudSound: triggerLoudSoundAlert,
     getSensitivity: () => parseInt(sensitivitySlider.value),
     getMusicPlaying: () => musicPlaying,
-    getIsConnected: () => isConnected
+    getIsConnected: () => isConnected,
+    onGatingChange: handleGatingChange
 });
 
 initVideoPlayback(
@@ -380,6 +426,15 @@ initVideoPlayback(
     {
         onUserInteraction: () => {
             ensureAudioContext(audioLevel);
+            // Set up noise gate after audio context is ready
+            const savedVol = localStorage.getItem('receiver-volume');
+            const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
+            setupNoiseGate(remoteVideo, initialVolume);
+            // Apply saved threshold
+            const savedGate = localStorage.getItem('receiver-noise-gate');
+            if (savedGate !== null) {
+                setNoiseGateThreshold(parseInt(savedGate));
+            }
         },
         getIsConnected: () => isConnected,
         onMediaMuted: setMediaMutedState
@@ -538,8 +593,11 @@ echoCancelToggle.addEventListener('change', () => {
 // Shared volume update function
 function updateVolume(value) {
     const numValue = parseInt(value);
-    remoteVideo.volume = numValue / 100;
+    const volumeLevel = numValue / 100;
+    remoteVideo.volume = volumeLevel;
     remoteVideo.muted = false;
+    // Also update Web Audio API volume (needed when noise gate is active)
+    setPlaybackVolume(volumeLevel);
     volumeSlider.value = numValue;
     volumeValue.textContent = numValue + '%';
     volumeDisplay.textContent = numValue + '%';
@@ -553,6 +611,13 @@ sensitivitySlider.addEventListener('input', () => {
     updateThresholdMarker();
     sensitivityDisplay.textContent = sensitivitySlider.value;
     localStorage.setItem('receiver-sensitivity', sensitivitySlider.value);
+});
+
+noiseGateSlider.addEventListener('input', () => {
+    const value = parseInt(noiseGateSlider.value);
+    updateNoiseGateDisplay(value);
+    setNoiseGateThreshold(value);
+    localStorage.setItem('receiver-noise-gate', value);
 });
 
 fullscreenBtn.addEventListener('click', () => {
@@ -603,15 +668,21 @@ musicPlaylistSelect.addEventListener('mouseleave', cancelLongPress);
 musicPlaylistSelect.addEventListener('touchend', cancelLongPress);
 musicPlaylistSelect.addEventListener('touchcancel', cancelLongPress);
 
-// User interaction handlers for audio context
-document.addEventListener('click', () => {
+// User interaction handlers for audio context and noise gate
+function onUserInteractionGlobal() {
     handleUserInteraction();
     ensureAudioContext(audioLevel);
-}, { passive: true });
-document.addEventListener('touchstart', () => {
-    handleUserInteraction();
-    ensureAudioContext(audioLevel);
-}, { passive: true });
+    // Set up noise gate after audio context is ready
+    const savedVol = localStorage.getItem('receiver-volume');
+    const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
+    setupNoiseGate(remoteVideo, initialVolume);
+    const savedGate = localStorage.getItem('receiver-noise-gate');
+    if (savedGate !== null) {
+        setNoiseGateThreshold(parseInt(savedGate));
+    }
+}
+document.addEventListener('click', onUserInteractionGlobal, { passive: true });
+document.addEventListener('touchstart', onUserInteractionGlobal, { passive: true });
 document.addEventListener('keydown', () => handleUserInteraction(), { passive: true });
 
 // Drawer toggle - position drawer above bottom bar
