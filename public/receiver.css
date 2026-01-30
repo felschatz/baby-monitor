@@ -219,6 +219,7 @@ body.connected {
 
 /* Soft alert - orange pulsing on UI elements */
 body.soft-alert-active .header,
+body.soft-alert-active .audio-meter-row,
 body.soft-alert-active .bottom-bar,
 body.soft-alert-active .info-strip {
     animation: softPulse 1.5s ease-in-out infinite;
@@ -231,6 +232,7 @@ body.soft-alert-active .info-strip {
 
 /* Loud alert - red blinking on UI elements */
 body.loud-alert-active .header,
+body.loud-alert-active .audio-meter-row,
 body.loud-alert-active .bottom-bar,
 body.loud-alert-active .info-strip {
     animation: loudPulse 0.3s infinite;
@@ -327,6 +329,94 @@ body.loud-alert-active .info-strip {
 }
 
 /* ========================================
+   AUDIO METER ROW - Full-width baby sound level
+   ======================================== */
+.audio-meter-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    background: rgba(0, 0, 0, 0.7);
+    border-top: 1px solid var(--border-subtle);
+    z-index: 10001;
+}
+
+.audio-meter-row .audio-meter-icon {
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
+}
+
+.audio-meter-row .audio-meter-bar {
+    flex: 1;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    box-shadow:
+        inset 0 2px 6px rgba(0, 0, 0, 0.5),
+        0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.audio-meter-row .audio-meter-level {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg,
+        #22c55e 0%,
+        #4ade80 30%,
+        #fbbf24 60%,
+        #f97316 80%,
+        #ef4444 100%
+    );
+    border-radius: 12px;
+    transition: width 0.05s ease-out;
+    box-shadow:
+        0 0 12px rgba(34, 197, 94, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.audio-meter-row .audio-meter-threshold {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    width: 4px;
+    background: white;
+    border-radius: 2px;
+    box-shadow:
+        0 0 8px rgba(255, 255, 255, 0.9),
+        0 0 16px rgba(255, 255, 255, 0.5);
+    transition: left 0.2s;
+}
+
+.audio-meter-row .audio-meter-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+    min-width: 36px;
+}
+
+/* Alert state - meter row glows */
+.audio-meter-row.alert {
+    background: rgba(239, 68, 68, 0.15);
+    animation: meterRowPulse 0.4s ease-in-out infinite;
+}
+
+.audio-meter-row.alert .audio-meter-bar {
+    box-shadow:
+        inset 0 2px 6px rgba(0, 0, 0, 0.5),
+        0 0 20px rgba(239, 68, 68, 0.5);
+}
+
+@keyframes meterRowPulse {
+    0%, 100% { background: rgba(239, 68, 68, 0.15); }
+    50% { background: rgba(239, 68, 68, 0.3); }
+}
+
+/* ========================================
    BOTTOM BAR - Always visible with PTT
    ======================================== */
 .bottom-bar {
@@ -384,68 +474,6 @@ body.loud-alert-active .info-strip {
     font-weight: 500;
 }
 
-/* Inline audio meter - always visible baby sound level */
-.audio-meter-inline {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex: 1;
-    min-width: 0;
-    background: rgba(0, 0, 0, 0.5);
-    padding: 10px 14px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.audio-meter-icon {
-    font-size: 1.3rem;
-    flex-shrink: 0;
-}
-
-.audio-meter-bar {
-    flex: 1;
-    height: 14px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 7px;
-    overflow: hidden;
-    position: relative;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.audio-meter-level {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #22c55e 0%, #fbbf24 60%, #ef4444 100%);
-    border-radius: 7px;
-    transition: width 0.05s ease-out;
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
-}
-
-.audio-meter-threshold {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: white;
-    border-radius: 2px;
-    box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
-    transition: left 0.2s;
-}
-
-/* Alert state - meter glows */
-.audio-meter-inline.alert .audio-meter-bar {
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 12px rgba(239, 68, 68, 0.6);
-}
-
-.audio-meter-inline.alert {
-    border-color: rgba(239, 68, 68, 0.5);
-    animation: meterPulse 0.5s ease-in-out infinite;
-}
-
-@keyframes meterPulse {
-    0%, 100% { border-color: rgba(239, 68, 68, 0.5); }
-    50% { border-color: rgba(239, 68, 68, 0.9); }
-}
 
 .drawer-toggle {
     display: flex;
@@ -836,6 +864,7 @@ body.loud-alert-active .info-strip {
 }
 
 /* Ensure bottom elements stay above drawer */
+body.drawer-open .audio-meter-row,
 body.drawer-open .bottom-bar,
 body.drawer-open .info-strip {
     position: relative;

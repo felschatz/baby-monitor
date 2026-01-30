@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A graceful fallback keeps the stream flowing even without sight.
+// Wisdom: The widest bar reveals what narrow glimpses cannot show.

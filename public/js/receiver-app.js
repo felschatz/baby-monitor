@@ -87,10 +87,10 @@ const sensitivityDisplay = document.getElementById('sensitivityDisplay');
 const musicInfoItem = document.getElementById('musicInfoItem');
 const musicStatusDisplay = document.getElementById('musicStatusDisplay');
 
-// Inline audio meter elements
+// Audio meter row elements
 const audioLevelInline = document.getElementById('audioLevelInline');
 const thresholdMarkerInline = document.getElementById('thresholdMarkerInline');
-const audioMeterInline = document.querySelector('.audio-meter-inline');
+const audioMeterRow = document.querySelector('.audio-meter-row');
 
 // Initialize session
 const sessionName = initSession({
@@ -212,8 +212,8 @@ function triggerLoudSoundAlert(isSoft = false) {
     }
 
     // Add alert state to inline meter
-    if (audioMeterInline) {
-        audioMeterInline.classList.add('alert');
+    if (audioMeterRow) {
+        audioMeterRow.classList.add('alert');
     }
 
     loudSoundCooldown = true;
@@ -222,8 +222,8 @@ function triggerLoudSoundAlert(isSoft = false) {
     loudSoundTimeout = setTimeout(() => {
         document.body.classList.remove('soft-alert-active');
         document.body.classList.remove('loud-alert-active');
-        if (audioMeterInline) {
-            audioMeterInline.classList.remove('alert');
+        if (audioMeterRow) {
+            audioMeterRow.classList.remove('alert');
         }
         setTimeout(() => {
             loudSoundCooldown = false;
@@ -616,12 +616,14 @@ document.addEventListener('keydown', () => handleUserInteraction(), { passive: t
 
 // Drawer toggle - position drawer above bottom bar
 function updateDrawerPosition() {
+    const audioMeterRowEl = document.querySelector('.audio-meter-row');
     const bottomBar = document.querySelector('.bottom-bar');
     const infoStrip = document.querySelector('.info-strip');
-    // Calculate total height of bottom bar + info strip
+    // Calculate total height of audio meter row + bottom bar + info strip
+    const audioMeterRowHeight = audioMeterRowEl ? audioMeterRowEl.offsetHeight : 0;
     const bottomBarHeight = bottomBar ? bottomBar.offsetHeight : 0;
     const infoStripHeight = infoStrip ? infoStrip.offsetHeight : 0;
-    const totalBottomHeight = bottomBarHeight + infoStripHeight;
+    const totalBottomHeight = audioMeterRowHeight + bottomBarHeight + infoStripHeight;
     document.documentElement.style.setProperty('--drawer-anchor-bottom', `${totalBottomHeight}px`);
 }
 
