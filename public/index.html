@@ -7,7 +7,7 @@
     <meta name="description" content="Turn any two phones into a baby monitor. Real-time HD video & audio streaming with no app required. Free, open source, and privacy-focused.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -16,15 +16,17 @@
         }
 
         :root {
-            --primary: #0d9488;
-            --primary-dark: #0f766e;
-            --secondary: #059669;
-            --accent: #2dd4bf;
-            --success: #10b981;
-            --text: #1e293b;
-            --text-light: #64748b;
-            --bg: #ffffff;
-            --bg-alt: #f8fafc;
+            --night: #0a0e1a;
+            --night-soft: #141b2d;
+            --night-lighter: #1e2942;
+            --glow: #f6c177;
+            --glow-soft: #fad4a1;
+            --glow-dim: rgba(246, 193, 119, 0.15);
+            --mint: #9ccfd8;
+            --rose: #ebbcba;
+            --text: #e0def4;
+            --text-muted: #908caa;
+            --text-subtle: #6e6a86;
         }
 
         html {
@@ -32,10 +34,31 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'DM Sans', sans-serif;
+            background: var(--night);
             color: var(--text);
-            line-height: 1.6;
+            line-height: 1.7;
             overflow-x: hidden;
+        }
+
+        /* Grain overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 10000;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Fraunces', serif;
+            font-weight: 600;
+            line-height: 1.2;
         }
 
         /* Navigation */
@@ -45,16 +68,16 @@
             left: 0;
             right: 0;
             z-index: 1000;
-            padding: 1rem 2rem;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-            transition: all 0.3s ease;
+            padding: 1.25rem 2rem;
+            background: rgba(10, 14, 26, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(246, 193, 119, 0.1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         nav.scrolled {
-            padding: 0.75rem 2rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            padding: 0.875rem 2rem;
+            background: rgba(10, 14, 26, 0.95);
         }
 
         .nav-container {
@@ -66,45 +89,78 @@
         }
 
         .logo {
+            font-family: 'Fraunces', serif;
             font-size: 1.5rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            font-weight: 700;
+            color: var(--glow);
             text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: radial-gradient(circle at 30% 30%, var(--glow), var(--glow-soft));
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--glow-dim), 0 0 40px var(--glow-dim);
+            animation: gentle-pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes gentle-pulse {
+            0%, 100% { box-shadow: 0 0 20px var(--glow-dim), 0 0 40px var(--glow-dim); }
+            50% { box-shadow: 0 0 30px rgba(246, 193, 119, 0.3), 0 0 60px var(--glow-dim); }
         }
 
         .nav-links {
             display: flex;
-            gap: 2rem;
+            gap: 2.5rem;
             align-items: center;
         }
 
         .nav-links a {
-            color: var(--text);
+            color: var(--text-muted);
             text-decoration: none;
             font-weight: 500;
-            transition: color 0.2s;
+            font-size: 0.9rem;
+            letter-spacing: 0.02em;
+            transition: color 0.3s;
+            position: relative;
         }
 
-        .nav-links a:hover {
-            color: var(--primary);
+        .nav-links a:not(.nav-cta):hover {
+            color: var(--text);
+        }
+
+        .nav-links a:not(.nav-cta)::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 1px;
+            background: var(--glow);
+            transition: width 0.3s;
+        }
+
+        .nav-links a:not(.nav-cta):hover::after {
+            width: 100%;
         }
 
         .nav-cta {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white !important;
-            padding: 0.6rem 1.5rem;
-            border-radius: 50px;
+            background: var(--glow);
+            color: var(--night) !important;
+            padding: 0.65rem 1.5rem;
+            border-radius: 100px;
             font-weight: 600;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 20px var(--glow-dim);
         }
 
         .nav-cta:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(13, 148, 136, 0.4);
-            color: white !important;
+            box-shadow: 0 4px 20px rgba(246, 193, 119, 0.4);
         }
 
         /* Hero Section */
@@ -112,247 +168,462 @@
             min-height: 100vh;
             display: flex;
             align-items: center;
-            padding: 8rem 2rem 4rem;
-            background: linear-gradient(135deg, rgba(13, 148, 136, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%);
+            padding: 10rem 2rem 6rem;
             position: relative;
             overflow: hidden;
         }
 
+        /* Ambient background orbs */
         .hero::before {
             content: '';
             position: absolute;
-            top: -50%;
-            right: -20%;
-            width: 70%;
-            height: 140%;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            border-radius: 50%;
-            opacity: 0.03;
-            animation: float 20s ease-in-out infinite;
+            top: 10%;
+            right: -10%;
+            width: 60%;
+            height: 80%;
+            background: radial-gradient(ellipse at center, rgba(246, 193, 119, 0.08) 0%, transparent 70%);
+            pointer-events: none;
         }
 
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) rotate(0deg); }
-            50% { transform: translate(-30px, 30px) rotate(5deg); }
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: -20%;
+            left: -20%;
+            width: 60%;
+            height: 80%;
+            background: radial-gradient(ellipse at center, rgba(156, 207, 216, 0.05) 0%, transparent 70%);
+            pointer-events: none;
         }
 
         .hero-container {
             max-width: 1200px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4rem;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 6rem;
             align-items: center;
+            position: relative;
+            z-index: 1;
         }
 
-        .hero-content h1 {
-            font-size: 3.5rem;
-            font-weight: 800;
-            line-height: 1.1;
-            margin-bottom: 1.5rem;
-            background: linear-gradient(135deg, var(--text) 0%, var(--primary-dark) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+        .hero-content {
+            animation: fade-up 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            opacity: 0;
         }
 
-        .hero-content p {
-            font-size: 1.25rem;
-            color: var(--text-light);
-            margin-bottom: 2rem;
-            max-width: 500px;
+        @keyframes fade-up {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
-        .hero-badges {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .badge {
+        .hero-eyebrow {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
             padding: 0.5rem 1rem;
-            background: white;
-            border-radius: 50px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: var(--text);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            background: var(--glow-dim);
+            border: 1px solid rgba(246, 193, 119, 0.2);
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--glow);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
         }
 
-        .badge-icon {
-            width: 20px;
-            height: 20px;
+        .hero-eyebrow::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--glow);
+            border-radius: 50%;
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .hero-content h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--text) 0%, var(--glow-soft) 50%, var(--text) 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 8s linear infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+        }
+
+        .hero-content p {
+            font-size: 1.15rem;
+            color: var(--text-muted);
+            margin-bottom: 2.5rem;
+            max-width: 500px;
+            line-height: 1.8;
         }
 
         .hero-buttons {
             display: flex;
             gap: 1rem;
             flex-wrap: wrap;
+            margin-bottom: 3rem;
         }
 
         .btn {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
             padding: 1rem 2rem;
-            border-radius: 50px;
+            border-radius: 100px;
             font-size: 1rem;
             font-weight: 600;
             text-decoration: none;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
             border: none;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
-            box-shadow: 0 4px 15px rgba(13, 148, 136, 0.4);
+            background: linear-gradient(135deg, var(--glow) 0%, #e5a84d 100%);
+            color: var(--night);
+            box-shadow: 0 4px 30px rgba(246, 193, 119, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
         .btn-primary:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(13, 148, 136, 0.5);
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 40px rgba(246, 193, 119, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
         .btn-secondary {
-            background: white;
+            background: transparent;
             color: var(--text);
-            border: 2px solid rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--night-lighter);
         }
 
         .btn-secondary:hover {
-            border-color: var(--primary);
-            color: var(--primary);
+            border-color: var(--text-subtle);
+            background: var(--night-soft);
             transform: translateY(-3px);
         }
 
+        .btn svg {
+            width: 18px;
+            height: 18px;
+            transition: transform 0.3s;
+        }
+
+        .btn-primary:hover svg {
+            transform: translateX(3px);
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 3rem;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-value {
+            font-family: 'Fraunces', serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--glow);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-subtle);
+            letter-spacing: 0.02em;
+        }
+
+        /* Phone Visual */
         .hero-visual {
             position: relative;
+            animation: fade-up 1s 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            opacity: 0;
         }
 
-        .phone-mockup {
+        .phone-scene {
             position: relative;
-            max-width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
         }
 
-        .phone-container {
+        /* Glow behind phones */
+        .phone-glow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(246, 193, 119, 0.15) 0%, transparent 70%);
+            filter: blur(40px);
+            animation: breathe 6s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+        }
+
+        .phones-wrapper {
             display: flex;
-            gap: 2rem;
-            justify-content: center;
-            align-items: flex-start;
+            align-items: center;
+            gap: 1.5rem;
+            position: relative;
+            z-index: 1;
         }
 
         .phone {
-            width: 180px;
-            height: 380px;
-            background: linear-gradient(145deg, #1a1a2e, #16213e);
-            border-radius: 35px;
+            width: 160px;
+            height: 340px;
+            background: linear-gradient(165deg, #2a2f42 0%, #1a1e2e 100%);
+            border-radius: 32px;
             padding: 8px;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+            box-shadow:
+                0 25px 60px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 255, 255, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
             position: relative;
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .phone-sender {
+            transform: rotate(-8deg) translateY(20px);
+        }
+
+        .phone-receiver {
+            transform: rotate(8deg) translateY(-20px);
+        }
+
+        .phone:hover {
+            transform: rotate(0deg) translateY(0) scale(1.05);
         }
 
         .phone-screen {
             width: 100%;
             height: 100%;
-            border-radius: 28px;
+            border-radius: 26px;
             overflow: hidden;
             position: relative;
+            background: var(--night);
         }
 
         .phone-sender .phone-screen {
-            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+            background: linear-gradient(180deg, #1a1e2e 0%, #0f1219 100%);
         }
 
         .phone-receiver .phone-screen {
-            background: linear-gradient(180deg, var(--primary) 0%, var(--secondary) 100%);
+            background: linear-gradient(180deg, var(--night-soft) 0%, var(--night) 100%);
         }
 
         .phone-notch {
             position: absolute;
-            top: 0;
+            top: 8px;
             left: 50%;
             transform: translateX(-50%);
-            width: 80px;
-            height: 25px;
-            background: #1a1a2e;
-            border-radius: 0 0 15px 15px;
+            width: 70px;
+            height: 22px;
+            background: #1a1e2e;
+            border-radius: 20px;
             z-index: 10;
         }
 
         .phone-content {
-            padding: 40px 15px 15px;
+            padding: 50px 15px 15px;
             height: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: white;
             text-align: center;
         }
 
-        .phone-icon {
-            font-size: 3rem;
+        .phone-sender .phone-icon {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, var(--night-lighter) 0%, var(--night-soft) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-bottom: 1rem;
-            animation: pulse 2s ease-in-out infinite;
+            border: 2px solid var(--glow-dim);
+            position: relative;
         }
 
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
+        .phone-sender .phone-icon::before {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #ef4444;
+            border-radius: 50%;
+            top: 4px;
+            right: 4px;
+            animation: rec-blink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes rec-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .phone-sender .phone-icon svg {
+            width: 28px;
+            height: 28px;
+            color: var(--text-muted);
+        }
+
+        .phone-receiver .phone-content {
+            justify-content: flex-start;
+            padding-top: 40px;
+        }
+
+        .video-preview {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(180deg, #2a3040 0%, #1e2432 100%);
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .video-preview::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(ellipse at 30% 40%, rgba(246, 193, 119, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 60%, rgba(156, 207, 216, 0.05) 0%, transparent 50%);
+        }
+
+        .video-preview-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--glow-dim);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+        }
+
+        .video-preview-icon svg {
+            width: 24px;
+            height: 24px;
+            color: var(--glow);
         }
 
         .phone-label {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             font-weight: 600;
-            opacity: 0.9;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
         }
 
-        .connection-line {
+        .phone-status {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 0.5rem;
+            font-size: 0.7rem;
+            color: var(--mint);
+        }
+
+        .phone-status::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--mint);
+            border-radius: 50%;
+        }
+
+        /* Connection beam */
+        .connection-beam {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 80px;
+            height: 3px;
+            z-index: 2;
         }
 
-        .connection-dots {
-            display: flex;
-            gap: 8px;
+        .beam-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent 0%, var(--glow) 50%, transparent 100%);
+            border-radius: 10px;
+            opacity: 0.6;
         }
 
-        .connection-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--primary);
+        .beam-particles {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            transform: translateY(-50%);
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--glow);
             border-radius: 50%;
-            animation: signal 1.5s ease-in-out infinite;
+            animation: flow 2s linear infinite;
+            box-shadow: 0 0 6px var(--glow);
         }
 
-        .connection-dot:nth-child(2) { animation-delay: 0.2s; }
-        .connection-dot:nth-child(3) { animation-delay: 0.4s; }
+        .particle:nth-child(1) { animation-delay: 0s; }
+        .particle:nth-child(2) { animation-delay: 0.5s; }
+        .particle:nth-child(3) { animation-delay: 1s; }
+        .particle:nth-child(4) { animation-delay: 1.5s; }
 
-        @keyframes signal {
-            0%, 100% { opacity: 0.3; transform: scale(0.8); }
-            50% { opacity: 1; transform: scale(1.2); }
-        }
-
-        .phone-receiver {
-            margin-top: 3rem;
+        @keyframes flow {
+            0% { left: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { left: 100%; opacity: 0; }
         }
 
         /* Features Section */
         .features {
-            padding: 6rem 2rem;
-            background: var(--bg);
+            padding: 8rem 2rem;
+            position: relative;
         }
 
         .section-container {
@@ -362,319 +633,309 @@
 
         .section-header {
             text-align: center;
-            margin-bottom: 4rem;
+            margin-bottom: 5rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
-        .section-header h2 {
-            font-size: 2.5rem;
-            font-weight: 800;
+        .section-label {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--glow);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
             margin-bottom: 1rem;
         }
 
+        .section-header h2 {
+            font-size: clamp(2rem, 4vw, 2.75rem);
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
         .section-header p {
-            font-size: 1.125rem;
-            color: var(--text-light);
-            max-width: 600px;
-            margin: 0 auto;
+            font-size: 1.1rem;
+            color: var(--text-muted);
         }
 
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
         }
 
         .feature-card {
             padding: 2rem;
-            background: var(--bg-alt);
+            background: linear-gradient(165deg, var(--night-soft) 0%, var(--night) 100%);
             border-radius: 20px;
-            transition: all 0.3s ease;
-            border: 1px solid transparent;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, rgba(246, 193, 119, 0.3) 50%, transparent 100%);
+            opacity: 0;
+            transition: opacity 0.4s;
         }
 
         .feature-card:hover {
             transform: translateY(-5px);
-            border-color: rgba(13, 148, 136, 0.2);
-            box-shadow: 0 20px 40px rgba(13, 148, 136, 0.1);
+            border-color: rgba(246, 193, 119, 0.1);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
         }
 
         .feature-icon {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            border-radius: 15px;
+            width: 50px;
+            height: 50px;
+            background: var(--glow-dim);
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.75rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
+            font-size: 1.5rem;
         }
 
         .feature-card h3 {
-            font-size: 1.25rem;
-            font-weight: 700;
-            margin-bottom: 0.75rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.6rem;
+            color: var(--text);
         }
 
         .feature-card p {
-            color: var(--text-light);
-            font-size: 0.95rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.6;
         }
 
         /* How It Works */
         .how-it-works {
-            padding: 6rem 2rem;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
+            padding: 8rem 2rem;
+            position: relative;
         }
 
-        .how-it-works .section-header h2 {
-            color: white;
-        }
-
-        .how-it-works .section-header p {
-            color: rgba(255, 255, 255, 0.8);
+        .how-it-works::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(ellipse at 20% 50%, rgba(246, 193, 119, 0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 50%, rgba(156, 207, 216, 0.03) 0%, transparent 50%);
+            pointer-events: none;
         }
 
         .steps {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 2rem;
-            margin-top: 3rem;
+            position: relative;
+            z-index: 1;
         }
 
         .step {
             text-align: center;
-            padding: 2rem;
+            padding: 2rem 1.5rem;
+            position: relative;
         }
 
         .step-number {
             width: 60px;
             height: 60px;
-            background: rgba(255, 255, 255, 0.2);
+            background: linear-gradient(135deg, var(--glow) 0%, #e5a84d 100%);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-family: 'Fraunces', serif;
             font-size: 1.5rem;
-            font-weight: 800;
+            font-weight: 700;
+            color: var(--night);
             margin: 0 auto 1.5rem;
-            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 30px rgba(246, 193, 119, 0.3);
         }
 
         .step h3 {
-            font-size: 1.25rem;
-            font-weight: 700;
+            font-size: 1.15rem;
+            font-weight: 600;
             margin-bottom: 0.75rem;
+            color: var(--text);
         }
 
         .step p {
-            color: rgba(255, 255, 255, 0.85);
-            font-size: 0.95rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.6;
         }
 
-        /* Tech Stack */
-        .tech-stack {
-            padding: 6rem 2rem;
-            background: var(--bg-alt);
+        /* Connecting line between steps */
+        .steps::before {
+            content: '';
+            position: absolute;
+            top: 30px;
+            left: 15%;
+            right: 15%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, var(--glow-dim) 20%, var(--glow-dim) 80%, transparent 100%);
         }
 
-        .tech-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin-top: 3rem;
-        }
-
-        .tech-item {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 15px;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-
-        .tech-item:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-        }
-
-        .tech-item-icon {
-            font-size: 2.5rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .tech-item h4 {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
-
-        .tech-item p {
-            color: var(--text-light);
-            font-size: 0.85rem;
-        }
-
-        /* Open Source */
+        /* Tech & Open Source Section */
         .open-source {
-            padding: 6rem 2rem;
-            background: var(--bg);
-        }
-
-        .open-source-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4rem;
-            align-items: center;
-        }
-
-        .open-source-text h2 {
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin-bottom: 1.5rem;
-        }
-
-        .open-source-text p {
-            color: var(--text-light);
-            font-size: 1.1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .open-source-features {
-            list-style: none;
-            margin-bottom: 2rem;
-        }
-
-        .open-source-features li {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 0.75rem;
-            font-weight: 500;
-        }
-
-        .open-source-features li::before {
-            content: '✓';
-            width: 24px;
-            height: 24px;
-            background: linear-gradient(135deg, var(--success) 0%, var(--secondary) 100%);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-
-        .github-card {
-            background: linear-gradient(145deg, #24292e, #1a1e22);
-            border-radius: 20px;
-            padding: 2rem;
-            color: white;
+            padding: 8rem 2rem;
+            background: var(--night-soft);
             position: relative;
             overflow: hidden;
         }
 
-        .github-card::before {
+        .open-source::before {
             content: '';
             position: absolute;
             top: -50%;
-            right: -50%;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            right: -20%;
+            width: 60%;
+            height: 200%;
+            background: radial-gradient(ellipse at center, rgba(246, 193, 119, 0.03) 0%, transparent 70%);
+            pointer-events: none;
         }
 
-        .github-header {
+        .open-source-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6rem;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .open-source-text h2 {
+            font-size: clamp(2rem, 4vw, 2.5rem);
+            margin-bottom: 1.5rem;
+        }
+
+        .open-source-text > p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            line-height: 1.8;
+        }
+
+        .feature-list {
+            list-style: none;
+            display: grid;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .feature-list li {
             display: flex;
             align-items: center;
             gap: 1rem;
-            margin-bottom: 1.5rem;
+            font-weight: 500;
         }
 
-        .github-logo {
-            width: 48px;
-            height: 48px;
-            fill: white;
-        }
-
-        .github-info h4 {
-            font-size: 1.25rem;
-            font-weight: 700;
-        }
-
-        .github-info p {
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 0.875rem;
-        }
-
-        .github-stats {
-            display: flex;
-            gap: 2rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .github-stat {
-            text-align: center;
-        }
-
-        .github-stat-value {
-            font-size: 1.5rem;
-            font-weight: 800;
-        }
-
-        .github-stat-label {
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.6);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .github-btn {
+        .feature-list li::before {
+            content: '';
+            width: 24px;
+            height: 24px;
+            background: var(--glow-dim);
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.75rem;
-            width: 100%;
-            padding: 1rem;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-            color: white;
-            text-decoration: none;
+            flex-shrink: 0;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23f6c177' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        /* Tech Stack Visual */
+        .tech-visual {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .tech-card {
+            background: linear-gradient(165deg, var(--night-lighter) 0%, var(--night-soft) 100%);
+            padding: 1.5rem;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .tech-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--glow-dim);
+        }
+
+        .tech-card-icon {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .tech-card h4 {
+            font-size: 0.95rem;
             font-weight: 600;
-            transition: all 0.3s ease;
+            margin-bottom: 0.25rem;
+            color: var(--text);
         }
 
-        .github-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateY(-2px);
-        }
-
-        .github-btn svg {
-            width: 20px;
-            height: 20px;
-            fill: currentColor;
+        .tech-card p {
+            font-size: 0.8rem;
+            color: var(--text-subtle);
         }
 
         /* CTA Section */
         .cta {
-            padding: 6rem 2rem;
-            background: linear-gradient(135deg, rgba(13, 148, 136, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%);
+            padding: 8rem 2rem;
             text-align: center;
+            position: relative;
+        }
+
+        .cta::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 400px;
+            background: radial-gradient(ellipse at center, rgba(246, 193, 119, 0.1) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .cta-content {
+            position: relative;
+            z-index: 1;
         }
 
         .cta h2 {
-            font-size: 2.5rem;
-            font-weight: 800;
+            font-size: clamp(2rem, 5vw, 3rem);
             margin-bottom: 1rem;
         }
 
         .cta p {
-            font-size: 1.125rem;
-            color: var(--text-light);
-            margin-bottom: 2rem;
+            font-size: 1.15rem;
+            color: var(--text-muted);
+            margin-bottom: 2.5rem;
             max-width: 500px;
             margin-left: auto;
             margin-right: auto;
@@ -683,8 +944,7 @@
         /* Footer */
         footer {
             padding: 3rem 2rem;
-            background: var(--text);
-            color: white;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .footer-container {
@@ -698,9 +958,10 @@
         }
 
         .footer-logo {
+            font-family: 'Fraunces', serif;
             font-size: 1.25rem;
-            font-weight: 800;
-            color: white;
+            font-weight: 700;
+            color: var(--glow);
             text-decoration: none;
         }
 
@@ -710,41 +971,39 @@
         }
 
         .footer-links a {
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--text-muted);
             text-decoration: none;
             font-size: 0.9rem;
             transition: color 0.2s;
         }
 
         .footer-links a:hover {
-            color: white;
-        }
-
-        .footer-social {
-            display: flex;
-            gap: 1rem;
+            color: var(--text);
         }
 
         .footer-social a {
             width: 40px;
             height: 40px;
-            background: rgba(255, 255, 255, 0.1);
+            background: var(--night-soft);
             border-radius: 50%;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            transition: all 0.3s ease;
+            color: var(--text-muted);
+            transition: all 0.3s;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .footer-social a:hover {
-            background: var(--primary);
+            background: var(--glow-dim);
+            color: var(--glow);
+            border-color: var(--glow-dim);
             transform: translateY(-3px);
         }
 
         .footer-social svg {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             fill: currentColor;
         }
 
@@ -759,57 +1018,49 @@
 
         .mobile-menu-btn span {
             display: block;
-            width: 25px;
-            height: 3px;
+            width: 24px;
+            height: 2px;
             background: var(--text);
-            margin: 5px 0;
+            margin: 6px 0;
             border-radius: 2px;
-            transition: all 0.3s ease;
+            transition: all 0.3s;
         }
 
         /* Responsive */
-        @media (max-width: 968px) {
+        @media (max-width: 1024px) {
             .hero-container {
                 grid-template-columns: 1fr;
                 text-align: center;
-            }
-
-            .hero-content {
-                order: 1;
-            }
-
-            .hero-visual {
-                order: 2;
-            }
-
-            .hero-content h1 {
-                font-size: 2.5rem;
+                gap: 4rem;
             }
 
             .hero-content p {
-                margin: 0 auto 2rem;
-            }
-
-            .hero-badges {
-                justify-content: center;
+                margin: 0 auto 2.5rem;
             }
 
             .hero-buttons {
                 justify-content: center;
             }
 
-            .phone {
-                width: 140px;
-                height: 300px;
+            .hero-stats {
+                justify-content: center;
             }
 
-            .open-source-content {
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .steps {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .steps::before {
+                display: none;
+            }
+
+            .open-source-grid {
                 grid-template-columns: 1fr;
-            }
-
-            .github-card {
-                max-width: 400px;
-                margin: 0 auto;
+                gap: 4rem;
             }
         }
 
@@ -823,32 +1074,32 @@
             }
 
             .hero {
-                padding: 6rem 1.5rem 3rem;
+                padding: 8rem 1.5rem 4rem;
             }
 
             .hero-content h1 {
-                font-size: 2rem;
+                font-size: 2.25rem;
             }
 
-            .section-header h2 {
-                font-size: 2rem;
-            }
-
-            .phone-container {
-                gap: 1rem;
+            .hero-stats {
+                gap: 2rem;
             }
 
             .phone {
-                width: 120px;
-                height: 260px;
+                width: 130px;
+                height: 280px;
             }
 
-            .phone-icon {
-                font-size: 2rem;
+            .features-grid {
+                grid-template-columns: 1fr;
             }
 
-            .phone-receiver {
-                margin-top: 2rem;
+            .steps {
+                grid-template-columns: 1fr;
+            }
+
+            .tech-visual {
+                grid-template-columns: repeat(2, 1fr);
             }
 
             .footer-container {
@@ -867,7 +1118,10 @@
     <!-- Navigation -->
     <nav id="navbar">
         <div class="nav-container">
-            <a href="/" class="logo">Baby Monitor</a>
+            <a href="/" class="logo">
+                <div class="logo-icon"></div>
+                Baby Monitor
+            </a>
             <div class="nav-links">
                 <a href="#features">Features</a>
                 <a href="#how-it-works">How It Works</a>
@@ -887,72 +1141,84 @@
     <section class="hero">
         <div class="hero-container">
             <div class="hero-content">
+                <div class="hero-eyebrow">Free & Open Source</div>
                 <h1>Turn Any Two Phones Into a Baby Monitor</h1>
-                <p>Real-time HD video and audio streaming between any two devices. No app downloads, no accounts, no monthly fees. Just open and connect.</p>
-
-                <div class="hero-badges">
-                    <span class="badge">
-                        <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                        </svg>
-                        Privacy First
-                    </span>
-                    <span class="badge">
-                        <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path d="M12 6v6l4 2"/>
-                        </svg>
-                        Real-Time
-                    </span>
-                    <span class="badge">
-                        <svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
-                        </svg>
-                        Free & Open Source
-                    </span>
-                </div>
+                <p>Real-time HD video and audio streaming. No apps to download, no accounts to create, no monthly fees. Just open your browser and connect.</p>
 
                 <div class="hero-buttons">
                     <a href="/start.html" class="btn btn-primary">
                         Start Monitoring
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 12h14M12 5l7 7-7 7"/>
                         </svg>
                     </a>
                     <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener" class="btn btn-secondary">
-                        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
                             <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
                         </svg>
-                        View on GitHub
+                        View Source
                     </a>
+                </div>
+
+                <div class="hero-stats">
+                    <div class="stat">
+                        <span class="stat-value">0</span>
+                        <span class="stat-label">Dependencies</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">P2P</span>
+                        <span class="stat-label">Direct Streaming</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">MIT</span>
+                        <span class="stat-label">License</span>
+                    </div>
                 </div>
             </div>
 
             <div class="hero-visual">
-                <div class="phone-mockup">
-                    <div class="phone-container">
+                <div class="phone-scene">
+                    <div class="phone-glow"></div>
+                    <div class="phones-wrapper">
                         <div class="phone phone-sender">
                             <div class="phone-screen">
                                 <div class="phone-notch"></div>
                                 <div class="phone-content">
-                                    <span class="phone-icon">📹</span>
-                                    <span class="phone-label">Baby's Phone</span>
+                                    <div class="phone-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M23 7l-7 5 7 5V7z"/>
+                                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                                        </svg>
+                                    </div>
+                                    <span class="phone-label">Sender</span>
+                                    <span class="phone-status">Recording</span>
                                 </div>
                             </div>
                         </div>
-                        <div class="connection-line">
-                            <div class="connection-dots">
-                                <span class="connection-dot"></span>
-                                <span class="connection-dot"></span>
-                                <span class="connection-dot"></span>
+
+                        <div class="connection-beam">
+                            <div class="beam-line"></div>
+                            <div class="beam-particles">
+                                <span class="particle"></span>
+                                <span class="particle"></span>
+                                <span class="particle"></span>
+                                <span class="particle"></span>
                             </div>
                         </div>
+
                         <div class="phone phone-receiver">
                             <div class="phone-screen">
                                 <div class="phone-notch"></div>
                                 <div class="phone-content">
-                                    <span class="phone-icon">👶</span>
-                                    <span class="phone-label">Parent's Phone</span>
+                                    <div class="video-preview">
+                                        <div class="video-preview-icon">
+                                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <span class="phone-label">Receiver</span>
+                                    <span class="phone-status">Connected</span>
                                 </div>
                             </div>
                         </div>
@@ -966,69 +1232,64 @@
     <section class="features" id="features">
         <div class="section-container">
             <div class="section-header">
+                <span class="section-label">Features</span>
                 <h2>Everything You Need, Nothing You Don't</h2>
-                <p>Built with simplicity in mind. No bloat, no unnecessary features - just reliable baby monitoring.</p>
+                <p>Built for simplicity and reliability. No bloat, just rock-solid baby monitoring.</p>
             </div>
 
             <div class="features-grid">
                 <div class="feature-card">
                     <div class="feature-icon">📺</div>
                     <h3>HD Video Streaming</h3>
-                    <p>Crystal clear 720p video with adaptive quality. Switch to SD for slower connections - you decide.</p>
+                    <p>Crystal clear 720p video with adaptive quality. Switch to SD for slower connections.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">🔊</div>
                     <h3>Loud Sound Alerts</h3>
-                    <p>Instant visual alerts when your baby cries. Adjustable sensitivity slider to match your environment.</p>
+                    <p>Instant visual alerts when your baby cries. Adjustable sensitivity to match your environment.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">🎙️</div>
                     <h3>Push-to-Talk</h3>
-                    <p>Soothe your baby remotely with two-way audio. Audio ducking automatically reduces baby sounds while you speak.</p>
+                    <p>Soothe your baby remotely with two-way audio. Audio ducking reduces background while you speak.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">🎵</div>
                     <h3>Lullaby Player</h3>
-                    <p>Play soothing music remotely with sleep timers. Self-hosters can add custom MP3 playlists to the server.</p>
+                    <p>Play soothing music remotely with sleep timers. Self-hosters can add custom playlists.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">🔗</div>
                     <h3>Peer-to-Peer</h3>
-                    <p>Direct WebRTC connection between devices. Your video never touches our servers - maximum privacy.</p>
+                    <p>Direct WebRTC connection. Your video never touches our servers - maximum privacy.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">📱</div>
                     <h3>Works Everywhere</h3>
-                    <p>Any modern browser on any device. No app store, no downloads, no platform restrictions.</p>
+                    <p>Any modern browser on any device. No app store, no downloads, no restrictions.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">📶</div>
                     <h3>Audio-Only Mode</h3>
-                    <p>Disable video to save bandwidth on slow connections. Perfect for audio monitoring when you don't need to see.</p>
+                    <p>Disable video to save bandwidth. Perfect for monitoring when you don't need to see.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">🔇</div>
-                    <h3>Music Echo Reduction</h3>
-                    <p>Experimental spectral subtraction reduces lullaby bleedthrough in the audio stream while preserving baby sounds.</p>
+                    <h3>Echo Reduction</h3>
+                    <p>Spectral subtraction reduces lullaby bleedthrough while preserving baby sounds.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">🔋</div>
                     <h3>Battery Optimized</h3>
-                    <p>Screen auto-dims after 5 seconds on sender. Multiple keep-awake mechanisms prevent the phone from sleeping.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🌐</div>
-                    <h3>Multiple Viewers</h3>
-                    <p>One sender, unlimited receivers. Let grandparents watch too - each session supports multiple viewers.</p>
+                    <p>Screen auto-dims on sender. Multiple keep-awake mechanisms prevent sleep.</p>
                 </div>
             </div>
         </div>
@@ -1038,120 +1299,49 @@
     <section class="how-it-works" id="how-it-works">
         <div class="section-container">
             <div class="section-header">
+                <span class="section-label">Simple Setup</span>
                 <h2>Up and Running in 30 Seconds</h2>
-                <p>No accounts, no setup wizards, no complicated pairing. Just three simple steps.</p>
+                <p>No accounts, no setup wizards, no complicated pairing.</p>
             </div>
 
             <div class="steps">
                 <div class="step">
                     <div class="step-number">1</div>
                     <h3>Create a Session</h3>
-                    <p>Choose any session name - it's your private room. "felix-baby", "nursery-cam", anything works.</p>
+                    <p>Choose any session name - it's your private room. "nursery", "baby-cam", anything works.</p>
                 </div>
 
                 <div class="step">
                     <div class="step-number">2</div>
                     <h3>Set Up Sender</h3>
-                    <p>Open the sender page on the phone near your baby. Grant camera & microphone access.</p>
+                    <p>Open the sender page on the phone near your baby. Grant camera & mic access.</p>
                 </div>
 
                 <div class="step">
                     <div class="step-number">3</div>
                     <h3>Watch & Listen</h3>
-                    <p>Open the receiver on your phone with the same session name. You're connected!</p>
+                    <p>Open receiver on your phone with the same session name. You're connected!</p>
                 </div>
 
                 <div class="step">
                     <div class="step-number">⭐</div>
                     <h3>Bookmark It</h3>
-                    <p>Save the URL for instant access tomorrow. No need to enter the session name again.</p>
+                    <p>Save the URL for instant access. No need to enter the session name again.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Pro Tips -->
-    <section class="features" id="tips">
-        <div class="section-container">
-            <div class="section-header">
-                <h2>Pro Tips for Reliable Monitoring</h2>
-                <p>A few settings tweaks ensure your baby monitor runs all night without issues.</p>
-            </div>
-
-            <div class="features-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
-                <div class="feature-card">
-                    <div class="feature-icon">⚙️</div>
-                    <h3>Sender Phone Settings</h3>
-                    <p>For reliable overnight use, disable battery optimization for Chrome (Settings → Apps → Chrome → Battery → Unrestricted). Also disable any auto power-off schedules and lock the app in recent apps.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🔌</div>
-                    <h3>Keep It Plugged In</h3>
-                    <p>Always keep the sender phone connected to a charger. Use a reliable cable - cheap cables can disconnect and interrupt monitoring.</p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🔖</div>
-                    <h3>Bookmark Your URLs</h3>
-                    <p>After connecting once, bookmark both sender and receiver URLs. Tomorrow you can just open the bookmark - no need to enter the session name again.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Tech Stack -->
-    <section class="tech-stack">
-        <div class="section-container">
-            <div class="section-header">
-                <h2>Built with Modern Web Tech</h2>
-                <p>Minimal dependencies, maximum reliability. No complex frameworks - just battle-tested web standards.</p>
-            </div>
-
-            <div class="tech-grid">
-                <div class="tech-item">
-                    <div class="tech-item-icon">🔌</div>
-                    <h4>WebRTC</h4>
-                    <p>Peer-to-peer streaming</p>
-                </div>
-                <div class="tech-item">
-                    <div class="tech-item-icon">📡</div>
-                    <h4>Server-Sent Events</h4>
-                    <p>Simple signaling</p>
-                </div>
-                <div class="tech-item">
-                    <div class="tech-item-icon">🟢</div>
-                    <h4>Node.js</h4>
-                    <p>Lightweight server</p>
-                </div>
-                <div class="tech-item">
-                    <div class="tech-item-icon">📦</div>
-                    <h4>Zero Dependencies</h4>
-                    <p>Pure Node.js</p>
-                </div>
-                <div class="tech-item">
-                    <div class="tech-item-icon">🌐</div>
-                    <h4>Vanilla JS</h4>
-                    <p>No frameworks</p>
-                </div>
-                <div class="tech-item">
-                    <div class="tech-item-icon">🔒</div>
-                    <h4>HTTPS Ready</h4>
-                    <p>Secure by default</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Open Source -->
+    <!-- Open Source Section -->
     <section class="open-source" id="open-source">
         <div class="section-container">
-            <div class="open-source-content">
+            <div class="open-source-grid">
                 <div class="open-source-text">
-                    <h2>Free & Open Source Forever</h2>
-                    <p>This isn't a freemium product with hidden costs. It's a genuine open source project you can run yourself, modify, and share.</p>
+                    <span class="section-label">Open Source</span>
+                    <h2>Free Forever. No Catch.</h2>
+                    <p>This isn't freemium. It's a genuine open source project you can run yourself, modify, and share. Your data stays between your devices.</p>
 
-                    <ul class="open-source-features">
+                    <ul class="feature-list">
                         <li>Self-host on your own server</li>
                         <li>No tracking or analytics</li>
                         <li>No accounts required</li>
@@ -1159,41 +1349,45 @@
                         <li>Contributions welcome</li>
                     </ul>
 
-                    <p>Your data stays between your devices. Video streams peer-to-peer - the server only handles signaling to establish the connection.</p>
-                </div>
-
-                <div class="github-card">
-                    <div class="github-header">
-                        <svg class="github-logo" viewBox="0 0 16 16">
+                    <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener" class="btn btn-secondary">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
                             <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
                         </svg>
-                        <div class="github-info">
-                            <h4>felschatz/baby-monitor</h4>
-                            <p>Real-time WebRTC baby monitor</p>
-                        </div>
-                    </div>
-
-                    <div class="github-stats">
-                        <div class="github-stat">
-                            <div class="github-stat-value">0</div>
-                            <div class="github-stat-label">Dependencies</div>
-                        </div>
-                        <div class="github-stat">
-                            <div class="github-stat-value">MIT</div>
-                            <div class="github-stat-label">License</div>
-                        </div>
-                        <div class="github-stat">
-                            <div class="github-stat-value">SSE</div>
-                            <div class="github-stat-label">Signaling</div>
-                        </div>
-                    </div>
-
-                    <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener" class="github-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
-                        </svg>
-                        View Source Code
+                        View on GitHub
                     </a>
+                </div>
+
+                <div class="tech-visual">
+                    <div class="tech-card">
+                        <div class="tech-card-icon">🔌</div>
+                        <h4>WebRTC</h4>
+                        <p>Peer-to-peer streaming</p>
+                    </div>
+                    <div class="tech-card">
+                        <div class="tech-card-icon">📡</div>
+                        <h4>Server-Sent Events</h4>
+                        <p>Simple signaling</p>
+                    </div>
+                    <div class="tech-card">
+                        <div class="tech-card-icon">🟢</div>
+                        <h4>Node.js</h4>
+                        <p>Lightweight server</p>
+                    </div>
+                    <div class="tech-card">
+                        <div class="tech-card-icon">📦</div>
+                        <h4>Zero Dependencies</h4>
+                        <p>Pure Node.js</p>
+                    </div>
+                    <div class="tech-card">
+                        <div class="tech-card-icon">🌐</div>
+                        <h4>Vanilla JS</h4>
+                        <p>No frameworks</p>
+                    </div>
+                    <div class="tech-card">
+                        <div class="tech-card-icon">🔒</div>
+                        <h4>HTTPS Ready</h4>
+                        <p>Secure by default</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1202,14 +1396,16 @@
     <!-- CTA Section -->
     <section class="cta">
         <div class="section-container">
-            <h2>Ready to Get Started?</h2>
-            <p>Set up your baby monitor in under a minute. No signup, no credit card, no catch.</p>
-            <a href="/start.html" class="btn btn-primary">
-                Launch Baby Monitor
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-            </a>
+            <div class="cta-content">
+                <h2>Ready to Get Started?</h2>
+                <p>Set up your baby monitor in under a minute. No signup, no credit card, no catch.</p>
+                <a href="/start.html" class="btn btn-primary">
+                    Launch Baby Monitor
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
         </div>
     </section>
 
@@ -1223,7 +1419,6 @@
                 <a href="#features">Features</a>
                 <a href="#how-it-works">How It Works</a>
                 <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener">GitHub</a>
-                <a href="https://github.com/felschatz/baby-monitor/issues" target="_blank" rel="noopener">Contribute</a>
             </div>
 
             <div class="footer-social">
@@ -1261,12 +1456,35 @@
             });
         });
 
-        // Mobile menu (basic toggle - could be enhanced)
+        // Mobile menu toggle
         const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
         const navLinks = document.querySelector('.nav-links');
 
         mobileMenuBtn.addEventListener('click', () => {
             navLinks.style.display = navLinks.style.display === 'flex' ? 'none' : 'flex';
+        });
+
+        // Intersection Observer for scroll animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        // Animate feature cards on scroll
+        document.querySelectorAll('.feature-card, .step, .tech-card').forEach((el, i) => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(30px)';
+            el.style.transition = `all 0.6s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.1}s`;
+            observer.observe(el);
         });
     </script>
 </body>
