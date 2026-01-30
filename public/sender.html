@@ -74,7 +74,10 @@
         </div>
         <div class="music-volume-row">
             <span>🔊</span>
-            <input type="range" id="musicVolume" min="0" max="100" value="50">
+            <div class="volume-slider-container">
+                <input type="range" id="musicVolume" min="0" max="100" value="50">
+                <div class="volume-midpoint-marker"></div>
+            </div>
             <span id="musicVolumeValue">50%</span>
         </div>
         <div class="music-label" id="musicLabel">Play lullabies</div>
