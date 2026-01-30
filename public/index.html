@@ -1466,8 +1466,8 @@
 
         // Intersection Observer for scroll animations
         const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
+            threshold: 0.15,
+            rootMargin: '0px 0px -20px 0px'
         };
 
         const observer = new IntersectionObserver((entries) => {
@@ -1479,12 +1479,22 @@
             });
         }, observerOptions);
 
-        // Animate feature cards on scroll
-        document.querySelectorAll('.feature-card, .step, .tech-card').forEach((el, i) => {
-            el.style.opacity = '0';
-            el.style.transform = 'translateY(30px)';
-            el.style.transition = `all 0.6s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.1}s`;
-            observer.observe(el);
+        // Animate elements by section (reset delay for each section)
+        const sections = [
+            { selector: '.feature-card', parent: '.features-grid' },
+            { selector: '.step', parent: '.steps' },
+            { selector: '.tech-card', parent: '.tech-visual' }
+        ];
+
+        sections.forEach(({ selector, parent }) => {
+            const container = document.querySelector(parent);
+            if (!container) return;
+            container.querySelectorAll(selector).forEach((el, i) => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(20px)';
+                el.style.transition = `all 0.5s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.05}s`;
+                observer.observe(el);
+            });
         });
     </script>
 </body>

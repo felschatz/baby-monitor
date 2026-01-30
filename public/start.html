@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Baby Monitor</title>
+    <title>Start - Baby Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -11,54 +14,266 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --night: #0a0e1a;
+            --night-soft: #141b2d;
+            --night-lighter: #1e2942;
+            --glow: #f6c177;
+            --glow-soft: #fad4a1;
+            --glow-dim: rgba(246, 193, 119, 0.15);
+            --mint: #9ccfd8;
+            --rose: #ebbcba;
+            --text: #e0def4;
+            --text-muted: #908caa;
+            --text-subtle: #6e6a86;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'DM Sans', sans-serif;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--night);
+            color: var(--text);
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Grain overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 10000;
+        }
+
+        /* Ambient glow */
+        body::after {
+            content: '';
+            position: fixed;
+            top: -20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 600px;
+            background: radial-gradient(ellipse at center, rgba(246, 193, 119, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Fraunces', serif;
         }
 
         .container {
             text-align: center;
-            max-width: 400px;
+            max-width: 440px;
             width: 100%;
+            position: relative;
+            z-index: 1;
+            animation: fade-up 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        @keyframes fade-up {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle at 30% 30%, var(--glow), var(--glow-soft));
+            border-radius: 50%;
+            box-shadow: 0 0 30px var(--glow-dim), 0 0 60px var(--glow-dim);
+            animation: gentle-pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes gentle-pulse {
+            0%, 100% { box-shadow: 0 0 30px var(--glow-dim), 0 0 60px var(--glow-dim); }
+            50% { box-shadow: 0 0 40px rgba(246, 193, 119, 0.25), 0 0 80px var(--glow-dim); }
         }
 
         h1 {
-            color: white;
-            margin-bottom: 10px;
-            font-size: 2.5rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: var(--glow);
         }
 
         .subtitle {
-            color: rgba(255,255,255,0.9);
-            margin-bottom: 40px;
+            color: var(--text-muted);
+            margin-bottom: 2.5rem;
+            font-size: 1rem;
+        }
+
+        /* Session Input Card */
+        .input-card {
+            background: linear-gradient(165deg, var(--night-soft) 0%, var(--night) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .input-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, rgba(246, 193, 119, 0.2) 50%, transparent 100%);
+        }
+
+        .input-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-subtle);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.75rem;
+            text-align: left;
+        }
+
+        .session-input {
+            width: 100%;
+            padding: 1rem 1.25rem;
             font-size: 1.1rem;
+            font-family: 'DM Sans', sans-serif;
+            border: 2px solid var(--night-lighter);
+            border-radius: 12px;
+            background: var(--night);
+            color: var(--text);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .session-input:focus {
+            outline: none;
+            border-color: var(--glow);
+            box-shadow: 0 0 0 4px var(--glow-dim);
+        }
+
+        .session-input::placeholder {
+            color: var(--text-subtle);
+        }
+
+        /* Quality Toggle */
+        .quality-section {
+            margin-top: 1.25rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .quality-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .quality-header .input-label {
+            margin-bottom: 0;
+        }
+
+        .quality-toggle {
+            display: flex;
+            background: var(--night);
+            border-radius: 10px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .quality-option {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quality-option.active {
+            background: var(--glow);
+            color: var(--night);
+        }
+
+        .quality-option:not(.active):hover {
+            color: var(--text);
+        }
+
+        .quality-hint {
+            font-size: 0.8rem;
+            color: var(--text-subtle);
+            text-align: right;
+        }
+
+        /* Role Buttons */
+        .role-buttons {
+            display: grid;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
         }
 
         .btn {
-            display: block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
             width: 100%;
-            padding: 20px 40px;
-            margin: 15px 0;
-            font-size: 1.3rem;
+            padding: 1.25rem 1.5rem;
+            font-size: 1.1rem;
             font-weight: 600;
+            font-family: 'DM Sans', sans-serif;
             border: none;
-            border-radius: 15px;
+            border-radius: 16px;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             text-decoration: none;
-            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%);
         }
 
         .btn:hover {
             transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
 
         .btn:active {
@@ -66,160 +281,335 @@
         }
 
         .btn-sender {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: linear-gradient(135deg, var(--glow) 0%, #e5a84d 100%);
+            color: var(--night);
+            box-shadow: 0 4px 20px rgba(246, 193, 119, 0.3);
+        }
+
+        .btn-sender:hover {
+            box-shadow: 0 8px 30px rgba(246, 193, 119, 0.4);
         }
 
         .btn-receiver {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            background: linear-gradient(135deg, var(--mint) 0%, #7ec8d3 100%);
+            color: var(--night);
+            box-shadow: 0 4px 20px rgba(156, 207, 216, 0.3);
         }
 
-        .icon {
-            font-size: 2rem;
-            margin-bottom: 5px;
-            display: block;
+        .btn-receiver:hover {
+            box-shadow: 0 8px 30px rgba(156, 207, 216, 0.4);
         }
 
-        .status {
-            margin-top: 30px;
-            padding: 15px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 10px;
-            color: white;
-        }
-
-        .instructions {
-            margin-top: 30px;
-            color: rgba(255,255,255,0.8);
-            font-size: 0.9rem;
-            line-height: 1.6;
-        }
-
-        .session-input-container {
-            margin-bottom: 20px;
-        }
-
-        .session-input-container input {
-            width: 100%;
-            padding: 15px;
-            font-size: 1.1rem;
-            border: none;
-            border-radius: 10px;
-            text-align: center;
-            background: rgba(255,255,255,0.95);
-        }
-
-        .session-input-container input:focus {
-            outline: 3px solid rgba(255,255,255,0.5);
-        }
-
-        .session-input-container input::placeholder {
-            color: #999;
-        }
-
-        .quality-selector {
+        .btn-icon {
+            width: 44px;
+            height: 44px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 12px;
             display: flex;
+            align-items: center;
             justify-content: center;
-            gap: 30px;
-            margin-bottom: 20px;
-            color: white;
+            font-size: 1.5rem;
+            flex-shrink: 0;
         }
 
-        .quality-option {
+        .btn-text {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            text-align: left;
+        }
+
+        .btn-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+
+        .btn-subtitle {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            font-weight: 500;
+        }
+
+        .btn-arrow {
+            margin-left: auto;
+            opacity: 0.5;
+            transition: transform 0.3s, opacity 0.3s;
+        }
+
+        .btn:hover .btn-arrow {
+            transform: translateX(4px);
+            opacity: 1;
+        }
+
+        /* Status Card */
+        .status-card {
+            background: var(--night-soft);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            padding: 1rem 1.25rem;
             display: flex;
             align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            font-size: 1.1rem;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
         }
 
-        .quality-option input[type="radio"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-subtle);
+            flex-shrink: 0;
         }
 
-        .quality-label {
-            font-size: 0.85rem;
-            color: rgba(255,255,255,0.7);
-            margin-top: -10px;
-            margin-bottom: 15px;
+        .status-indicator.active {
+            background: #4ade80;
+            box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+            animation: pulse-green 2s ease-in-out infinite;
         }
 
-        .github-link {
-            margin-top: 30px;
-            color: rgba(255,255,255,0.7);
-            text-decoration: none;
+        @keyframes pulse-green {
+            0%, 100% { box-shadow: 0 0 10px rgba(74, 222, 128, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(74, 222, 128, 0.7); }
+        }
+
+        .status-text {
+            flex: 1;
+            text-align: left;
+        }
+
+        .status-title {
+            font-weight: 600;
             font-size: 0.9rem;
-            display: inline-flex;
+            color: var(--text);
+        }
+
+        .status-detail {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Instructions */
+        .instructions {
+            background: var(--night-soft);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            padding: 1.25rem;
+            text-align: left;
+        }
+
+        .instructions-title {
+            font-family: 'Fraunces', serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 1rem;
+            display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 0.5rem;
+        }
+
+        .instructions-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: var(--glow);
+            border-radius: 2px;
+        }
+
+        .steps {
+            list-style: none;
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .step {
+            display: flex;
+            gap: 0.75rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .step-number {
+            width: 22px;
+            height: 22px;
+            background: var(--night-lighter);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--glow);
+            flex-shrink: 0;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+        }
+
+        .footer-link {
+            color: var(--text-subtle);
+            text-decoration: none;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
             transition: color 0.2s;
         }
 
-        .github-link:hover {
-            color: white;
+        .footer-link:hover {
+            color: var(--text);
         }
 
-        .github-link svg {
-            width: 20px;
-            height: 20px;
+        .footer-link svg {
+            width: 18px;
+            height: 18px;
             fill: currentColor;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                max-width: 100%;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            .btn {
+                padding: 1rem 1.25rem;
+            }
+
+            .btn-icon {
+                width: 40px;
+                height: 40px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Baby Monitor</h1>
+        <a href="/" class="logo">
+            <div class="logo-icon"></div>
+            <h1>Baby Monitor</h1>
+        </a>
         <p class="subtitle">Real-time audio & video streaming</p>
 
-        <div class="session-input-container">
-            <input type="text" id="sessionInput" placeholder="Enter session name (e.g., felix-baby)" autocomplete="off" autocapitalize="none">
+        <div class="input-card">
+            <label class="input-label" for="sessionInput">Session Name</label>
+            <input
+                type="text"
+                id="sessionInput"
+                class="session-input"
+                placeholder="e.g., nursery, baby-cam, felix-baby"
+                autocomplete="off"
+                autocapitalize="none"
+            >
+
+            <div class="quality-section">
+                <div class="quality-header">
+                    <span class="input-label">Video Quality</span>
+                    <div class="quality-toggle">
+                        <button type="button" class="quality-option" data-quality="sd">SD</button>
+                        <button type="button" class="quality-option active" data-quality="hd">HD</button>
+                    </div>
+                </div>
+                <p class="quality-hint">SD (480p) uses less data on slow connections</p>
+            </div>
         </div>
 
-        <div class="quality-selector">
-            <label class="quality-option">
-                <input type="radio" name="quality" value="sd" id="qualitySD">
-                SD (480p)
-            </label>
-            <label class="quality-option">
-                <input type="radio" name="quality" value="hd" id="qualityHD" checked>
-                HD (720p)
-            </label>
+        <div class="role-buttons">
+            <button class="btn btn-sender" id="senderBtn">
+                <span class="btn-icon">📹</span>
+                <span class="btn-text">
+                    <span class="btn-title">Baby's Phone</span>
+                    <span class="btn-subtitle">Sender - Place near baby</span>
+                </span>
+                <svg class="btn-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </button>
+
+            <button class="btn btn-receiver" id="receiverBtn">
+                <span class="btn-icon">👶</span>
+                <span class="btn-text">
+                    <span class="btn-title">Parent's Phone</span>
+                    <span class="btn-subtitle">Receiver - Watch & listen</span>
+                </span>
+                <svg class="btn-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </button>
         </div>
-        <p class="quality-label">SD uses less data on slow connections</p>
 
-        <button class="btn btn-sender" id="senderBtn">
-            <span class="icon">📹</span>
-            Baby's Phone (Sender)
-        </button>
-
-        <button class="btn btn-receiver" id="receiverBtn">
-            <span class="icon">👶</span>
-            Parent's Phone (Receiver)
-        </button>
-
-        <div class="status" id="status">
-            Checking status...
+        <div class="status-card" id="statusCard">
+            <div class="status-indicator" id="statusIndicator"></div>
+            <div class="status-text">
+                <div class="status-title" id="statusTitle">Checking status...</div>
+                <div class="status-detail" id="statusDetail">Connecting to server</div>
+            </div>
         </div>
 
         <div class="instructions">
-            <p><strong>Instructions:</strong></p>
-            <p>1. Enter a session name (same for sender &amp; receiver)</p>
-            <p>2. Open "Sender" on the phone near the baby</p>
-            <p>3. Open "Receiver" on your phone</p>
-            <p>4. Bookmark the URL for easy daily access</p>
+            <div class="instructions-title">Quick Start</div>
+            <ol class="steps">
+                <li class="step">
+                    <span class="step-number">1</span>
+                    <span>Enter a session name (use the same name on both devices)</span>
+                </li>
+                <li class="step">
+                    <span class="step-number">2</span>
+                    <span>Open <strong>Sender</strong> on the phone near your baby</span>
+                </li>
+                <li class="step">
+                    <span class="step-number">3</span>
+                    <span>Open <strong>Receiver</strong> on your phone to watch</span>
+                </li>
+                <li class="step">
+                    <span class="step-number">4</span>
+                    <span>Bookmark the URL for instant access tomorrow</span>
+                </li>
+            </ol>
         </div>
 
-        <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener" class="github-link">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-            GitHub
-        </a>
+        <div class="footer">
+            <a href="/" class="footer-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                Home
+            </a>
+            <a href="https://github.com/felschatz/baby-monitor" target="_blank" rel="noopener" class="footer-link">
+                <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                GitHub
+            </a>
+        </div>
     </div>
 
     <script>
         const sessionInput = document.getElementById('sessionInput');
         const senderBtn = document.getElementById('senderBtn');
         const receiverBtn = document.getElementById('receiverBtn');
+        const qualityOptions = document.querySelectorAll('.quality-option');
+
+        // Quality toggle
+        let selectedQuality = 'hd';
+
+        qualityOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                qualityOptions.forEach(o => o.classList.remove('active'));
+                option.classList.add('active');
+                selectedQuality = option.dataset.quality;
+            });
+        });
 
         // Pre-fill from localStorage if available
         const savedSession = localStorage.getItem('babymonitor-session');
@@ -229,26 +619,19 @@
 
         function navigateToRole(role) {
             const session = sessionInput.value.trim();
-            // Map role to short URL path
             const pathMap = { sender: 's', receiver: 'r' };
             const shortPath = pathMap[role] || role;
 
-            // Get quality setting (only relevant for sender)
-            const quality = document.querySelector('input[name="quality"]:checked').value;
-
             if (!session) {
-                // Navigate without session - will show prompt on destination
                 if (role === 'sender') {
-                    window.location.href = `/${role}?q=${quality}`;
+                    window.location.href = `/${role}?q=${selectedQuality}`;
                 } else {
                     window.location.href = `/${role}`;
                 }
             } else {
-                // Save to localStorage
                 localStorage.setItem('babymonitor-session', session);
-                // Navigate with session using short path (/s/ or /r/)
                 if (role === 'sender') {
-                    window.location.href = `/${shortPath}/${encodeURIComponent(session)}?q=${quality}`;
+                    window.location.href = `/${shortPath}/${encodeURIComponent(session)}?q=${selectedQuality}`;
                 } else {
                     window.location.href = `/${shortPath}/${encodeURIComponent(session)}`;
                 }
@@ -261,26 +644,32 @@
         // Allow Enter key in session input
         sessionInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                // Focus on sender button as default action
                 senderBtn.focus();
             }
         });
 
         async function checkStatus() {
+            const statusIndicator = document.getElementById('statusIndicator');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusDetail = document.getElementById('statusDetail');
+
             try {
                 const response = await fetch('/api/status');
                 const data = await response.json();
-                const statusEl = document.getElementById('status');
 
                 if (data.activeSessions > 0) {
-                    statusEl.innerHTML = `<strong>${data.activeSessions} Active Session${data.activeSessions > 1 ? 's' : ''}</strong><br>Total Receivers: ${data.totalReceivers}`;
-                    statusEl.style.background = 'rgba(76, 175, 80, 0.5)';
+                    statusIndicator.classList.add('active');
+                    statusTitle.textContent = `${data.activeSessions} Active Session${data.activeSessions > 1 ? 's' : ''}`;
+                    statusDetail.textContent = `${data.totalReceivers} receiver${data.totalReceivers !== 1 ? 's' : ''} connected`;
                 } else {
-                    statusEl.innerHTML = '<strong>No Active Sessions</strong><br>Enter a session name to start';
-                    statusEl.style.background = 'rgba(255,255,255,0.2)';
+                    statusIndicator.classList.remove('active');
+                    statusTitle.textContent = 'No Active Sessions';
+                    statusDetail.textContent = 'Enter a session name to start monitoring';
                 }
             } catch (err) {
-                document.getElementById('status').innerHTML = 'Unable to check status';
+                statusIndicator.classList.remove('active');
+                statusTitle.textContent = 'Server Unavailable';
+                statusDetail.textContent = 'Unable to check status';
             }
         }
 
