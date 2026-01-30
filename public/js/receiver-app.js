@@ -15,7 +15,8 @@ import {
     setupNoiseGate,
     setupNoiseGateFromStream,
     setPlaybackVolume,
-    resetNoiseGate
+    resetNoiseGate,
+    isAudioRoutedThroughWebAudio
 } from './audio-analysis.js';
 import {
     initVideoPlayback,
@@ -195,6 +196,7 @@ function setDisconnectedState() {
     disconnectAlert.classList.add('active');
 
     audioOnlyIndicator.classList.remove('active');
+    noiseGateInfoItem.classList.remove('gating');
     resetMusicUI();
 }
 
@@ -279,6 +281,11 @@ function updateNoiseGateDisplay(value) {
 }
 
 function handleGatingChange(isGating) {
+    // Don't update gating indicator when disconnected
+    if (!isConnected) {
+        noiseGateInfoItem.classList.remove('gating');
+        return;
+    }
     if (isGating) {
         noiseGateInfoItem.classList.add('gating');
     } else {
@@ -445,7 +452,8 @@ initVideoPlayback(
             }
         },
         getIsConnected: () => isConnected,
-        onMediaMuted: setMediaMutedState
+        onMediaMuted: setMediaMutedState,
+        isAudioRoutedThroughWebAudio
     }
 );
 
@@ -606,7 +614,11 @@ function updateVolume(value) {
     const numValue = parseInt(value);
     const volumeLevel = numValue / 100;
     remoteVideo.volume = volumeLevel;
-    remoteVideo.muted = false;
+    // Only un-mute video element if audio is NOT routed through Web Audio API
+    // (noise gate routes audio through Web Audio, keeping video muted)
+    if (!isAudioRoutedThroughWebAudio()) {
+        remoteVideo.muted = false;
+    }
     // Also update Web Audio API volume (needed when noise gate is active)
     setPlaybackVolume(volumeLevel);
     volumeSlider.value = numValue;

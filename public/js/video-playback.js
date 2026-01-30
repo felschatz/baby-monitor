@@ -19,6 +19,7 @@ let videoContainer = null;
 let onUserInteraction = null;
 let getIsConnected = null;
 let onMediaMuted = null;
+let isAudioRoutedThroughWebAudio = null;
 
 // Track mute state
 let videoTrackMuted = false;
@@ -40,6 +41,7 @@ export function initVideoPlayback(elements, callbacks) {
     onUserInteraction = callbacks.onUserInteraction;
     getIsConnected = callbacks.getIsConnected;
     onMediaMuted = callbacks.onMediaMuted;
+    isAudioRoutedThroughWebAudio = callbacks.isAudioRoutedThroughWebAudio;
 
     // Debug video events
     remoteVideo.addEventListener('loadeddata', () => {
@@ -67,7 +69,7 @@ export function initVideoPlayback(elements, callbacks) {
         if (onUserInteraction) onUserInteraction();
 
         if (remoteVideo.srcObject) {
-            remoteVideo.muted = false;
+            safeUnmuteVideo();
             remoteVideo.play().then(() => {
                 console.log('Play succeeded after overlay tap');
                 overlay.classList.add('hidden');
@@ -135,20 +137,30 @@ export function hideOverlay() {
 }
 
 /**
+ * Safely unmute video element, but only if audio is not routed through Web Audio
+ * (noise gate routes audio through Web Audio and keeps video muted)
+ */
+function safeUnmuteVideo() {
+    if (!isAudioRoutedThroughWebAudio || !isAudioRoutedThroughWebAudio()) {
+        remoteVideo.muted = false;
+    }
+}
+
+/**
  * Try to play video
  */
 export function tryPlayVideo() {
     if (!remoteVideo.srcObject) return;
 
-    // First try: play with sound
-    remoteVideo.muted = false;
+    // First try: play with sound (unless audio routed through Web Audio)
+    safeUnmuteVideo();
     remoteVideo.play().then(() => {
         console.log('Video playing with sound!');
         hideOverlay();
     }).catch(err => {
         console.log('Play with sound failed, trying muted:', err.message);
 
-        // Second try: play muted
+        // Second try: play muted (for autoplay policy)
         remoteVideo.muted = true;
         remoteVideo.play().then(() => {
             console.log('Video playing muted');
@@ -168,15 +180,16 @@ export function handleUserInteraction() {
     userHasInteracted = true;
     console.log('User interaction detected');
 
+    // Call onUserInteraction first to set up noise gate if needed
+    if (onUserInteraction) onUserInteraction();
+
     if (remoteVideo.srcObject) {
-        remoteVideo.muted = false;
+        safeUnmuteVideo();
         remoteVideo.play().then(() => {
             console.log('Video playing after interaction');
             overlay.classList.add('hidden');
         }).catch(e => console.log('Play after interaction failed:', e));
     }
-
-    if (onUserInteraction) onUserInteraction();
 }
 
 /**
@@ -252,7 +265,7 @@ export function handleVideoTrack(track, savedVolume) {
     remoteVideo.play().then(() => {
         console.log('Video playing (muted), dimensions:', remoteVideo.videoWidth, 'x', remoteVideo.videoHeight);
         if (userHasInteracted) {
-            remoteVideo.muted = false;
+            safeUnmuteVideo();
             overlay.classList.add('hidden');
         } else {
             showPlayOverlay();

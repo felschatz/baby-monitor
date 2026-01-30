@@ -364,6 +364,14 @@ export function isNoiseGateActive() {
 }
 
 /**
+ * Check if audio is routed through Web Audio API (for noise gate/volume control)
+ * When true, the video element should stay muted and volume controlled via setPlaybackVolume
+ */
+export function isAudioRoutedThroughWebAudio() {
+    return !!(streamAudioSource || videoElementSource);
+}
+
+/**
  * Reset noise gate state (for reconnection)
  */
 export function resetNoiseGate() {
