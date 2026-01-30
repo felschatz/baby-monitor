@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Stream directly, gate precisely.
+// Wisdom: A session name is a secret shared between watchful eyes.

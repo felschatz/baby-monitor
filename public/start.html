@@ -183,6 +183,30 @@
             color: var(--text-subtle);
         }
 
+        .session-hint {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            padding: 0.65rem 0.85rem;
+            background: rgba(235, 188, 186, 0.08);
+            border: 1px solid rgba(235, 188, 186, 0.15);
+            border-radius: 10px;
+            font-size: 0.8rem;
+            color: var(--rose);
+            line-height: 1.45;
+            text-align: left;
+        }
+
+        .hint-icon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            margin-top: 1px;
+            stroke: var(--rose);
+            opacity: 0.8;
+        }
+
         /* Quality Toggle */
         .quality-section {
             margin-top: 1.25rem;
@@ -512,6 +536,13 @@
                 autocomplete="off"
                 autocapitalize="none"
             >
+            <div class="session-hint">
+                <svg class="hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                <span>Pick something unique — this name is your password. Anyone who knows it can watch.</span>
+            </div>
 
             <div class="quality-section">
                 <div class="quality-header">
