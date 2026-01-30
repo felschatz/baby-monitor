@@ -10,6 +10,7 @@ let peerConnection = null;
 let localStream = null;
 let pendingCandidates = [];
 let receiverWantsVideo = true;
+let videoAvailable = true; // Track if video capture is available
 let audioContext = null;
 let analyser = null;
 
@@ -40,13 +41,34 @@ export function initSenderWebRTC(callbacks) {
  * @param {boolean} options.audio - Enable audio
  * @param {string} options.quality - Video quality 'sd' or 'hd'
  * @param {HTMLVideoElement} options.videoElement - Video element to display stream
- * @returns {Promise<MediaStream>}
+ * @returns {Promise<{stream: MediaStream, videoFailed: boolean}>}
  */
 export async function startStreaming(options) {
     const { video, audio, quality, videoElement } = options;
 
-    const constraints = getMediaConstraints({ video, audio, quality });
-    localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    let videoFailed = false;
+
+    if (video) {
+        // Try with video first
+        try {
+            const constraints = getMediaConstraints({ video: true, audio, quality });
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            videoAvailable = true;
+        } catch (err) {
+            console.warn('Video capture failed, falling back to audio-only:', err.message);
+            videoFailed = true;
+            videoAvailable = false;
+            // Fall back to audio-only
+            const audioConstraints = getMediaConstraints({ video: false, audio, quality });
+            localStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
+        }
+    } else {
+        // User requested audio-only
+        const constraints = getMediaConstraints({ video: false, audio, quality });
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        videoAvailable = true; // Don't mark as unavailable if user chose audio-only
+    }
+
     videoElement.srcObject = localStream;
 
     console.log('Got local stream');
@@ -58,7 +80,7 @@ export async function startStreaming(options) {
         console.log('Video track settings:', videoTrack.getSettings());
     }
 
-    return localStream;
+    return { stream: localStream, videoFailed };
 }
 
 /**
@@ -319,6 +341,7 @@ export function stopStreaming(videoElement) {
 
     videoElement.srcObject = null;
     receiverWantsVideo = true;
+    videoAvailable = true; // Reset for next stream attempt
 }
 
 /**
@@ -370,3 +393,5 @@ export function setReceiverWantsVideo(value) { receiverWantsVideo = value; }
 export function getReceiverWantsVideo() { return receiverWantsVideo; }
 export function setPttActive(value) { pttActive = value; }
 export function isPttActive() { return pttActive; }
+export function isVideoAvailable() { return videoAvailable; }
+export function setVideoAvailable(value) { videoAvailable = value; }

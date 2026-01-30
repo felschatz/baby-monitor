@@ -45,7 +45,9 @@ import {
     getAudioContext,
     setReceiverWantsVideo,
     getReceiverWantsVideo,
-    setPttActive
+    setPttActive,
+    isVideoAvailable,
+    setVideoAvailable
 } from './sender-webrtc.js';
 
 // DOM elements
@@ -326,6 +328,10 @@ async function handleMessage(message) {
                 updateStreamingStatus();
             }
             if (getLocalStream()) {
+                // If receiver wants video but video is unavailable, notify them
+                if (message.videoEnabled && !isVideoAvailable()) {
+                    signaling.sendSignal({ type: 'video-unavailable' });
+                }
                 await createOffer(pttAudio);
                 broadcastMusicStatus();
             } else {
@@ -338,6 +344,10 @@ async function handleMessage(message) {
             setReceiverWantsVideo(message.enabled);
             updateStreamingStatus();
             if (getLocalStream()) {
+                // If receiver wants video but video is unavailable, notify them
+                if (message.enabled && !isVideoAvailable()) {
+                    signaling.sendSignal({ type: 'video-unavailable' });
+                }
                 await createOffer(pttAudio);
             }
             break;
@@ -419,13 +429,25 @@ async function startStreamingHandler() {
     console.log('startStreamingHandler called, video:', enableVideo.checked, 'audio:', enableAudio.checked);
     try {
         console.log('Calling startStreaming...');
-        await startStreaming({
+        const { stream, videoFailed } = await startStreaming({
             video: enableVideo.checked,
             audio: enableAudio.checked,
             quality: videoQuality,
             videoElement: localVideo
         });
-        console.log('startStreaming completed');
+        console.log('startStreaming completed, videoFailed:', videoFailed);
+
+        // If video failed, update the checkbox and notify receivers
+        if (videoFailed) {
+            console.log('Video capture failed, switching to audio-only mode');
+            enableVideo.checked = false;
+            enableVideo.disabled = true;
+            info.textContent = 'Video unavailable - streaming audio only';
+            // Notify receivers that video is unavailable
+            if (signaling.isConnected()) {
+                signaling.sendSignal({ type: 'video-unavailable' });
+            }
+        }
 
         if (enableAudio.checked) {
             setupAudioAnalysis(getLocalStream(), audioLevel);
@@ -438,7 +460,9 @@ async function startStreamingHandler() {
         isStreaming = true;
         updateStreamingStatus();
 
-        info.textContent = 'Streaming... Waiting for receivers.';
+        if (!videoFailed) {
+            info.textContent = 'Streaming... Waiting for receivers.';
+        }
         setConnectedState(true);
 
         enableAudioPlayback();
@@ -471,6 +495,10 @@ function stopStreamingHandler() {
     isStreaming = false;
     setReceiverWantsVideo(true);
     setEchoCancelEnabled(false);
+
+    // Re-enable video checkbox for next stream attempt
+    enableVideo.disabled = false;
+    enableVideo.checked = true;
 
     setConnectedState(false);
     info.textContent = 'Streaming stopped.';

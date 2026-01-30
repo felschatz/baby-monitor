@@ -477,6 +477,8 @@ async function handleMessage(message) {
             updateAudioOnlyIndicator();
             // Clear video element to prepare for reconnection
             remoteVideo.srcObject = null;
+            // Re-enable audio-only toggle for next connection attempt
+            audioOnlyToggle.disabled = false;
             break;
 
         case 'offer':
@@ -503,6 +505,15 @@ async function handleMessage(message) {
         case 'echo-cancel-status':
             console.log('Received echo cancel status:', message);
             handleEchoCancelStatus(message);
+            break;
+
+        case 'video-unavailable':
+            console.log('Sender video is unavailable');
+            // Auto-enable audio-only mode and disable toggle
+            audioOnlyToggle.checked = true;
+            audioOnlyToggle.disabled = true;
+            setAudioOnlyMode(true);
+            info.textContent = 'Sender video unavailable';
             break;
 
         case 'heartbeat':

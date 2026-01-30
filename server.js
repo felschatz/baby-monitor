@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A marker at the midpoint guides the hand between precision and power.
+// Wisdom: A graceful fallback keeps the stream flowing even without sight.
