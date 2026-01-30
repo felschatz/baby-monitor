@@ -13,7 +13,9 @@ import {
     resetAudioAnalysis,
     setNoiseGateThreshold,
     setupNoiseGate,
-    setPlaybackVolume
+    setupNoiseGateFromStream,
+    setPlaybackVolume,
+    resetNoiseGate
 } from './audio-analysis.js';
 import {
     initVideoPlayback,
@@ -119,6 +121,7 @@ if (!sessionName) {
 let isConnected = false;
 let isMediaMuted = false;
 let musicPlaying = false;
+let currentStream = null;  // Store stream for noise gate setup
 let musicAvailable = false;
 let musicPlaylists = [];
 let currentPlaylistId = localStorage.getItem('receiver-music-playlist') || '1';
@@ -429,7 +432,12 @@ initVideoPlayback(
             // Set up noise gate after audio context is ready
             const savedVol = localStorage.getItem('receiver-volume');
             const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
-            setupNoiseGate(remoteVideo, initialVolume);
+            // Use stream-based noise gate for better WebRTC compatibility
+            if (currentStream) {
+                setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
+            } else {
+                setupNoiseGate(remoteVideo, initialVolume);
+            }
             // Apply saved threshold
             const savedGate = localStorage.getItem('receiver-noise-gate');
             if (savedGate !== null) {
@@ -469,8 +477,9 @@ initReceiverWebRTC({
         }
     },
     onTrack: (event) => {
-        remoteVideo.srcObject = event.streams[0];
-        console.log('Set video srcObject, tracks in stream:', event.streams[0].getTracks().length);
+        currentStream = event.streams[0];
+        remoteVideo.srcObject = currentStream;
+        console.log('Set video srcObject, tracks in stream:', currentStream.getTracks().length);
 
         const savedVol = localStorage.getItem('receiver-volume');
         if (savedVol !== null) {
@@ -490,7 +499,7 @@ initReceiverWebRTC({
                 info.textContent = 'Streaming (audio only)';
                 updateAudioOnlyIndicator();
             }
-            setupAudioAnalysis(event.streams[0], audioLevel, audioLevelInline);
+            setupAudioAnalysis(currentStream, audioLevel, audioLevelInline);
             setupAudioTrackMuteDetection(event.track);
         }
     }
@@ -527,10 +536,12 @@ async function handleMessage(message) {
             setDisconnectedState();
             closePeerConnection();
             resetAudioAnalysis();
+            resetNoiseGate();
             resetMediaMutedState();
             setHasVideoTrack(false);
             updateAudioOnlyIndicator();
-            // Clear video element to prepare for reconnection
+            // Clear video element and stream for reconnection
+            currentStream = null;
             remoteVideo.srcObject = null;
             // Re-enable audio-only toggle for next connection attempt
             audioOnlyToggle.disabled = false;
@@ -675,7 +686,12 @@ function onUserInteractionGlobal() {
     // Set up noise gate after audio context is ready
     const savedVol = localStorage.getItem('receiver-volume');
     const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
-    setupNoiseGate(remoteVideo, initialVolume);
+    // Use stream-based noise gate for better WebRTC compatibility
+    if (currentStream) {
+        setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
+    } else {
+        setupNoiseGate(remoteVideo, initialVolume);
+    }
     const savedGate = localStorage.getItem('receiver-noise-gate');
     if (savedGate !== null) {
         setNoiseGateThreshold(parseInt(savedGate));

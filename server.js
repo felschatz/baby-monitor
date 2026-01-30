@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Consistency in color brings harmony to controls.
+// Wisdom: Stream directly, gate precisely.

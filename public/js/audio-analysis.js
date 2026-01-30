@@ -14,8 +14,8 @@ let noiseGateGain = null;
 let volumeGain = null;
 let noiseGateThreshold = 0;
 let isGating = false;
-let noiseGateSource = null;
-let videoElementSource = null;
+let streamAudioSource = null;  // MediaStreamSource for noise gate (more reliable than MediaElementSource)
+let videoElementSource = null; // Keep for backwards compatibility but prefer streamAudioSource
 
 // Callbacks
 let onLoudSound = null;
@@ -101,8 +101,10 @@ export async function tryStartAudioAnalysis(audioLevelElement) {
         audioAnalysisRunning = true;
         console.log('Audio analysis started successfully');
 
+        let frameCount = 0;
         function updateAudioLevel() {
             if (!analyser || !audioAnalysisRunning) return;
+            frameCount++;
 
             analyser.getByteFrequencyData(dataArray);
 
@@ -120,14 +122,22 @@ export async function tryStartAudioAnalysis(audioLevelElement) {
             });
 
             // Apply noise gate if threshold is set
-            if (noiseGateGain && noiseGateThreshold > 0) {
-                const shouldGate = percentage < noiseGateThreshold;
-                if (shouldGate !== isGating) {
-                    isGating = shouldGate;
-                    // Smooth transition to avoid clicks
-                    const targetGain = shouldGate ? 0 : 1;
-                    noiseGateGain.gain.setTargetAtTime(targetGain, audioContext.currentTime, 0.01);
-                    if (onGatingChange) onGatingChange(shouldGate);
+            if (noiseGateThreshold > 0) {
+                if (!noiseGateGain) {
+                    // Log every 100 frames to avoid spam
+                    if (frameCount % 100 === 1) {
+                        console.warn('Noise gate: threshold set but noiseGateGain not initialized - tap screen to enable');
+                    }
+                } else {
+                    const shouldGate = percentage < noiseGateThreshold;
+                    if (shouldGate !== isGating) {
+                        isGating = shouldGate;
+                        // Smooth transition to avoid clicks
+                        const targetGain = shouldGate ? 0 : 1;
+                        noiseGateGain.gain.setTargetAtTime(targetGain, audioContext.currentTime, 0.01);
+                        console.log(`Noise gate: ${shouldGate ? 'MUTING' : 'UNMUTING'} (level=${percentage.toFixed(1)}%, threshold=${noiseGateThreshold}%)`);
+                        if (onGatingChange) onGatingChange(shouldGate);
+                    }
                 }
             }
 
@@ -232,24 +242,85 @@ export function getNoiseGateThreshold() {
 }
 
 /**
- * Set up noise gate for video element audio
- * Routes video audio through Web Audio API with gain nodes for gating and volume
- * @param {HTMLVideoElement} videoElement - The video element to gate audio for
+ * Set up noise gate using MediaStream directly (more reliable for WebRTC)
+ * Routes stream audio through Web Audio API with gain nodes for gating and volume
+ * @param {MediaStream} stream - The media stream to gate
+ * @param {HTMLVideoElement} videoElement - The video element (will be muted)
  * @param {number} initialVolume - Initial volume (0-1)
  */
-export function setupNoiseGate(videoElement, initialVolume = 1) {
+export function setupNoiseGateFromStream(stream, videoElement, initialVolume = 1) {
+    console.log('setupNoiseGateFromStream called, audioContext:', !!audioContext, 'streamAudioSource:', !!streamAudioSource);
+
     if (!audioContext) {
-        console.log('AudioContext not ready, cannot setup noise gate');
-        return;
+        console.warn('Noise gate: AudioContext not ready - will retry on next interaction');
+        return false;
     }
 
-    // Only create the source once per video element
-    if (videoElementSource) {
-        console.log('Noise gate already set up');
-        return;
+    // Only create the source once
+    if (streamAudioSource) {
+        console.log('Noise gate already set up (stream-based)');
+        return true;
+    }
+
+    if (!stream) {
+        console.warn('Noise gate: No stream provided');
+        return false;
     }
 
     try {
+        console.log('Creating MediaStreamSource for noise gate...');
+
+        // Mute the video element to avoid double playback
+        // Audio will come through Web Audio API instead
+        videoElement.muted = true;
+
+        // Create source from the stream directly (not the video element)
+        streamAudioSource = audioContext.createMediaStreamSource(stream);
+
+        // Create gain node for noise gating
+        noiseGateGain = audioContext.createGain();
+        noiseGateGain.gain.value = 1;
+
+        // Create gain node for volume control
+        volumeGain = audioContext.createGain();
+        volumeGain.gain.value = initialVolume;
+
+        // Connect: stream -> noiseGate -> volume -> destination
+        streamAudioSource.connect(noiseGateGain);
+        noiseGateGain.connect(volumeGain);
+        volumeGain.connect(audioContext.destination);
+
+        console.log('Noise gate set up successfully (stream-based), initial volume:', initialVolume);
+        return true;
+    } catch (err) {
+        console.error('Error setting up noise gate from stream:', err);
+        return false;
+    }
+}
+
+/**
+ * Set up noise gate for video element audio (legacy method)
+ * Routes video audio through Web Audio API with gain nodes for gating and volume
+ * @param {HTMLVideoElement} videoElement - The video element to gate audio for
+ * @param {number} initialVolume - Initial volume (0-1)
+ * @deprecated Use setupNoiseGateFromStream instead for WebRTC streams
+ */
+export function setupNoiseGate(videoElement, initialVolume = 1) {
+    console.log('setupNoiseGate called, audioContext:', !!audioContext, 'videoElementSource:', !!videoElementSource);
+
+    if (!audioContext) {
+        console.warn('Noise gate: AudioContext not ready - will retry on next interaction');
+        return false;
+    }
+
+    // Only create the source once per video element
+    if (videoElementSource || streamAudioSource) {
+        console.log('Noise gate already set up');
+        return true;
+    }
+
+    try {
+        console.log('Creating MediaElementSource for video element...');
         // Create media element source (can only be done once per element)
         videoElementSource = audioContext.createMediaElementSource(videoElement);
 
@@ -267,9 +338,11 @@ export function setupNoiseGate(videoElement, initialVolume = 1) {
         noiseGateGain.connect(volumeGain);
         volumeGain.connect(audioContext.destination);
 
-        console.log('Noise gate set up for video element, initial volume:', initialVolume);
+        console.log('Noise gate set up successfully, initial volume:', initialVolume);
+        return true;
     } catch (err) {
         console.error('Error setting up noise gate:', err);
+        return false;
     }
 }
 
@@ -291,11 +364,25 @@ export function isNoiseGateActive() {
 }
 
 /**
- * Reset noise gate state
+ * Reset noise gate state (for reconnection)
  */
 export function resetNoiseGate() {
+    console.log('Resetting noise gate');
     isGating = false;
+
+    // Disconnect and reset stream source
+    if (streamAudioSource) {
+        try {
+            streamAudioSource.disconnect();
+        } catch (e) {}
+        streamAudioSource = null;
+    }
+
+    // Reset gain nodes (don't disconnect - they may still be connected to video element source)
     if (noiseGateGain) {
         noiseGateGain.gain.value = 1;
     }
+
+    // Note: We don't reset videoElementSource because createMediaElementSource
+    // can only be called once per element. The gain nodes remain connected.
 }

@@ -12,6 +12,10 @@ const SMOOTHING = 0.6;              // Temporal smoothing between frames
 const MUSIC_SCALE = 0.7;            // Scale music magnitude for acoustic path
 const PROCESSOR_BUFFER_SIZE = 4096; // Processing buffer size
 const MAX_OVERRUNS = 10;            // Fallback to simple mode after this many
+const DEFAULT_DELAY_MS = 250;       // Initial delay estimate for speaker→mic path
+const MIN_DELAY_MS = 50;            // Minimum plausible delay
+const MAX_DELAY_MS = 500;           // Maximum plausible delay
+const CALIBRATION_DURATION_MS = 3000; // Duration of auto-calibration phase
 
 // State
 let echoCancelEnabled = false;
@@ -150,11 +154,24 @@ function createHannWindow(size) {
     return window;
 }
 
-function initFFTState() {
+function initFFTState(sampleRate) {
     const hannWindow = createHannWindow(FFT_SIZE);
+
+    // Calculate delay parameters
+    const framesPerSecond = sampleRate / HOP_SIZE;
+    const msPerFrame = 1000 / framesPerSecond;
+    const maxDelayFrames = Math.ceil((MAX_DELAY_MS / 1000) * framesPerSecond);
+    const numBins = FFT_SIZE / 2 + 1;
+
+    // Calibration buffers - store time-domain samples for cross-correlation
+    const calibrationSamples = Math.ceil((CALIBRATION_DURATION_MS / 1000) * sampleRate);
+    const maxDelaySamples = Math.ceil((MAX_DELAY_MS / 1000) * sampleRate);
 
     return {
         hannWindow,
+        sampleRate,
+        framesPerSecond,
+        msPerFrame,
         inputRing: new Float32Array(FFT_SIZE),
         outputRing: new Float32Array(FFT_SIZE * 2),
         inputPos: 0,
@@ -164,11 +181,86 @@ function initFFTState() {
         fftReal: new Float32Array(FFT_SIZE),
         fftImag: new Float32Array(FFT_SIZE),
         musicFreqData: null,
-        prevMag: new Float32Array(FFT_SIZE / 2 + 1),
+        prevMag: new Float32Array(numBins),
         overrunCount: 0,
         useSimpleMode: false,
-        lastProcessTime: 0
+        lastProcessTime: 0,
+        // Delay compensation - use max delay for buffer size, actual delay is dynamic
+        delayFrames: Math.ceil((DEFAULT_DELAY_MS / 1000) * framesPerSecond),
+        maxDelayFrames,
+        musicHistoryBuffer: new Array(maxDelayFrames + 1).fill(null).map(() => new Float32Array(numBins)),
+        musicHistoryWritePos: 0,
+        musicHistoryFilled: false,
+        // Auto-calibration state
+        calibrating: true,
+        calibrationStartTime: 0,
+        calibrationMicBuffer: new Float32Array(calibrationSamples),
+        calibrationMusicBuffer: new Float32Array(calibrationSamples),
+        calibrationPos: 0,
+        calibrationSamples,
+        maxDelaySamples,
+        detectedDelayMs: DEFAULT_DELAY_MS
     };
+}
+
+// === Delay Detection via Cross-Correlation ===
+
+/**
+ * Compute cross-correlation to find delay between music and mic signals.
+ * Returns the delay in samples that maximizes correlation.
+ */
+function detectDelay(musicBuffer, micBuffer, maxDelaySamples, sampleRate) {
+    const minDelay = Math.floor((MIN_DELAY_MS / 1000) * sampleRate);
+    const maxDelay = Math.min(maxDelaySamples, Math.floor((MAX_DELAY_MS / 1000) * sampleRate));
+    const len = musicBuffer.length;
+
+    // Downsample for faster computation (every 4th sample)
+    const step = 4;
+    let bestCorrelation = -Infinity;
+    let bestDelay = Math.floor((DEFAULT_DELAY_MS / 1000) * sampleRate);
+
+    for (let delay = minDelay; delay <= maxDelay; delay += step) {
+        let correlation = 0;
+        let count = 0;
+
+        // Correlate music[i] with mic[i + delay]
+        for (let i = 0; i < len - delay; i += step) {
+            correlation += musicBuffer[i] * micBuffer[i + delay];
+            count++;
+        }
+
+        if (count > 0) {
+            correlation /= count;
+            if (correlation > bestCorrelation) {
+                bestCorrelation = correlation;
+                bestDelay = delay;
+            }
+        }
+    }
+
+    // Refine around best delay with finer resolution
+    const refineStart = Math.max(minDelay, bestDelay - step * 2);
+    const refineEnd = Math.min(maxDelay, bestDelay + step * 2);
+
+    for (let delay = refineStart; delay <= refineEnd; delay++) {
+        let correlation = 0;
+        let count = 0;
+
+        for (let i = 0; i < len - delay; i += step) {
+            correlation += musicBuffer[i] * micBuffer[i + delay];
+            count++;
+        }
+
+        if (count > 0) {
+            correlation /= count;
+            if (correlation > bestCorrelation) {
+                bestCorrelation = correlation;
+                bestDelay = delay;
+            }
+        }
+    }
+
+    return { delaySamples: bestDelay, correlation: bestCorrelation };
 }
 
 // === Processing Functions ===
@@ -268,13 +360,15 @@ export function setupEchoCancellation() {
         console.log('Setting up FFT-based echo cancellation...');
 
         originalAudioTrack = audioTrack;
-        fftState = initFFTState();
+        fftState = initFFTState(ctx.sampleRate);
+        console.log(`Echo cancel: initial delay = ${fftState.delayFrames} frames (${DEFAULT_DELAY_MS}ms at ${ctx.sampleRate}Hz), auto-calibrating...`);
 
         echoMusicAnalyser = ctx.createAnalyser();
         echoMusicAnalyser.fftSize = FFT_SIZE;
         echoMusicAnalyser.smoothingTimeConstant = 0.3;
 
         fftState.musicFreqData = new Float32Array(echoMusicAnalyser.frequencyBinCount);
+        fftState.musicTimeDomainData = new Float32Array(echoMusicAnalyser.fftSize);
 
         echoMicSource = ctx.createMediaStreamSource(localStream);
 
@@ -308,12 +402,18 @@ export function setupEchoCancellation() {
                     inputRms += inputData[j] * inputData[j];
                 }
                 inputRms = Math.sqrt(inputRms / bufferSize);
-                console.log(`Echo cancel debug: musicPlaying=${getMusicPlaying()}, inputRms=${inputRms.toFixed(6)}, totalSamples=${fftState?.totalSamplesIn || 0}`);
+                const calibStatus = fftState?.calibrating ? `calibrating (${fftState.calibrationPos}/${fftState.calibrationSamples})` : `delay=${fftState?.detectedDelayMs?.toFixed(0)}ms`;
+                console.log(`Echo cancel: ${calibStatus}, inputRms=${inputRms.toFixed(6)}`);
             }
 
             if (!getMusicPlaying()) {
                 for (let i = 0; i < bufferSize; i++) {
                     outputData[i] = inputData[i];
+                }
+                // Reset calibration if music stopped
+                if (fftState.calibrating) {
+                    fftState.calibrationPos = 0;
+                    fftState.calibrationStartTime = 0;
                 }
                 return;
             }
@@ -323,7 +423,52 @@ export function setupEchoCancellation() {
                 return;
             }
 
+            // Get current music data (frequency + time domain for calibration)
             echoMusicAnalyser.getFloatFrequencyData(fftState.musicFreqData);
+
+            // During calibration, collect time-domain samples for cross-correlation
+            if (fftState.calibrating) {
+                if (fftState.calibrationStartTime === 0) {
+                    fftState.calibrationStartTime = performance.now();
+                }
+
+                // Get music time-domain data
+                echoMusicAnalyser.getFloatTimeDomainData(fftState.musicTimeDomainData);
+
+                // Store samples for correlation
+                const samplesToStore = Math.min(bufferSize, fftState.calibrationSamples - fftState.calibrationPos);
+                for (let i = 0; i < samplesToStore; i++) {
+                    const pos = fftState.calibrationPos + i;
+                    // Use center of time-domain buffer for music
+                    const musicIdx = Math.floor(i * fftState.musicTimeDomainData.length / bufferSize);
+                    fftState.calibrationMusicBuffer[pos] = fftState.musicTimeDomainData[musicIdx];
+                    fftState.calibrationMicBuffer[pos] = inputData[i];
+                }
+                fftState.calibrationPos += samplesToStore;
+
+                // Check if calibration is complete
+                const elapsed = performance.now() - fftState.calibrationStartTime;
+                if (elapsed >= CALIBRATION_DURATION_MS && fftState.calibrationPos >= fftState.maxDelaySamples * 2) {
+                    // Run delay detection
+                    const result = detectDelay(
+                        fftState.calibrationMusicBuffer,
+                        fftState.calibrationMicBuffer,
+                        fftState.maxDelaySamples,
+                        fftState.sampleRate
+                    );
+
+                    const detectedMs = (result.delaySamples / fftState.sampleRate) * 1000;
+                    fftState.detectedDelayMs = detectedMs;
+                    fftState.delayFrames = Math.ceil((detectedMs / 1000) * fftState.framesPerSecond);
+                    fftState.calibrating = false;
+
+                    console.log(`Echo cancel: auto-detected delay = ${detectedMs.toFixed(0)}ms (${fftState.delayFrames} frames), correlation = ${result.correlation.toFixed(6)}`);
+
+                    // Clear calibration buffers to free memory
+                    fftState.calibrationMusicBuffer = null;
+                    fftState.calibrationMicBuffer = null;
+                }
+            }
 
             for (let i = 0; i < bufferSize; i++) {
                 fftState.inputRing[fftState.inputPos] = inputData[i];
@@ -332,6 +477,28 @@ export function setupEchoCancellation() {
 
                 if (fftState.totalSamplesIn >= FFT_SIZE &&
                     (fftState.totalSamplesIn - FFT_SIZE) % HOP_SIZE === 0) {
+                    // Store current music data in history buffer
+                    const historyBuf = fftState.musicHistoryBuffer[fftState.musicHistoryWritePos];
+                    for (let k = 0; k < fftState.musicFreqData.length; k++) {
+                        historyBuf[k] = fftState.musicFreqData[k];
+                    }
+
+                    // Read delayed music data for subtraction
+                    const bufferLen = fftState.musicHistoryBuffer.length;
+                    const delayedPos = (fftState.musicHistoryWritePos - fftState.delayFrames + bufferLen) % bufferLen;
+                    const delayedMusic = fftState.musicHistoryBuffer[delayedPos];
+
+                    // Copy delayed data to musicFreqData for processFFTFrame
+                    for (let k = 0; k < fftState.musicFreqData.length; k++) {
+                        fftState.musicFreqData[k] = delayedMusic[k];
+                    }
+
+                    // Advance write position
+                    fftState.musicHistoryWritePos = (fftState.musicHistoryWritePos + 1) % bufferLen;
+                    if (fftState.musicHistoryWritePos === 0) {
+                        fftState.musicHistoryFilled = true;
+                    }
+
                     processFFTFrame();
                 }
 
