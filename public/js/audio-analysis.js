@@ -80,6 +80,34 @@ export async function tryStartAudioAnalysis(audioLevelElement) {
         if (!audioContext) {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             console.log('Created AudioContext, state:', audioContext.state);
+
+            // Monitor for AudioContext suspension (e.g., when Bluetooth connects)
+            audioContext.onstatechange = () => {
+                console.log('AudioContext state changed to:', audioContext.state);
+                if (audioContext.state === 'suspended') {
+                    console.log('AudioContext suspended (device change?), attempting resume...');
+                    audioContext.resume().then(() => {
+                        console.log('AudioContext resumed after suspension, state:', audioContext.state);
+                    }).catch(err => {
+                        console.warn('Could not auto-resume AudioContext:', err);
+                    });
+                }
+            };
+
+            // Listen for device changes (Bluetooth connect/disconnect)
+            if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+                navigator.mediaDevices.addEventListener('devicechange', () => {
+                    console.log('Audio device change detected');
+                    if (audioContext && audioContext.state === 'suspended') {
+                        console.log('Resuming AudioContext after device change...');
+                        audioContext.resume().then(() => {
+                            console.log('AudioContext resumed after device change, state:', audioContext.state);
+                        }).catch(err => {
+                            console.warn('Could not resume AudioContext after device change:', err);
+                        });
+                    }
+                });
+            }
         }
 
         if (audioContext.state === 'suspended') {
