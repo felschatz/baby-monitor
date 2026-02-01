@@ -10,10 +10,17 @@ let peerConnection = null;
 let pendingCandidates = [];
 let pttAudioSender = null; // Pre-negotiated sender for PTT audio
 
+// Stale stream detection state
+let staleCheckInterval = null;
+let lastBytesReceived = 0;
+let staleSinceTime = null;
+const STALE_THRESHOLD_MS = 5000; // 5 seconds with no new bytes = stale
+
 // Callbacks
 let sendSignal = null;
 let onConnectionStateChange = null;
 let onTrack = null;
+let onStreamStale = null;
 
 /**
  * Initialize receiver WebRTC
@@ -23,6 +30,7 @@ export function initReceiverWebRTC(callbacks) {
     sendSignal = callbacks.sendSignal;
     onConnectionStateChange = callbacks.onConnectionStateChange;
     onTrack = callbacks.onTrack;
+    onStreamStale = callbacks.onStreamStale;
 }
 
 /**
@@ -84,6 +92,13 @@ export async function handleOffer(offer) {
 
     peerConnection.onconnectionstatechange = () => {
         console.log('Connection state:', peerConnection.connectionState);
+        if (peerConnection.connectionState === 'connected') {
+            startStaleStreamDetection();
+        } else if (peerConnection.connectionState === 'disconnected' ||
+                   peerConnection.connectionState === 'failed' ||
+                   peerConnection.connectionState === 'closed') {
+            stopStaleStreamDetection();
+        }
         if (onConnectionStateChange) {
             onConnectionStateChange(peerConnection.connectionState);
         }
@@ -150,9 +165,71 @@ export async function handleIceCandidate(candidate) {
 }
 
 /**
+ * Start monitoring for stale stream (no bytes received)
+ */
+function startStaleStreamDetection() {
+    stopStaleStreamDetection();
+    lastBytesReceived = 0;
+    staleSinceTime = null;
+
+    staleCheckInterval = setInterval(async () => {
+        if (!peerConnection || peerConnection.connectionState !== 'connected') {
+            return;
+        }
+
+        try {
+            const stats = await peerConnection.getStats();
+            let totalBytesReceived = 0;
+
+            stats.forEach(report => {
+                // Check inbound-rtp stats for received bytes
+                if (report.type === 'inbound-rtp' && report.bytesReceived) {
+                    totalBytesReceived += report.bytesReceived;
+                }
+            });
+
+            const now = Date.now();
+
+            if (totalBytesReceived > lastBytesReceived) {
+                // Data is flowing
+                if (staleSinceTime !== null) {
+                    console.log('Stream recovered - bytes flowing again');
+                    staleSinceTime = null;
+                    if (onStreamStale) onStreamStale(false);
+                }
+                lastBytesReceived = totalBytesReceived;
+            } else {
+                // No new bytes received
+                if (staleSinceTime === null) {
+                    staleSinceTime = now;
+                    console.log('Stream may be stale - no new bytes received');
+                } else if (now - staleSinceTime >= STALE_THRESHOLD_MS) {
+                    console.log('Stream is stale - no bytes for', STALE_THRESHOLD_MS, 'ms');
+                    if (onStreamStale) onStreamStale(true);
+                }
+            }
+        } catch (err) {
+            console.error('Error checking stream stats:', err);
+        }
+    }, 1000); // Check every second
+}
+
+/**
+ * Stop stale stream detection
+ */
+function stopStaleStreamDetection() {
+    if (staleCheckInterval) {
+        clearInterval(staleCheckInterval);
+        staleCheckInterval = null;
+    }
+    staleSinceTime = null;
+}
+
+/**
  * Close peer connection
  */
 export function closePeerConnection() {
+    stopStaleStreamDetection();
     if (peerConnection) {
         peerConnection.close();
         peerConnection = null;

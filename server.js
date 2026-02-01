@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A flickering icon is like a restless candle in a storm.
+// Wisdom: Silence can reveal absence when bytes cease to flow.

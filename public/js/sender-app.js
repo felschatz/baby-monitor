@@ -322,44 +322,52 @@ async function handleMessage(message) {
             break;
 
         case 'request-offer':
-            console.log('Receiver requesting offer, videoEnabled:', message.videoEnabled);
-            if (message.videoEnabled !== undefined) {
-                setReceiverWantsVideo(message.videoEnabled);
+            console.log('Receiver requesting offer, receiverId:', message.receiverId, 'videoEnabled:', message.videoEnabled);
+            if (message.videoEnabled !== undefined && message.receiverId) {
+                setReceiverWantsVideo(message.videoEnabled, message.receiverId);
                 updateStreamingStatus();
             }
-            if (getLocalStream()) {
+            if (getLocalStream() && message.receiverId) {
                 // If receiver wants video but video is unavailable, notify them
                 if (message.videoEnabled && !isVideoAvailable()) {
-                    signaling.sendSignal({ type: 'video-unavailable' });
+                    signaling.sendSignal({ type: 'video-unavailable', receiverId: message.receiverId });
                 }
-                await createOffer(pttAudio);
+                await createOffer(pttAudio, message.receiverId);
                 broadcastMusicStatus();
+            } else if (!message.receiverId) {
+                console.log('No receiverId in request-offer, ignoring');
             } else {
                 console.log('No local stream yet');
             }
             break;
 
         case 'video-request':
-            console.log('Receiver video request:', message.enabled);
-            setReceiverWantsVideo(message.enabled);
-            updateStreamingStatus();
-            if (getLocalStream()) {
-                // If receiver wants video but video is unavailable, notify them
-                if (message.enabled && !isVideoAvailable()) {
-                    signaling.sendSignal({ type: 'video-unavailable' });
+            console.log('Receiver video request:', message.enabled, 'receiverId:', message.receiverId);
+            if (message.receiverId) {
+                setReceiverWantsVideo(message.enabled, message.receiverId);
+                updateStreamingStatus();
+                if (getLocalStream()) {
+                    // If receiver wants video but video is unavailable, notify them
+                    if (message.enabled && !isVideoAvailable()) {
+                        signaling.sendSignal({ type: 'video-unavailable', receiverId: message.receiverId });
+                    }
+                    await createOffer(pttAudio, message.receiverId);
                 }
-                await createOffer(pttAudio);
             }
             break;
 
         case 'answer':
-            console.log('Received answer');
-            await handleAnswer(message.answer);
+            console.log('Received answer from receiverId:', message.receiverId);
+            if (message.receiverId) {
+                await handleAnswer(message.answer, message.receiverId);
+            } else {
+                console.log('No receiverId in answer, ignoring');
+            }
             break;
 
         case 'ice-candidate':
-            if (message.candidate) {
-                await handleIceCandidate(message.candidate);
+            if (message.candidate && message.receiverId) {
+                await handleIceCandidate(message.candidate, message.receiverId);
             }
             break;
 
@@ -368,9 +376,9 @@ async function handleMessage(message) {
             break;
 
         case 'ptt-start':
-            console.log('Received PTT start from parent');
-            setPttActive(true);
-            showPTTIndicator(pttStatus);
+            console.log('Received PTT start from receiver:', message.receiverId);
+            setPttActive(true, message.receiverId);
+            showPTTIndicator(pttStatus, message.receiverId);
             // Try to play PTT audio (it should have srcObject set from connection)
             if (pttAudio.srcObject) {
                 pttAudio.play().then(() => {
@@ -382,15 +390,17 @@ async function handleMessage(message) {
             break;
 
         case 'ptt-offer':
-            console.log('Received PTT offer from parent');
-            showPTTIndicator(pttStatus);
-            await handlePTTOffer(message.offer);
+            console.log('Received PTT offer from receiver:', message.receiverId);
+            showPTTIndicator(pttStatus, message.receiverId);
+            if (message.receiverId) {
+                await handlePTTOffer(message.offer, message.receiverId);
+            }
             break;
 
         case 'ptt-stop':
-            console.log('Received PTT stop from parent');
-            setPttActive(false);
-            hidePTTIndicator(pttStatus);
+            console.log('Received PTT stop from receiver:', message.receiverId);
+            setPttActive(false, message.receiverId);
+            hidePTTIndicator(pttStatus, message.receiverId);
             break;
 
         case 'music-start':
@@ -467,9 +477,9 @@ async function startStreamingHandler() {
 
         enableAudioPlayback();
 
-        console.log('Creating offer...');
-        await createOffer(pttAudio);
-        console.log('Offer created');
+        // Don't create offer here - wait for receivers to request one
+        // Each receiver will send request-offer with their receiverId
+        console.log('Stream ready, waiting for receiver requests');
     } catch (err) {
         console.error('Error starting stream:', err);
         alert('Failed to access camera/microphone: ' + err.message);

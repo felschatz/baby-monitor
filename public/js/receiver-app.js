@@ -484,6 +484,10 @@ initReceiverWebRTC({
             }, 2000);
         }
     },
+    onStreamStale: (isStale) => {
+        // Called when no bytes received for ~5 seconds (sender screen likely off)
+        setMediaMutedState(isStale);
+    },
     onTrack: (event) => {
         currentStream = event.streams[0];
         remoteVideo.srcObject = currentStream;

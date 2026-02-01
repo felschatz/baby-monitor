@@ -56,6 +56,27 @@ function sendToSender(sessionName, message) {
 }
 
 /**
+ * Send to a specific receiver in a session
+ * @param {string} sessionName
+ * @param {string} receiverId
+ * @param {object} message
+ */
+function sendToReceiver(sessionName, receiverId, message) {
+    const { getSession } = require('./session-manager');
+    const session = getSession(sessionName);
+    if (!session) return;
+    const res = session.receivers.get(receiverId);
+    if (res) {
+        console.log('Sending to receiver', receiverId, 'in session', sessionName, ':', message.type);
+        if (!sendSSE(res, message)) {
+            session.receivers.delete(receiverId);
+        }
+    } else {
+        console.log('Receiver', receiverId, 'not found in session', sessionName);
+    }
+}
+
+/**
  * Setup SSE headers
  * @param {http.ServerResponse} res
  */
@@ -173,6 +194,7 @@ function handleReceiverSSE(req, res, sessionName) {
 module.exports = {
     sendSSE,
     broadcastToReceivers,
+    sendToReceiver,
     sendToSender,
     setupSSE,
     handleSenderSSE,

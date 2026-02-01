@@ -5,7 +5,7 @@
 
 const { parseJsonBody, sendJson } = require('./utils');
 const { hasSender } = require('./session-manager');
-const { broadcastToReceivers, sendToSender } = require('./sse-manager');
+const { broadcastToReceivers, sendToReceiver, sendToSender } = require('./sse-manager');
 
 /**
  * Handle signal endpoint
@@ -34,41 +34,51 @@ async function handleSignal(req, res) {
     switch (message.type) {
         case 'request-offer':
             if (hasSender(sessionName)) {
-                sendToSender(sessionName, { type: 'request-offer', videoEnabled: message.videoEnabled });
+                sendToSender(sessionName, { type: 'request-offer', videoEnabled: message.videoEnabled, receiverId: message.receiverId });
             }
             break;
 
         case 'video-request':
             if (hasSender(sessionName)) {
-                sendToSender(sessionName, { type: 'video-request', enabled: message.enabled });
+                sendToSender(sessionName, { type: 'video-request', enabled: message.enabled, receiverId: message.receiverId });
             }
             break;
 
         case 'offer':
-            broadcastToReceivers(sessionName, { type: 'offer', offer: message.offer });
+            // If receiverId is specified, send only to that receiver; otherwise broadcast
+            if (message.receiverId) {
+                sendToReceiver(sessionName, message.receiverId, { type: 'offer', offer: message.offer });
+            } else {
+                broadcastToReceivers(sessionName, { type: 'offer', offer: message.offer });
+            }
             break;
 
         case 'answer':
-            sendToSender(sessionName, { type: 'answer', answer: message.answer });
+            sendToSender(sessionName, { type: 'answer', answer: message.answer, receiverId: message.receiverId });
             break;
 
         case 'ptt-offer':
             console.log('Forwarding PTT offer to sender in session', sessionName);
             if (hasSender(sessionName)) {
-                sendToSender(sessionName, { type: 'ptt-offer', offer: message.offer });
+                sendToSender(sessionName, { type: 'ptt-offer', offer: message.offer, receiverId: message.receiverId });
             }
             break;
 
         case 'ptt-start':
-            sendToSender(sessionName, { type: 'ptt-start' });
+            sendToSender(sessionName, { type: 'ptt-start', receiverId: message.receiverId });
             break;
 
         case 'ptt-answer':
-            broadcastToReceivers(sessionName, { type: 'ptt-answer', answer: message.answer });
+            // If receiverId is specified, send only to that receiver; otherwise broadcast
+            if (message.receiverId) {
+                sendToReceiver(sessionName, message.receiverId, { type: 'ptt-answer', answer: message.answer });
+            } else {
+                broadcastToReceivers(sessionName, { type: 'ptt-answer', answer: message.answer });
+            }
             break;
 
         case 'ptt-stop':
-            sendToSender(sessionName, { type: 'ptt-stop' });
+            sendToSender(sessionName, { type: 'ptt-stop', receiverId: message.receiverId });
             break;
 
         case 'music-start':
@@ -120,9 +130,14 @@ async function handleSignal(req, res) {
 
         case 'ice-candidate':
             if (message.role === 'sender') {
-                broadcastToReceivers(sessionName, { type: 'ice-candidate', candidate: message.candidate });
+                // If receiverId is specified, send only to that receiver; otherwise broadcast
+                if (message.receiverId) {
+                    sendToReceiver(sessionName, message.receiverId, { type: 'ice-candidate', candidate: message.candidate });
+                } else {
+                    broadcastToReceivers(sessionName, { type: 'ice-candidate', candidate: message.candidate });
+                }
             } else {
-                sendToSender(sessionName, { type: 'ice-candidate', candidate: message.candidate });
+                sendToSender(sessionName, { type: 'ice-candidate', candidate: message.candidate, receiverId: message.receiverId });
             }
             break;
 
