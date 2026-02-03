@@ -84,8 +84,14 @@ const musicPlaylistSelect = document.getElementById('musicPlaylistSelect');
 const musicTimerSelect = document.getElementById('musicTimerSelect');
 const musicResetBtn = document.getElementById('musicResetBtn');
 const musicVolumeSlider = document.getElementById('musicVolume');
-const musicVolumeValue = document.getElementById('musicVolumeValue');
 const musicLabel = document.getElementById('musicLabel');
+
+// Enhanced volume slider elements
+const volumeSliderContainer = document.getElementById('volumeSliderContainer');
+const volumeTrackFill = document.getElementById('volumeTrackFill');
+const volumeTooltip = document.getElementById('volumeTooltip');
+const volumeMinusBtn = document.getElementById('volumeMinus');
+const volumePlusBtn = document.getElementById('volumePlus');
 
 // Extract quality setting from URL
 const urlParams = new URLSearchParams(window.location.search);
@@ -227,8 +233,13 @@ initMusicPlayer(
         musicTimerSelect,
         musicResetBtn,
         musicVolumeSlider,
-        musicVolumeValue,
-        musicLabel
+        musicLabel,
+        // Enhanced volume slider elements
+        volumeSliderContainer,
+        volumeTrackFill,
+        volumeTooltip,
+        volumeMinusBtn,
+        volumePlusBtn
     },
     {
         onMusicStatusBroadcast: (status) => {

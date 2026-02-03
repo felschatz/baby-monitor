@@ -27,8 +27,14 @@ let musicPlaylistSelect = null;
 let musicTimerSelect = null;
 let musicResetBtn = null;
 let musicVolumeSlider = null;
-let musicVolumeValue = null;
 let musicLabel = null;
+
+// Enhanced volume slider elements
+let volumeSliderContainer = null;
+let volumeTrackFill = null;
+let volumeTooltip = null;
+let volumeMinusBtn = null;
+let volumePlusBtn = null;
 
 // Callbacks
 let onMusicStatusBroadcast = null;
@@ -75,8 +81,14 @@ export function initMusicPlayer(elements, callbacks) {
     musicTimerSelect = elements.musicTimerSelect;
     musicResetBtn = elements.musicResetBtn;
     musicVolumeSlider = elements.musicVolumeSlider;
-    musicVolumeValue = elements.musicVolumeValue;
     musicLabel = elements.musicLabel;
+
+    // Enhanced volume slider elements
+    volumeSliderContainer = elements.volumeSliderContainer;
+    volumeTrackFill = elements.volumeTrackFill;
+    volumeTooltip = elements.volumeTooltip;
+    volumeMinusBtn = elements.volumeMinusBtn;
+    volumePlusBtn = elements.volumePlusBtn;
 
     onMusicStatusBroadcast = callbacks.onMusicStatusBroadcast;
     onEchoCancelSetup = callbacks.onEchoCancelSetup;
@@ -86,19 +98,24 @@ export function initMusicPlayer(elements, callbacks) {
     const savedMusicVolume = localStorage.getItem('sender-music-volume');
     if (savedMusicVolume !== null) {
         musicVolumeSlider.value = savedMusicVolume;
-        musicVolumeValue.textContent = savedMusicVolume + '%';
         musicAudio.volume = sliderToVolume(parseInt(savedMusicVolume));
     } else {
         musicVolumeSlider.value = DEFAULT_VOLUME_SLIDER;
-        musicVolumeValue.textContent = DEFAULT_VOLUME_SLIDER + '%';
         musicAudio.volume = sliderToVolume(DEFAULT_VOLUME_SLIDER);
     }
+    // Defer initial UI update until after layout
+    requestAnimationFrame(() => {
+        updateVolumeUI(parseInt(musicVolumeSlider.value, 10));
+    });
+
+    // Enhanced volume slider interactions
+    initEnhancedVolumeSlider();
 
     // Music volume control (logarithmic for better low-volume control)
     musicVolumeSlider.addEventListener('input', () => {
-        const value = musicVolumeSlider.value;
+        const value = parseInt(musicVolumeSlider.value);
         musicAudio.volume = sliderToVolume(value);
-        musicVolumeValue.textContent = value + '%';
+        updateVolumeUI(value);
         localStorage.setItem('sender-music-volume', value);
     });
 
@@ -162,6 +179,141 @@ export function initMusicPlayer(elements, callbacks) {
 
     // Fetch playlist on load
     fetchMusicPlaylist();
+}
+
+/**
+ * Update volume UI elements (fill, tooltip)
+ */
+function updateVolumeUI(value) {
+    // Update track fill
+    if (volumeTrackFill) {
+        volumeTrackFill.style.width = value + '%';
+    }
+    // Update tooltip
+    if (volumeTooltip) {
+        volumeTooltip.textContent = value + '%';
+        // Position tooltip based on slider value
+        const sliderWidth = musicVolumeSlider.offsetWidth;
+        const thumbOffset = (value / 100) * sliderWidth;
+        volumeTooltip.style.left = thumbOffset + 'px';
+    }
+}
+
+/**
+ * Initialize enhanced volume slider with +/- buttons and drag zoom
+ */
+function initEnhancedVolumeSlider() {
+    if (!volumeSliderContainer || !musicVolumeSlider) return;
+
+    const STEP = 1; // Volume change per button press
+
+    // Helper to set volume
+    const setVolume = (newValue) => {
+        musicVolumeSlider.value = newValue;
+        musicAudio.volume = sliderToVolume(newValue);
+        updateVolumeUI(newValue);
+        localStorage.setItem('sender-music-volume', newValue);
+    };
+
+    // Plus button handler
+    if (volumePlusBtn) {
+        let holdTimeout = null;
+        let holdInterval = null;
+
+        const stopHold = () => {
+            if (holdTimeout) {
+                clearTimeout(holdTimeout);
+                holdTimeout = null;
+            }
+            if (holdInterval) {
+                clearInterval(holdInterval);
+                holdInterval = null;
+            }
+        };
+
+        const startHold = () => {
+            stopHold();
+            holdTimeout = setTimeout(() => {
+                holdInterval = setInterval(() => {
+                    const currentValue = parseInt(musicVolumeSlider.value, 10);
+                    const newValue = Math.min(100, currentValue + STEP);
+                    setVolume(newValue);
+                }, 80);
+            }, 400);
+        };
+
+        volumePlusBtn.addEventListener('click', () => {
+            const currentValue = parseInt(musicVolumeSlider.value, 10);
+            const newValue = Math.min(100, currentValue + STEP);
+            setVolume(newValue);
+        });
+
+        volumePlusBtn.addEventListener('mousedown', startHold);
+        volumePlusBtn.addEventListener('touchstart', startHold);
+        volumePlusBtn.addEventListener('mouseup', stopHold);
+        volumePlusBtn.addEventListener('mouseleave', stopHold);
+        volumePlusBtn.addEventListener('touchend', stopHold);
+        volumePlusBtn.addEventListener('touchcancel', stopHold);
+    }
+
+    // Minus button handler
+    if (volumeMinusBtn) {
+        let holdTimeout = null;
+        let holdInterval = null;
+
+        const stopHold = () => {
+            if (holdTimeout) {
+                clearTimeout(holdTimeout);
+                holdTimeout = null;
+            }
+            if (holdInterval) {
+                clearInterval(holdInterval);
+                holdInterval = null;
+            }
+        };
+
+        const startHold = () => {
+            stopHold();
+            holdTimeout = setTimeout(() => {
+                holdInterval = setInterval(() => {
+                    const currentValue = parseInt(musicVolumeSlider.value, 10);
+                    const newValue = Math.max(0, currentValue - STEP);
+                    setVolume(newValue);
+                }, 80);
+            }, 400);
+        };
+
+        volumeMinusBtn.addEventListener('click', () => {
+            const currentValue = parseInt(musicVolumeSlider.value, 10);
+            const newValue = Math.max(0, currentValue - STEP);
+            setVolume(newValue);
+        });
+
+        volumeMinusBtn.addEventListener('mousedown', startHold);
+        volumeMinusBtn.addEventListener('touchstart', startHold);
+        volumeMinusBtn.addEventListener('mouseup', stopHold);
+        volumeMinusBtn.addEventListener('mouseleave', stopHold);
+        volumeMinusBtn.addEventListener('touchend', stopHold);
+        volumeMinusBtn.addEventListener('touchcancel', stopHold);
+    }
+
+    // Add dragging class for enlarged thumb and tooltip
+    const handleDragStart = () => {
+        volumeSliderContainer.classList.add('dragging');
+    };
+
+    const handleDragEnd = () => {
+        volumeSliderContainer.classList.remove('dragging');
+    };
+
+    // Mouse events
+    musicVolumeSlider.addEventListener('mousedown', handleDragStart);
+    document.addEventListener('mouseup', handleDragEnd);
+
+    // Touch events
+    musicVolumeSlider.addEventListener('touchstart', handleDragStart);
+    document.addEventListener('touchend', handleDragEnd);
+    document.addEventListener('touchcancel', handleDragEnd);
 }
 
 /**

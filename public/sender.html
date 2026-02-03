@@ -73,12 +73,15 @@
             <button class="music-reset-btn" id="musicResetBtn" style="display: none;">Reset</button>
         </div>
         <div class="music-volume-row">
-            <span>🔊</span>
-            <div class="volume-slider-container">
+            <button class="volume-btn volume-minus" id="volumeMinus" aria-label="Decrease volume">−</button>
+            <div class="volume-slider-container" id="volumeSliderContainer">
                 <input type="range" id="musicVolume" min="0" max="100" value="50">
+                <div class="volume-track-fill" id="volumeTrackFill"></div>
                 <div class="volume-midpoint-marker"></div>
+                <div class="volume-thumb-enlarged" id="volumeThumbEnlarged"></div>
+                <div class="volume-tooltip" id="volumeTooltip">50%</div>
             </div>
-            <span id="musicVolumeValue">50%</span>
+            <button class="volume-btn volume-plus" id="volumePlus" aria-label="Increase volume">+</button>
         </div>
         <div class="music-label" id="musicLabel">Play lullabies</div>
     </div>
