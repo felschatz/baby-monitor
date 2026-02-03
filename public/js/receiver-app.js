@@ -629,6 +629,17 @@ async function handleMessage(message) {
             info.textContent = 'Sender video unavailable';
             break;
 
+        case 'sender-ready':
+            // Sender's stream is now ready - request an offer
+            // This handles the case where our earlier request-offer arrived before sender was ready
+            console.log('Sender ready, requesting stream');
+            overlayText.textContent = 'Sender ready. Requesting stream...';
+            signaling.sendSignal({ type: 'request-offer', videoEnabled: !getAudioOnlyMode() });
+            if (echoCancelEnabled) {
+                signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
+            }
+            break;
+
         case 'heartbeat':
             break;
     }
