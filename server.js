@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Media sessions bridge the gap between app and operating system.
+// Wisdom: Percentages adapt to any container, pixels require measurement.
