@@ -789,12 +789,10 @@ document.addEventListener('click', (e) => {
         drawerToggle.classList.remove('active');
         document.body.classList.remove('drawer-open');
     }
-}, { passive: true, signal });
+}, { passive: true });
 
 // Page unload cleanup
 window.addEventListener('beforeunload', () => {
-    // Abort all event listeners using the global controller
-    globalAbortController.abort();
     // Clear any pending timeouts
     if (loudSoundTimeout) {
         clearTimeout(loudSoundTimeout);
