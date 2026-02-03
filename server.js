@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Sometimes a clean slate is better than a patched one.
+// Wisdom: Always clean up after yourself, especially with stateful connections.

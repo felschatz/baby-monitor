@@ -38,7 +38,8 @@ import {
     initPTT,
     startPTT,
     stopPTT,
-    setupPTTButton
+    setupPTTButton,
+    cleanupPTT
 } from './ptt.js';
 import {
     initReceiverWebRTC,
@@ -809,6 +810,7 @@ window.addEventListener('beforeunload', () => {
     if (longPressTimer) {
         clearTimeout(longPressTimer);
     }
+    cleanupPTT();
     destroyKeepAwake();
     destroyAudioAnalysis();
     destroyVideoPlayback();

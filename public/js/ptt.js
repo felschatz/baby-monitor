@@ -28,6 +28,9 @@ export function initPTT(deps) {
     getPTTAudioSender = deps.getPTTAudioSender;
 }
 
+// Track if we sent ptt-start (to ensure we always send ptt-stop)
+let pttStartSent = false;
+
 /**
  * Start push-to-talk
  * @param {HTMLElement} pttBtn
@@ -39,35 +42,32 @@ export async function startPTT(pttBtn, pttLabel) {
         return;
     }
     if (!getIsConnected()) {
-        console.log('PTT: Not connected');
+        console.log('PTT: Not connected, isConnected:', getIsConnected());
         return;
     }
-
-    // Add visual feedback immediately
-    pttBtn.classList.add('active');
-    pttLabel.textContent = 'Speaking...';
 
     const pttSender = getPTTAudioSender?.();
     if (!pttSender) {
         console.log('PTT: No audio sender available (connection not ready)');
-        pttBtn.classList.remove('active');
-        pttLabel.textContent = 'Hold to talk to baby';
         return;
     }
 
+    // All checks passed - activate PTT
     pttActive = true;
+    pttBtn.classList.add('active');
+    pttLabel.textContent = 'Speaking...';
+
+    // Audio ducking - lower baby audio to prevent echo
+    preDuckVolume = remoteVideo.volume;
+    remoteVideo.volume = Math.min(remoteVideo.volume, DUCKING_VOLUME);
+    console.log('PTT: Ducked audio from', preDuckVolume, 'to', remoteVideo.volume);
+
+    // Notify sender that PTT is starting
+    sendSignal({ type: 'ptt-start' });
+    pttStartSent = true;
+    console.log('PTT: Sent start notification');
 
     try {
-
-        // Audio ducking - lower baby audio to prevent echo
-        preDuckVolume = remoteVideo.volume;
-        remoteVideo.volume = Math.min(remoteVideo.volume, DUCKING_VOLUME);
-        console.log('PTT: Ducked audio from', preDuckVolume, 'to', remoteVideo.volume);
-
-        // Notify sender that PTT is starting
-        sendSignal({ type: 'ptt-start' });
-        console.log('PTT: Sent start notification');
-
         // Get microphone access
         console.log('PTT: Requesting microphone...');
         pttStream = await navigator.mediaDevices.getUserMedia({
@@ -97,12 +97,24 @@ export async function startPTT(pttBtn, pttLabel) {
  * @param {HTMLElement} pttLabel
  */
 export async function stopPTT(pttBtn, pttLabel) {
-    if (!pttActive) return;
+    // Always reset visual state
+    pttBtn.classList.remove('active');
+    pttLabel.textContent = 'Hold to talk to baby';
+
+    // Always send ptt-stop if we sent ptt-start (even if pttActive is false due to race)
+    if (pttStartSent) {
+        sendSignal({ type: 'ptt-stop' });
+        console.log('PTT: Sent stop notification');
+        pttStartSent = false;
+    }
+
+    if (!pttActive) {
+        console.log('PTT: stopPTT called but not active');
+        return;
+    }
     pttActive = false;
 
     console.log('PTT: Stopping...');
-    pttBtn.classList.remove('active');
-    pttLabel.textContent = 'Hold to talk to baby';
 
     // Restore audio volume (un-duck)
     if (preDuckVolume !== null) {
@@ -110,10 +122,6 @@ export async function stopPTT(pttBtn, pttLabel) {
         console.log('PTT: Restored audio to', preDuckVolume);
         preDuckVolume = null;
     }
-
-    // Notify sender that PTT has stopped
-    sendSignal({ type: 'ptt-stop' });
-    console.log('PTT: Sent stop notification');
 
     // Clear the track from the sender (no renegotiation needed)
     const pttSender = getPTTAudioSender?.();
@@ -177,6 +185,25 @@ export function setupPTTButton(pttBtn, pttLabel) {
     });
 
     pttBtn.addEventListener('touchcancel', () => stopPTT(pttBtn, pttLabel));
+}
+
+/**
+ * Cleanup PTT state (call on disconnect/unload)
+ */
+export function cleanupPTT() {
+    // Send ptt-stop if we had started
+    if (pttStartSent && sendSignal) {
+        sendSignal({ type: 'ptt-stop' });
+        console.log('PTT: Cleanup - sent stop notification');
+        pttStartSent = false;
+    }
+    pttActive = false;
+
+    // Stop microphone if active
+    if (pttStream) {
+        pttStream.getTracks().forEach(track => track.stop());
+        pttStream = null;
+    }
 }
 
 // Getters
