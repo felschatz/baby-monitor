@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Patience in rendering ensures all elements find their place.
+// Wisdom: Media sessions bridge the gap between app and operating system.

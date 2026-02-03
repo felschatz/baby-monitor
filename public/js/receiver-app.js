@@ -50,6 +50,13 @@ import {
     requestOffer,
     getPTTAudioSender
 } from './receiver-webrtc.js';
+import {
+    isMediaSessionSupported,
+    initMediaSession,
+    setMediaSessionEnabled,
+    updateMediaSessionState,
+    destroyMediaSession
+} from './media-session.js';
 
 // DOM elements
 const sessionOverlay = document.getElementById('sessionOverlay');
@@ -82,6 +89,8 @@ const thresholdMarker = document.getElementById('thresholdMarker');
 const audioOnlyToggle = document.getElementById('audioOnlyToggle');
 const echoCancelToggle = document.getElementById('echoCancelToggle');
 const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
+const mediaSessionToggle = document.getElementById('mediaSessionToggle');
+const mediaSessionToggleLabel = document.getElementById('mediaSessionToggleLabel');
 
 // Music elements
 const musicContainer = document.getElementById('musicContainer');
@@ -130,6 +139,7 @@ let playlistsUnlocked = localStorage.getItem('receiver-playlists-unlocked') === 
 let loudSoundTimeout = null;
 let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
+let mediaSessionEnabled = localStorage.getItem('receiver-media-session') === 'true';
 
 // Initialize keep-awake
 initKeepAwake();
@@ -158,6 +168,18 @@ if (savedNoiseGate !== null) {
 audioOnlyToggle.checked = getAudioOnlyMode();
 echoCancelToggle.checked = echoCancelEnabled;
 
+// Initialize media session
+if (isMediaSessionSupported()) {
+    initMediaSession({ videoElement: remoteVideo, sessionName });
+    mediaSessionToggle.checked = mediaSessionEnabled;
+    if (mediaSessionEnabled) {
+        setMediaSessionEnabled(true);
+    }
+} else {
+    // Hide toggle if not supported
+    mediaSessionToggleLabel.style.display = 'none';
+}
+
 // Helper functions
 function setConnectedState(connected) {
     isConnected = connected;
@@ -170,6 +192,7 @@ function setConnectedState(connected) {
         pttBtn.disabled = false;
         sessionStorage.setItem('receiver-streaming', 'true');
         updateAudioOnlyIndicator();
+        updateMediaSessionState(true);
     } else {
         document.body.classList.remove('connected');
         statusDot.classList.remove('connected');
@@ -178,6 +201,7 @@ function setConnectedState(connected) {
         pttBtn.disabled = true;
         stopPTT(pttBtn, pttLabel);
         audioOnlyIndicator.classList.remove('active');
+        updateMediaSessionState(false);
     }
 }
 
@@ -198,6 +222,7 @@ function setDisconnectedState() {
     audioOnlyIndicator.classList.remove('active');
     noiseGateInfoItem.classList.remove('gating');
     resetMusicUI();
+    updateMediaSessionState(false);
 }
 
 function setMediaMutedState(muted) {
@@ -613,6 +638,16 @@ echoCancelToggle.addEventListener('change', () => {
     signaling.sendSignal({ type: 'echo-cancel-enable', enabled: echoCancelEnabled });
 });
 
+mediaSessionToggle.addEventListener('change', () => {
+    mediaSessionEnabled = mediaSessionToggle.checked;
+    localStorage.setItem('receiver-media-session', mediaSessionEnabled);
+    console.log('Media session mode:', mediaSessionEnabled);
+    setMediaSessionEnabled(mediaSessionEnabled);
+    if (mediaSessionEnabled) {
+        updateMediaSessionState(isConnected);
+    }
+}, { signal });
+
 // Shared volume update function
 function updateVolume(value) {
     const numValue = parseInt(value);
@@ -754,7 +789,26 @@ document.addEventListener('click', (e) => {
         drawerToggle.classList.remove('active');
         document.body.classList.remove('drawer-open');
     }
-}, { passive: true });
+}, { passive: true, signal });
+
+// Page unload cleanup
+window.addEventListener('beforeunload', () => {
+    // Abort all event listeners using the global controller
+    globalAbortController.abort();
+    // Clear any pending timeouts
+    if (loudSoundTimeout) {
+        clearTimeout(loudSoundTimeout);
+    }
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+    }
+    destroyKeepAwake();
+    destroyAudioAnalysis();
+    destroyVideoPlayback();
+    destroyMediaSession();
+    closePeerConnection();
+    signaling.disconnect();
+});
 
 // Initialize
 updateThresholdMarker();
