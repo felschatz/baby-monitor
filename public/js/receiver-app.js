@@ -646,7 +646,7 @@ mediaSessionToggle.addEventListener('change', () => {
     if (mediaSessionEnabled) {
         updateMediaSessionState(isConnected);
     }
-}, { signal });
+});
 
 // Shared volume update function
 function updateVolume(value) {
