@@ -22,7 +22,14 @@ function sendFile(res, filePath) {
             res.end('Not Found');
             return;
         }
-        res.writeHead(200, { 'Content-Type': contentType });
+
+        // Set cache headers - no caching for JS/CSS during development
+        const headers = { 'Content-Type': contentType };
+        if (ext === '.js' || ext === '.css') {
+            headers['Cache-Control'] = 'no-cache, must-revalidate';
+        }
+
+        res.writeHead(200, headers);
         res.end(data);
     });
 }

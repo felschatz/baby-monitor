@@ -142,8 +142,21 @@ export async function stopPTT(pttBtn, pttLabel) {
  * @param {HTMLElement} pttLabel
  */
 export function setupPTTButton(pttBtn, pttLabel) {
+    console.log('PTT: Button setup complete');
+
+    // Check microphone permission on setup
+    if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'microphone' }).then(result => {
+            console.log('PTT: Microphone permission state:', result.state);
+            result.onchange = () => {
+                console.log('PTT: Microphone permission changed to:', result.state);
+            };
+        }).catch(e => console.log('PTT: Could not query mic permission:', e));
+    }
+
     // Mouse events
     pttBtn.addEventListener('mousedown', (e) => {
+        console.log('PTT: mousedown event');
         e.preventDefault();
         startPTT(pttBtn, pttLabel);
     });
@@ -153,6 +166,7 @@ export function setupPTTButton(pttBtn, pttLabel) {
 
     // Touch events
     pttBtn.addEventListener('touchstart', (e) => {
+        console.log('PTT: touchstart event');
         e.preventDefault();
         startPTT(pttBtn, pttLabel);
     });

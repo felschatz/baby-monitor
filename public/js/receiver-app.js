@@ -562,6 +562,15 @@ async function handleMessage(message) {
             break;
 
         case 'sender-available':
+            // If we were previously connected (sender refreshed), reload for clean reconnection
+            // This is more reliable than trying to manually reset all state
+            if (sessionStorage.getItem('receiver-streaming') === 'true') {
+                console.log('Sender reconnected - reloading for clean state');
+                sessionStorage.removeItem('receiver-streaming');
+                window.location.reload();
+                return;
+            }
+            // First connection - request stream normally
             overlayText.textContent = 'Sender started. Requesting stream...';
             signaling.sendSignal({ type: 'request-offer', videoEnabled: !getAudioOnlyMode() });
             if (echoCancelEnabled) {
