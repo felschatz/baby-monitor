@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: New pathways open when the signal finds its way through changing channels.
+// Wisdom: Patience in rendering ensures all elements find their place.

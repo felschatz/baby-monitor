@@ -518,62 +518,201 @@ body.disconnected {
     background: rgba(255,255,255,0.3);
 }
 
+/* Enhanced volume slider */
 .music-volume-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
     justify-content: center;
-    margin-top: 10px;
+    margin-top: 12px;
+    padding: 8px 0;
 }
 
+/* Plus/Minus buttons */
+.volume-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    background: linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 300;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+.volume-btn:active {
+    transform: scale(0.92);
+    background: linear-gradient(145deg, rgba(76, 175, 80, 0.4), rgba(76, 175, 80, 0.2));
+    border-color: rgba(76, 175, 80, 0.6);
+}
+
+.volume-btn:focus {
+    outline: none;
+    border-color: rgba(76, 175, 80, 0.6);
+}
+
+/* Main slider container */
 .volume-slider-container {
     position: relative;
     flex: 1;
-    max-width: 160px;
+    max-width: 180px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    touch-action: none;
 }
 
+/* Native range input - hidden but functional */
 .music-volume-row input[type="range"] {
     width: 100%;
-    height: 6px;
+    height: 100%;
     -webkit-appearance: none;
-    background: rgba(255,255,255,0.2);
-    border-radius: 3px;
+    background: transparent;
     outline: none;
+    cursor: pointer;
+    position: relative;
+    z-index: 10;
+    margin: 0;
 }
 
+/* Track background */
+.music-volume-row input[type="range"]::-webkit-slider-runnable-track {
+    height: 12px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.music-volume-row input[type="range"]::-moz-range-track {
+    height: 12px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Volume fill indicator */
+.volume-track-fill {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 12px;
+    background: linear-gradient(90deg, #43a047, #66bb6a);
+    border-radius: 6px 0 0 6px;
+    pointer-events: none;
+    z-index: 1;
+    width: 50%;
+    transition: width 0.05s ease-out;
+}
+
+/* Midpoint marker */
 .volume-midpoint-marker {
     position: absolute;
     left: 50%;
-    top: -4px;
-    width: 2px;
-    height: 14px;
-    background: rgba(255, 255, 255, 0.5);
-    border-radius: 1px;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 2px;
     pointer-events: none;
-    transform: translateX(-50%);
+    z-index: 2;
 }
 
+/* Default thumb styling */
 .music-volume-row input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    background: #43a047;
+    background: linear-gradient(145deg, #66bb6a, #43a047);
     cursor: pointer;
+    margin-top: -8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(255, 255, 255, 0.15);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    position: relative;
+    z-index: 20;
 }
 
 .music-volume-row input[type="range"]::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    background: #6ce171;
+    background: linear-gradient(145deg, #66bb6a, #43a047);
     cursor: pointer;
     border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(255, 255, 255, 0.15);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.music-volume-row span {
-    font-size: 0.8rem;
-    min-width: 36px;
+/* Active/dragging state - enlarged thumb */
+.volume-slider-container.dragging input[type="range"]::-webkit-slider-thumb {
+    transform: scale(1.4);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 4px rgba(76, 175, 80, 0.3);
+}
+
+.volume-slider-container.dragging input[type="range"]::-moz-range-thumb {
+    transform: scale(1.4);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 4px rgba(76, 175, 80, 0.3);
+}
+
+/* Enlarged touch target (invisible) */
+.volume-thumb-enlarged {
+    display: none;
+}
+
+/* Volume percentage tooltip - always visible */
+.volume-tooltip {
+    position: absolute;
+    top: -32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    pointer-events: none;
+    opacity: 1;
+    transition: transform 0.15s ease, background 0.15s ease;
+    white-space: nowrap;
+    z-index: 100;
+}
+
+.volume-tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid rgba(0, 0, 0, 0.75);
+    transition: border-top-color 0.15s ease;
+}
+
+/* Highlight tooltip when dragging */
+.volume-slider-container.dragging .volume-tooltip {
+    background: rgba(67, 160, 71, 0.9);
+    transform: translateX(-50%) scale(1.1);
+}
+
+.volume-slider-container.dragging .volume-tooltip::after {
+    border-top-color: rgba(67, 160, 71, 0.9);
+}
+
+/* Container scales up slightly when active */
+.volume-slider-container.dragging {
+    transform: scaleY(1.1);
 }
 
 .music-label {
