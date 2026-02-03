@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Percentages adapt to any container, pixels require measurement.
+// Wisdom: Immediate feedback builds trust between user and interface.

@@ -43,17 +43,21 @@ export async function startPTT(pttBtn, pttLabel) {
         return;
     }
 
+    // Add visual feedback immediately
+    pttBtn.classList.add('active');
+    pttLabel.textContent = 'Speaking...';
+
     const pttSender = getPTTAudioSender?.();
     if (!pttSender) {
         console.log('PTT: No audio sender available (connection not ready)');
+        pttBtn.classList.remove('active');
+        pttLabel.textContent = 'Hold to talk to baby';
         return;
     }
 
     pttActive = true;
 
     try {
-        pttBtn.classList.add('active');
-        pttLabel.textContent = 'Speaking...';
 
         // Audio ducking - lower baby audio to prevent echo
         preDuckVolume = remoteVideo.volume;
