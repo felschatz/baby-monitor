@@ -41,7 +41,10 @@ import {
     startPTT,
     stopPTT,
     setupPTTButton,
-    cleanupPTT
+    cleanupPTT,
+    setBluetoothMode,
+    getBluetoothMode,
+    isBluetoothAudioDetected
 } from './ptt.js';
 import {
     initReceiverWebRTC,
@@ -94,6 +97,7 @@ const fullscreenBtn = document.getElementById('fullscreenBtn');
 const info = document.getElementById('info');
 const thresholdMarker = document.getElementById('thresholdMarker');
 const audioOnlyToggle = document.getElementById('audioOnlyToggle');
+const bluetoothModeToggle = document.getElementById('bluetoothModeToggle');
 const echoCancelToggle = document.getElementById('echoCancelToggle');
 const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
 const mediaSessionToggle = document.getElementById('mediaSessionToggle');
@@ -147,6 +151,7 @@ let loudSoundTimeout = null;
 let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
 let mediaSessionEnabled = localStorage.getItem('receiver-media-session') === 'true';
+let bluetoothModeEnabled = localStorage.getItem('receiver-bluetooth-mode') === 'true';
 
 // Initialize keep-awake
 initKeepAwake();
@@ -174,6 +179,26 @@ if (savedNoiseGate !== null) {
 // Initialize audio-only toggle
 audioOnlyToggle.checked = getAudioOnlyMode();
 echoCancelToggle.checked = echoCancelEnabled;
+
+// Initialize Bluetooth mode toggle - enables PTT without mic to avoid A2DP→HFP switch
+bluetoothModeToggle.checked = bluetoothModeEnabled;
+setBluetoothMode(bluetoothModeEnabled);
+// Update PTT label based on initial Bluetooth mode state
+if (bluetoothModeEnabled) {
+    pttLabel.textContent = 'Hold to alert sender';
+}
+
+// Show Bluetooth warning after a delay (to allow device detection)
+setTimeout(() => {
+    if (isBluetoothAudioDetected() && !bluetoothModeEnabled) {
+        console.log('Bluetooth audio output detected - PTT may disrupt audio');
+        // Highlight the Bluetooth mode toggle to suggest enabling it
+        const bluetoothLabel = document.getElementById('bluetoothModeLabel');
+        if (bluetoothLabel) {
+            bluetoothLabel.classList.add('suggested');
+        }
+    }
+}, 1500);
 
 // Set video element reference for noise gate (uses video.muted for Bluetooth compatibility)
 setVideoElement(remoteVideo);
@@ -649,6 +674,15 @@ audioOnlyToggle.addEventListener('change', () => {
     setAudioOnlyMode(audioOnlyToggle.checked);
     console.log('Audio-only mode:', getAudioOnlyMode());
     signaling.sendSignal({ type: 'video-request', enabled: !getAudioOnlyMode() });
+});
+
+bluetoothModeToggle.addEventListener('change', () => {
+    bluetoothModeEnabled = bluetoothModeToggle.checked;
+    localStorage.setItem('receiver-bluetooth-mode', bluetoothModeEnabled);
+    setBluetoothMode(bluetoothModeEnabled);
+    // Update PTT label to reflect mode change
+    pttLabel.textContent = bluetoothModeEnabled ? 'Hold to alert sender' : 'Hold to talk to baby';
+    console.log('Bluetooth mode:', bluetoothModeEnabled);
 });
 
 echoCancelToggle.addEventListener('change', () => {

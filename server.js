@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: True compatibility means letting the native path do its work — don't route when you don't need to.
+// Wisdom: The built-in mic speaks without disturbing Bluetooth's musical flow.

@@ -387,14 +387,17 @@ async function handleMessage(message) {
             break;
 
         case 'ptt-start':
-            console.log('Received PTT start from receiver:', message.receiverId);
+            console.log('Received PTT start from receiver:', message.receiverId, 'bluetoothMode:', message.bluetoothMode);
             setPttActive(true, message.receiverId);
-            showPTTIndicator(pttStatus, message.receiverId);
+            showPTTIndicator(pttStatus, message.receiverId, message.bluetoothMode);
             // Try to play PTT audio (it should have srcObject set from connection)
-            if (pttAudio.srcObject) {
+            // In Bluetooth mode, no audio will be received (mic not acquired)
+            if (pttAudio.srcObject && !message.bluetoothMode) {
                 pttAudio.play().then(() => {
                     console.log('PTT audio started on ptt-start signal');
                 }).catch(e => console.log('PTT play on start:', e.message));
+            } else if (message.bluetoothMode) {
+                console.log('PTT in Bluetooth mode - no audio expected (visual alert only)');
             } else {
                 console.log('PTT audio srcObject not yet set');
             }

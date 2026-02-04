@@ -427,14 +427,29 @@ export async function replaceAudioTrack(newTrack) {
 }
 
 // PTT indicator helpers
-export function showPTTIndicator(indicatorElement, receiverId) {
+// Track Bluetooth mode state per receiver for UI display
+const pttBluetoothModeReceivers = new Set();
+
+export function showPTTIndicator(indicatorElement, receiverId, bluetoothMode = false) {
     if (receiverId) {
         pttActiveReceivers.add(receiverId);
+        if (bluetoothMode) {
+            pttBluetoothModeReceivers.add(receiverId);
+        }
     }
     if (pttTimeout) {
         clearTimeout(pttTimeout);
     }
     indicatorElement.classList.add('active');
+
+    // Show different text for Bluetooth mode (visual alert only, no audio)
+    if (bluetoothMode || pttBluetoothModeReceivers.size > 0) {
+        indicatorElement.classList.add('bluetooth-mode');
+        indicatorElement.textContent = '📱 Parent wants attention';
+    } else {
+        indicatorElement.classList.remove('bluetooth-mode');
+        indicatorElement.textContent = '👂 Parent is speaking...';
+    }
 
     pttTimeout = setTimeout(() => {
         console.log('PTT timeout - hiding indicator');
@@ -445,6 +460,7 @@ export function showPTTIndicator(indicatorElement, receiverId) {
 export function hidePTTIndicator(indicatorElement, receiverId) {
     if (receiverId) {
         pttActiveReceivers.delete(receiverId);
+        pttBluetoothModeReceivers.delete(receiverId);
     }
     // Only hide if no receivers have active PTT
     if (pttActiveReceivers.size === 0) {
@@ -453,6 +469,8 @@ export function hidePTTIndicator(indicatorElement, receiverId) {
             pttTimeout = null;
         }
         indicatorElement.classList.remove('active');
+        indicatorElement.classList.remove('bluetooth-mode');
+        indicatorElement.textContent = '👂 Parent is speaking...';
     }
 }
 

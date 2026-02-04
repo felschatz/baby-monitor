@@ -295,12 +295,27 @@ body.disconnected {
     animation: pttGlow 1.5s ease-in-out infinite;
 }
 
+/* PTT Bluetooth mode - orange/amber indicator (visual alert only) */
+.ptt-status.bluetooth-mode {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+    animation: pttBluetoothGlow 1s ease-in-out infinite;
+}
+
 @keyframes pttGlow {
     0%, 100% {
         box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.1);
     }
     50% {
         box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.25);
+    }
+}
+
+@keyframes pttBluetoothGlow {
+    0%, 100% {
+        box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.1);
+    }
+    50% {
+        box-shadow: inset 0 0 35px rgba(255, 255, 255, 0.3);
     }
 }
 
