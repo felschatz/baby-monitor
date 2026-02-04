@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Disable is gentler than stop for audio track transitions.
+// Wisdom: Keep resources warm when you know they will be needed again.
