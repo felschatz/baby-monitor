@@ -797,7 +797,8 @@ body.loud-alert-active .info-strip {
 }
 
 .music-playlist-select,
-.music-timer-select {
+.music-timer-select,
+.timer-select {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid var(--border-subtle);
     color: var(--text-primary);
@@ -808,7 +809,8 @@ body.loud-alert-active .info-strip {
 }
 
 .music-playlist-select:focus,
-.music-timer-select:focus {
+.music-timer-select:focus,
+.timer-select:focus {
     outline: none;
     border-color: var(--accent-purple);
 }
@@ -819,15 +821,22 @@ body.loud-alert-active .info-strip {
 }
 
 .music-playlist-select:disabled,
-.music-timer-select:disabled {
+.music-timer-select:disabled,
+.timer-select:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
 .music-playlist-select option,
-.music-timer-select option {
+.music-timer-select option,
+.timer-select option {
     background: #f0f0f0;
     color: #1a1a2e;
+}
+
+.timer-status {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
 }
 
 .music-reset-btn {

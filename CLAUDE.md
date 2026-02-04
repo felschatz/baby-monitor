@@ -81,7 +81,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Audio ducking reduces baby audio to 15% during PTT
 - STUN servers: stunprotocol.org, nextcloud.com, sipgate.net
 - FFT-based spectral subtraction for music echo reduction
-- Auto-shutdown: Sender stops after configurable timeout (default 6 hours) to save battery
+- Auto-shutdown: Sender stops after timeout set by receiver (default 6 hours)
 
 ## Visual States
 
@@ -97,7 +97,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 ## Implementation Details
 
 - Wake Lock API keeps screens on (with auto-shutdown timer)
-- Auto-shutdown stops streaming after 6 hours (configurable via `?shutdown=N` URL param, 0 to disable)
+- Auto-shutdown configured by receiver (default 6 hours, uses seconds instead of hours when ENABLE_DEBUG_TIMER=true)
 - AudioContext analyzes volume for loud sound detection
 - Sensitivity slider controls threshold (saved to localStorage)
 - Volume control persisted to localStorage
@@ -142,6 +142,7 @@ Signaling messages sent via `/api/signal`:
 | `music-status` | Sender → Receivers | Music playback status |
 | `echo-cancel-enable` | Receiver → Sender | Toggle spectral subtraction |
 | `echo-cancel-status` | Sender → Receivers | Echo cancel status (enabled, active) |
+| `shutdown-timeout` | Receiver → Sender | Set auto-shutdown timeout (value, unit) |
 
 ## Music/Playlist Structure
 
@@ -166,7 +167,6 @@ mp3/
 - `/sender` - Landing page with session prompt
 - `/s/{session}` - Sender page for specific session (bookmarkable)
 - `/s/{session}?q=sd` - SD quality mode (default is HD)
-- `/s/{session}?shutdown=8` - Auto-shutdown after 8 hours (default: 6, 0 to disable)
 - `/receiver` - Landing page with session prompt
 - `/r/{session}` - Receiver page for specific session (bookmarkable)
 - Short paths (`/s/`, `/r/`) avoid conflicts with static files on some hosting setups

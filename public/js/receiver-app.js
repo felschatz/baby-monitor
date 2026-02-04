@@ -53,13 +53,6 @@ import {
     requestOffer,
     getPTTAudioSender
 } from './receiver-webrtc.js';
-import {
-    isMediaSessionSupported,
-    initMediaSession,
-    setMediaSessionEnabled,
-    updateMediaSessionState,
-    destroyMediaSession
-} from './media-session.js';
 
 import {
     destroyKeepAwake
@@ -96,8 +89,8 @@ const thresholdMarker = document.getElementById('thresholdMarker');
 const audioOnlyToggle = document.getElementById('audioOnlyToggle');
 const echoCancelToggle = document.getElementById('echoCancelToggle');
 const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
-const mediaSessionToggle = document.getElementById('mediaSessionToggle');
-const mediaSessionToggleLabel = document.getElementById('mediaSessionToggleLabel');
+const shutdownTimerSelect = document.getElementById('shutdownTimerSelect');
+const shutdownTimerStatus = document.getElementById('shutdownTimerStatus');
 
 // Music elements
 const musicContainer = document.getElementById('musicContainer');
@@ -146,7 +139,8 @@ let playlistsUnlocked = localStorage.getItem('receiver-playlists-unlocked') === 
 let loudSoundTimeout = null;
 let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
-let mediaSessionEnabled = localStorage.getItem('receiver-media-session') === 'true';
+let debugTimerMode = false; // Will be set from /api/music response
+let shutdownTimerValue = parseInt(localStorage.getItem('receiver-shutdown-timer') || '6');
 
 // Initialize keep-awake
 initKeepAwake();
@@ -178,17 +172,8 @@ echoCancelToggle.checked = echoCancelEnabled;
 // Set video element reference for noise gate
 setVideoElement(remoteVideo);
 
-// Initialize media session
-if (isMediaSessionSupported()) {
-    initMediaSession({ videoElement: remoteVideo, sessionName });
-    mediaSessionToggle.checked = mediaSessionEnabled;
-    if (mediaSessionEnabled) {
-        setMediaSessionEnabled(true);
-    }
-} else {
-    // Hide toggle if not supported
-    mediaSessionToggleLabel.style.display = 'none';
-}
+// Initialize shutdown timer select
+shutdownTimerSelect.value = shutdownTimerValue.toString();
 
 // Helper functions
 function setConnectedState(connected) {
@@ -202,7 +187,6 @@ function setConnectedState(connected) {
         pttBtn.disabled = false;
         sessionStorage.setItem('receiver-streaming', 'true');
         updateAudioOnlyIndicator();
-        updateMediaSessionState(true);
     } else {
         document.body.classList.remove('connected');
         statusDot.classList.remove('connected');
@@ -211,7 +195,6 @@ function setConnectedState(connected) {
         pttBtn.disabled = true;
         stopPTT(pttBtn, pttLabel);
         audioOnlyIndicator.classList.remove('active');
-        updateMediaSessionState(false);
     }
 }
 
@@ -232,7 +215,6 @@ function setDisconnectedState() {
     audioOnlyIndicator.classList.remove('active');
     noiseGateInfoItem.classList.remove('gating');
     resetMusicUI();
-    updateMediaSessionState(false);
 }
 
 function setMediaMutedState(muted) {
@@ -364,6 +346,20 @@ async function checkMusicAvailability() {
             debugOption.value = '1';
             debugOption.textContent = '1 min (debug)';
             musicTimerSelect.insertBefore(debugOption, musicTimerSelect.firstChild);
+        }
+
+        // Setup shutdown timer based on debug mode
+        if (data.debugTimer) {
+            debugTimerMode = true;
+            // Replace hours with seconds in shutdown timer for debug mode
+            shutdownTimerSelect.innerHTML = `
+                <option value="0">Disabled</option>
+                <option value="10">10 sec</option>
+                <option value="30">30 sec</option>
+                <option value="60">60 sec</option>
+                <option value="120">2 min</option>
+            `;
+            shutdownTimerSelect.value = shutdownTimerValue.toString();
         }
 
         if ((data.files && data.files.length > 0) || musicPlaylists.length > 0) {
@@ -562,6 +558,12 @@ async function handleMessage(message) {
                 if (echoCancelEnabled) {
                     signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
                 }
+                // Send shutdown timer setting to sender
+                signaling.sendSignal({
+                    type: 'shutdown-timeout',
+                    value: shutdownTimerValue,
+                    unit: debugTimerMode ? 'seconds' : 'hours'
+                });
             } else {
                 overlayText.textContent = 'Waiting for sender to start streaming...';
             }
@@ -582,6 +584,12 @@ async function handleMessage(message) {
             if (echoCancelEnabled) {
                 signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
             }
+            // Send shutdown timer setting to sender
+            signaling.sendSignal({
+                type: 'shutdown-timeout',
+                value: shutdownTimerValue,
+                unit: debugTimerMode ? 'seconds' : 'hours'
+            });
             break;
 
         case 'sender-disconnected':
@@ -664,14 +672,16 @@ echoCancelToggle.addEventListener('change', () => {
     signaling.sendSignal({ type: 'echo-cancel-enable', enabled: echoCancelEnabled });
 });
 
-mediaSessionToggle.addEventListener('change', () => {
-    mediaSessionEnabled = mediaSessionToggle.checked;
-    localStorage.setItem('receiver-media-session', mediaSessionEnabled);
-    console.log('Media session mode:', mediaSessionEnabled);
-    setMediaSessionEnabled(mediaSessionEnabled);
-    if (mediaSessionEnabled) {
-        updateMediaSessionState(isConnected);
-    }
+shutdownTimerSelect.addEventListener('change', () => {
+    shutdownTimerValue = parseInt(shutdownTimerSelect.value);
+    localStorage.setItem('receiver-shutdown-timer', shutdownTimerValue);
+    console.log('Shutdown timer changed:', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
+    // Send new shutdown timeout to sender
+    signaling.sendSignal({
+        type: 'shutdown-timeout',
+        value: shutdownTimerValue,
+        unit: debugTimerMode ? 'seconds' : 'hours'
+    });
 });
 
 // Shared volume update function
@@ -816,7 +826,6 @@ window.addEventListener('beforeunload', () => {
     destroyKeepAwake();
     destroyAudioAnalysis();
     destroyVideoPlayback();
-    destroyMediaSession();
     closePeerConnection();
     signaling.disconnect();
 });

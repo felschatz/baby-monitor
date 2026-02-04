@@ -10,7 +10,8 @@ let lastWakeLockLog = 0;
 let autoShutdownTimeout = null;
 let autoShutdownEndTime = null; // Store end time separately (setTimeout returns a number in some environments)
 let autoShutdownCallback = null;
-let autoShutdownHours = 6; // Default: 6 hours
+let autoShutdownHours = 6; // Default: 6 hours (or seconds in debug mode)
+let autoShutdownUnit = 'hours'; // 'hours' or 'seconds'
 
 /**
  * Rate-limited logging for wake lock events
@@ -136,12 +137,19 @@ export function initKeepAwake() {
 }
 
 /**
- * Set the auto-shutdown timeout (in hours)
- * @param {number} hours - Hours before auto-shutdown (0 to disable)
+ * Set the auto-shutdown timeout
+ * @param {number} value - Time before auto-shutdown (0 to disable)
+ * @param {string} unit - 'hours' or 'seconds'
  */
+export function setAutoShutdownTime(value, unit = 'hours') {
+    autoShutdownHours = value;
+    autoShutdownUnit = unit;
+    console.log('Auto-shutdown set to', value, unit);
+}
+
+// Legacy function for backwards compatibility
 export function setAutoShutdownHours(hours) {
-    autoShutdownHours = hours;
-    console.log('Auto-shutdown set to', hours, 'hours');
+    setAutoShutdownTime(hours, 'hours');
 }
 
 /**
@@ -165,17 +173,19 @@ export function startAutoShutdown(onShutdown) {
     cancelAutoShutdown();
 
     autoShutdownCallback = onShutdown;
-    const timeoutMs = autoShutdownHours * 60 * 60 * 1000;
+    const timeoutMs = autoShutdownUnit === 'seconds'
+        ? autoShutdownHours * 1000
+        : autoShutdownHours * 60 * 60 * 1000;
     
     autoShutdownTimeout = setTimeout(() => {
-        console.log('Auto-shutdown triggered after', autoShutdownHours, 'hours');
+        console.log('Auto-shutdown triggered after', autoShutdownHours, autoShutdownUnit);
         triggerAutoShutdown();
     }, timeoutMs);
     
     // Store end time for remaining time calculation
     autoShutdownEndTime = Date.now() + timeoutMs;
     
-    console.log('Auto-shutdown timer started:', autoShutdownHours, 'hours');
+    console.log('Auto-shutdown timer started:', autoShutdownHours, autoShutdownUnit);
 }
 
 /**

@@ -128,6 +128,17 @@ async function handleSignal(req, res) {
             });
             break;
 
+        case 'shutdown-timeout':
+            // Receiver -> Sender: set auto-shutdown timeout
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, {
+                    type: 'shutdown-timeout',
+                    value: message.value,
+                    unit: message.unit
+                });
+            }
+            break;
+
         case 'sender-ready':
             // Sender -> Receivers: sender's stream is ready, request offers now
             broadcastToReceivers(sessionName, { type: 'sender-ready' });

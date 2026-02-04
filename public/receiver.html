@@ -149,11 +149,21 @@
                     <span>Reduce music echo</span>
                     <span class="experimental-badge">Beta</span>
                 </label>
-                <label class="toggle-option" id="mediaSessionToggleLabel" for="mediaSessionToggle">
-                    <input type="checkbox" id="mediaSessionToggle" aria-label="Keep audio playing when screen is off or app is in background">
-                    <span>Background audio</span>
-                    <span class="experimental-badge">Beta</span>
-                </label>
+            </div>
+
+            <div class="control-section">
+                <label class="control-label">Auto-shutdown timer</label>
+                <div class="control-row">
+                    <select class="timer-select" id="shutdownTimerSelect">
+                        <option value="0">Disabled</option>
+                        <option value="4">4 hours</option>
+                        <option value="6" selected>6 hours</option>
+                        <option value="8">8 hours</option>
+                        <option value="10">10 hours</option>
+                    </select>
+                    <span id="shutdownTimerStatus" class="timer-status"></span>
+                </div>
+                <div class="control-hint">Sender stops streaming after this time</div>
             </div>
 
             <button class="fullscreen-btn" id="fullscreenBtn">⛶ Fullscreen</button>

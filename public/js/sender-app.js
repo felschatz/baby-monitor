@@ -3,7 +3,7 @@
  * Wires together all modules for the sender page
  */
 
-import { initKeepAwake, startAutoShutdown, cancelAutoShutdown, destroyKeepAwake, setAutoShutdownHours } from './keep-awake.js';
+import { initKeepAwake, startAutoShutdown, cancelAutoShutdown, destroyKeepAwake, setAutoShutdownTime, getAutoShutdownRemaining } from './keep-awake.js';
 import { initSession } from './session.js';
 import { createSignalingManager } from './signaling.js';
 import { initScreenDimming } from './screen-dimming.js';
@@ -97,10 +97,6 @@ const volumePlusBtn = document.getElementById('volumePlus');
 const urlParams = new URLSearchParams(window.location.search);
 const videoQuality = urlParams.get('q') === 'sd' ? 'sd' : 'hd';
 
-// Extract auto-shutdown hours from URL (default: 6 hours, 0 to disable)
-const autoShutdownParam = urlParams.get('shutdown');
-const autoShutdownHoursConfig = autoShutdownParam !== null ? parseFloat(autoShutdownParam) : 6;
-
 // Initialize session
 const sessionName = initSession({
     pathPrefix: '/s/',
@@ -123,10 +119,10 @@ qualityBadge.classList.add(videoQuality);
 // State
 let isStreaming = false;
 let audioEnabled = false;
+let shutdownUnit = 'hours'; // Will be updated by receiver
 
-// Initialize keep-awake with auto-shutdown
+// Initialize keep-awake (auto-shutdown will be configured by receiver)
 initKeepAwake();
-setAutoShutdownHours(autoShutdownHoursConfig);
 
 // Initialize screen dimming
 initScreenDimming({
@@ -446,6 +442,19 @@ async function handleMessage(message) {
         case 'echo-cancel-enable':
             console.log('Received echo cancel toggle:', message.enabled);
             await handleEchoCancelToggle(message.enabled);
+            break;
+
+        case 'shutdown-timeout':
+            console.log('Received shutdown timeout:', message.value, message.unit);
+            shutdownUnit = message.unit || 'hours';
+            setAutoShutdownTime(message.value, shutdownUnit);
+            // Restart the timer if streaming
+            if (isStreaming) {
+                startAutoShutdown(() => {
+                    console.log('Auto-shutdown triggered by receiver setting');
+                    stopStreamingHandler();
+                });
+            }
             break;
 
         case 'heartbeat':
