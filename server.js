@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Recovery is not defeat, it is resilience in action.
+// Wisdom: Listen for the change before you try to fix it.
