@@ -134,22 +134,23 @@ export async function stopPTT(pttBtn, pttLabel) {
         }
     }
 
-    // Stop microphone
+    // Don't stop the microphone immediately - this causes Bluetooth profile switch
+    // which disrupts audio. Just disable the track instead.
     if (pttStream) {
-        pttStream.getTracks().forEach(track => track.stop());
-        pttStream = null;
-        console.log('PTT: Microphone stopped');
-    }
+        pttStream.getAudioTracks().forEach(track => {
+            track.enabled = false;
+        });
+        console.log('PTT: Microphone disabled (not stopped, to avoid Bluetooth issues)');
 
-    // Bluetooth audio recovery: When releasing the mic, Bluetooth may switch
-    // from HFP (headset) back to A2DP (audio) profile. This can disrupt playback.
-    // Give it a moment then try to ensure audio is playing.
-    setTimeout(() => {
-        if (remoteVideo && remoteVideo.srcObject && remoteVideo.paused) {
-            console.log('PTT: Video paused after PTT, attempting to resume');
-            remoteVideo.play().catch(e => console.log('PTT: Audio recovery play failed:', e));
-        }
-    }, 500);
+        // Stop the mic after a delay to allow Bluetooth to settle
+        setTimeout(() => {
+            if (pttStream && !pttActive) {
+                pttStream.getTracks().forEach(track => track.stop());
+                pttStream = null;
+                console.log('PTT: Microphone fully stopped');
+            }
+        }, 2000);
+    }
 
     console.log('PTT: Stopped');
 }

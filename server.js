@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Only fix what is broken, not what might be working.
+// Wisdom: Disable is gentler than stop for audio track transitions.
