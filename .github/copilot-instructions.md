@@ -37,7 +37,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 
 | Module | Purpose |
 |--------|---------|
-| `keep-awake.js` | Wake lock API, NoSleep video, silent audio |
+| `keep-awake.js` | Wake lock API, NoSleep video, auto-shutdown timer |
 | `session.js` | URL parsing, localStorage, session prompt |
 | `signaling.js` | SSE connection, sendSignal(), reconnection |
 | `webrtc.js` | STUN config, peer connection utilities |
@@ -58,7 +58,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 |--------|---------|
 | `audio-analysis.js` | Volume detection, RMS calculation, alerts |
 | `video-playback.js` | Autoplay handling, track monitoring |
-| `ptt.js` | Push-to-talk, audio ducking, renegotiation |
+| `ptt.js` | Push-to-talk, audio ducking |
 | `receiver-webrtc.js` | Answer creation, offer handling |
 | `receiver-app.js` | Main orchestration, event wiring |
 
@@ -81,16 +81,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Audio ducking reduces baby audio to 15% during PTT
 - STUN servers: stunprotocol.org, nextcloud.com, sipgate.net
 - FFT-based spectral subtraction for music echo reduction
-
-### Bluetooth Mode
-
-When enabled on the receiver, PTT signals are sent but the microphone is **not acquired**.
-This prevents the Bluetooth A2DP→HFP profile switch that breaks audio playback on many devices.
-In this mode:
-- Sender sees "📱 Parent wants attention" (orange indicator)
-- Audio playback continues uninterrupted on the receiver
-- Volume controls keep working correctly
-- Trade-off: Parent cannot speak to baby (visual alert only)
+- Auto-shutdown: Sender stops after configurable timeout (default 6 hours) to save battery
 
 ## Visual States
 
@@ -100,13 +91,13 @@ In this mode:
 | Disconnected | Red/black blink | Red/black overlay "CONNECTION LOST" |
 | Loud sound | - | Red/black overlay "LOUD SOUND DETECTED" |
 | PTT active | Blue pulsing "👂 Parent is speaking..." | - |
-| PTT (Bluetooth mode) | Orange pulsing "📱 Parent wants attention" | - |
 | Music playing | Purple pulsing "🎵 [track name]" | Track name + timer |
 | Screen dim | Black overlay after 5s | - |
 
 ## Implementation Details
 
-- Wake Lock API keeps screens on
+- Wake Lock API keeps screens on (with auto-shutdown timer)
+- Auto-shutdown stops streaming after 6 hours (configurable via `?shutdown=N` URL param, 0 to disable)
 - AudioContext analyzes volume for loud sound detection
 - Sensitivity slider controls threshold (saved to localStorage)
 - Volume control persisted to localStorage
@@ -141,7 +132,7 @@ Signaling messages sent via `/api/signal`:
 | `offer` | Sender → Receivers | WebRTC offer |
 | `answer` | Receiver → Sender | WebRTC answer |
 | `ice-candidate` | Both directions | ICE candidate exchange |
-| `ptt-start` | Receiver → Sender | PTT starting (includes `bluetoothMode` flag) |
+| `ptt-start` | Receiver → Sender | PTT starting |
 | `ptt-offer` | Receiver → Sender | PTT renegotiation offer (legacy, ignored) |
 | `ptt-answer` | Sender → Receivers | PTT renegotiation answer (legacy, ignored) |
 | `ptt-stop` | Receiver → Sender | PTT stopped |
@@ -174,6 +165,8 @@ mp3/
 
 - `/sender` - Landing page with session prompt
 - `/s/{session}` - Sender page for specific session (bookmarkable)
+- `/s/{session}?q=sd` - SD quality mode (default is HD)
+- `/s/{session}?shutdown=8` - Auto-shutdown after 8 hours (default: 6, 0 to disable)
 - `/receiver` - Landing page with session prompt
 - `/r/{session}` - Receiver page for specific session (bookmarkable)
 - Short paths (`/s/`, `/r/`) avoid conflicts with static files on some hosting setups

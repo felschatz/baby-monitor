@@ -3,7 +3,7 @@
  * Wires together all modules for the sender page
  */
 
-import { initKeepAwake } from './keep-awake.js';
+import { initKeepAwake, startAutoShutdown, cancelAutoShutdown, destroyKeepAwake, setAutoShutdownHours } from './keep-awake.js';
 import { initSession } from './session.js';
 import { createSignalingManager } from './signaling.js';
 import { initScreenDimming } from './screen-dimming.js';
@@ -97,6 +97,10 @@ const volumePlusBtn = document.getElementById('volumePlus');
 const urlParams = new URLSearchParams(window.location.search);
 const videoQuality = urlParams.get('q') === 'sd' ? 'sd' : 'hd';
 
+// Extract auto-shutdown hours from URL (default: 6 hours, 0 to disable)
+const autoShutdownParam = urlParams.get('shutdown');
+const autoShutdownHoursConfig = autoShutdownParam !== null ? parseFloat(autoShutdownParam) : 6;
+
 // Initialize session
 const sessionName = initSession({
     pathPrefix: '/s/',
@@ -120,8 +124,9 @@ qualityBadge.classList.add(videoQuality);
 let isStreaming = false;
 let audioEnabled = false;
 
-// Initialize keep-awake
+// Initialize keep-awake with auto-shutdown
 initKeepAwake();
+setAutoShutdownHours(autoShutdownHoursConfig);
 
 // Initialize screen dimming
 initScreenDimming({
@@ -491,6 +496,13 @@ async function startStreamingHandler() {
 
         enableAudioPlayback();
 
+        // Start auto-shutdown timer to save battery after long periods
+        startAutoShutdown(() => {
+            console.log('Auto-shutdown: stopping stream to save battery');
+            stopStreamingHandler();
+            info.textContent = 'Auto-stopped after ' + autoShutdownHoursConfig + ' hours to save battery. Tap to restart.';
+        });
+
         // Notify receivers that we're ready - they may have sent request-offer
         // before our stream was ready, so tell them to request again
         console.log('Stream ready, notifying receivers');
@@ -503,6 +515,9 @@ async function startStreamingHandler() {
 
 // Stop streaming handler
 function stopStreamingHandler() {
+    // Cancel auto-shutdown timer
+    cancelAutoShutdown();
+
     if (isEchoCancelActive()) {
         teardownEchoCancellation();
     }
@@ -527,6 +542,9 @@ function stopStreamingHandler() {
 
     setConnectedState(false);
     info.textContent = 'Streaming stopped.';
+
+    // Release keep-awake resources so phone can sleep
+    destroyKeepAwake();
 }
 
 // Event listeners
