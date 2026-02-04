@@ -7,7 +7,7 @@
 const DUCKING_VOLUME = 0.15;
 
 // State
-let pttStream = null;
+let pttStream = null;  // Kept alive between PTT presses to avoid Bluetooth issues
 let pttActive = false;
 let preDuckVolume = null;
 
@@ -68,16 +68,20 @@ export async function startPTT(pttBtn, pttLabel) {
     console.log('PTT: Sent start notification');
 
     try {
-        // Get microphone access
-        console.log('PTT: Requesting microphone...');
-        pttStream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: false
-            }
-        });
-        console.log('PTT: Got microphone');
+        // Reuse existing mic stream if available (avoids Bluetooth profile switch)
+        if (!pttStream) {
+            console.log('PTT: Requesting microphone...');
+            pttStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
+                }
+            });
+            console.log('PTT: Got microphone (keeping alive for future PTT)');
+        } else {
+            console.log('PTT: Reusing existing microphone stream');
+        }
 
         // Use replaceTrack for instant audio - no renegotiation needed!
         const audioTrack = pttStream.getAudioTracks()[0];
@@ -134,25 +138,9 @@ export async function stopPTT(pttBtn, pttLabel) {
         }
     }
 
-    // Don't stop the microphone immediately - this causes Bluetooth profile switch
-    // which disrupts audio. Just disable the track instead.
-    if (pttStream) {
-        pttStream.getAudioTracks().forEach(track => {
-            track.enabled = false;
-        });
-        console.log('PTT: Microphone disabled (not stopped, to avoid Bluetooth issues)');
-
-        // Stop the mic after a delay to allow Bluetooth to settle
-        setTimeout(() => {
-            if (pttStream && !pttActive) {
-                pttStream.getTracks().forEach(track => track.stop());
-                pttStream = null;
-                console.log('PTT: Microphone fully stopped');
-            }
-        }, 2000);
-    }
-
-    console.log('PTT: Stopped');
+    // Don't stop the microphone - keep it alive to avoid Bluetooth profile switch
+    // The replaceTrack(null) above already stopped audio from being sent
+    console.log('PTT: Stopped (mic kept alive)');
 }
 
 /**
