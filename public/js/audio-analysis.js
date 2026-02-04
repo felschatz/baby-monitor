@@ -36,6 +36,16 @@ export function initAudioAnalysis(callbacks) {
     onGatingChange = callbacks.onGatingChange;
 }
 
+/**
+ * Get current playback volume (for ducking)
+ */
+export function getPlaybackVolume() {
+    if (volumeGain) {
+        return volumeGain.gain.value;
+    }
+    return 1;
+}
+
 // Additional audio level elements (inline meter)
 let audioLevelElements = [];
 
@@ -80,6 +90,16 @@ export async function tryStartAudioAnalysis(audioLevelElement) {
         if (!audioContext) {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             console.log('Created AudioContext, state:', audioContext.state);
+
+            // Try to set the AudioContext to follow the default system output device
+            // This ensures Bluetooth and other device changes are followed automatically
+            if (audioContext.setSinkId) {
+                audioContext.setSinkId({ type: 'default' }).then(() => {
+                    console.log('AudioContext set to follow default output device');
+                }).catch(err => {
+                    console.warn('Could not set AudioContext to follow default device:', err);
+                });
+            }
 
             // Monitor for AudioContext suspension (e.g., when Bluetooth connects)
             audioContext.onstatechange = () => {
@@ -421,4 +441,40 @@ export function resetNoiseGate() {
 
     // Note: We don't reset videoElementSource because createMediaElementSource
     // can only be called once per element. The gain nodes remain connected.
+}
+
+/**
+ * Disable noise gate audio routing (un-mute video element, disconnect Web Audio)
+ * Call this when noise gate threshold is set to 0 to allow direct audio playback
+ * which better supports Bluetooth device switching
+ * @param {HTMLVideoElement} videoElement - The video element to un-mute
+ */
+export function disableNoiseGateRouting(videoElement) {
+    console.log('Disabling noise gate routing for direct audio playback');
+
+    // Disconnect stream source if it exists
+    if (streamAudioSource) {
+        try {
+            streamAudioSource.disconnect();
+        } catch (e) {}
+        streamAudioSource = null;
+    }
+
+    // Reset gain nodes
+    if (noiseGateGain) {
+        noiseGateGain.gain.value = 1;
+        noiseGateGain = null;
+    }
+    if (volumeGain) {
+        volumeGain = null;
+    }
+
+    isGating = false;
+
+    // Un-mute the video element so audio plays directly
+    // This allows Bluetooth device switching to work properly
+    if (videoElement) {
+        videoElement.muted = false;
+        console.log('Video element unmuted for direct audio playback');
+    }
 }

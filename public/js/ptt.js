@@ -3,6 +3,12 @@
  * Audio ducking and renegotiation
  */
 
+import {
+    isAudioRoutedThroughWebAudio,
+    setPlaybackVolume,
+    getPlaybackVolume
+} from './audio-analysis.js';
+
 // Audio ducking constant
 const DUCKING_VOLUME = 0.15;
 
@@ -58,9 +64,16 @@ export async function startPTT(pttBtn, pttLabel) {
     pttLabel.textContent = 'Speaking...';
 
     // Audio ducking - lower baby audio to prevent echo
-    preDuckVolume = remoteVideo.volume;
-    remoteVideo.volume = Math.min(remoteVideo.volume, DUCKING_VOLUME);
-    console.log('PTT: Ducked audio from', preDuckVolume, 'to', remoteVideo.volume);
+    // Check if audio is routed through Web Audio API (for noise gate)
+    if (isAudioRoutedThroughWebAudio()) {
+        preDuckVolume = getPlaybackVolume();
+        setPlaybackVolume(Math.min(preDuckVolume, DUCKING_VOLUME));
+        console.log('PTT: Ducked Web Audio volume from', preDuckVolume, 'to', Math.min(preDuckVolume, DUCKING_VOLUME));
+    } else {
+        preDuckVolume = remoteVideo.volume;
+        remoteVideo.volume = Math.min(remoteVideo.volume, DUCKING_VOLUME);
+        console.log('PTT: Ducked video element volume from', preDuckVolume, 'to', remoteVideo.volume);
+    }
 
     // Notify sender that PTT is starting
     sendSignal({ type: 'ptt-start' });
@@ -79,6 +92,15 @@ export async function startPTT(pttBtn, pttLabel) {
                 }
             });
             console.log('PTT: Got microphone (keeping alive for future PTT)');
+
+            // Bluetooth profile switch may have disrupted audio playback
+            // Resume video after a moment to recover audio
+            setTimeout(() => {
+                if (remoteVideo && remoteVideo.srcObject) {
+                    console.log('PTT: Recovering audio after Bluetooth profile switch');
+                    remoteVideo.play().catch(e => console.log('PTT: Could not resume video:', e));
+                }
+            }, 150);
         } else {
             console.log('PTT: Reusing existing microphone stream');
         }
@@ -122,8 +144,13 @@ export async function stopPTT(pttBtn, pttLabel) {
 
     // Restore audio volume (un-duck)
     if (preDuckVolume !== null) {
-        remoteVideo.volume = preDuckVolume;
-        console.log('PTT: Restored audio to', preDuckVolume);
+        if (isAudioRoutedThroughWebAudio()) {
+            setPlaybackVolume(preDuckVolume);
+            console.log('PTT: Restored Web Audio volume to', preDuckVolume);
+        } else {
+            remoteVideo.volume = preDuckVolume;
+            console.log('PTT: Restored video element volume to', preDuckVolume);
+        }
         preDuckVolume = null;
     }
 

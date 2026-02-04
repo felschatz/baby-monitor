@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Keep resources warm when you know they will be needed again.
+// Wisdom: Sometimes the simplest fix is just to try playing again after the disruption.

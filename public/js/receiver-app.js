@@ -16,7 +16,9 @@ import {
     setupNoiseGateFromStream,
     setPlaybackVolume,
     resetNoiseGate,
-    isAudioRoutedThroughWebAudio
+    isAudioRoutedThroughWebAudio,
+    disableNoiseGateRouting,
+    getNoiseGateThreshold
 } from './audio-analysis.js';
 import {
     initVideoPlayback,
@@ -462,19 +464,17 @@ initVideoPlayback(
     {
         onUserInteraction: () => {
             ensureAudioContext(audioLevel);
-            // Set up noise gate after audio context is ready
-            const savedVol = localStorage.getItem('receiver-volume');
-            const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
-            // Use stream-based noise gate for better WebRTC compatibility
-            if (currentStream) {
-                setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
-            } else {
-                setupNoiseGate(remoteVideo, initialVolume);
-            }
-            // Apply saved threshold
+            // Only set up noise gate routing if threshold > 0
+            // When threshold is 0, audio plays directly from video element
+            // which provides better Bluetooth device switching support
             const savedGate = localStorage.getItem('receiver-noise-gate');
-            if (savedGate !== null) {
-                setNoiseGateThreshold(parseInt(savedGate));
+            const noiseGateValue = savedGate !== null ? parseInt(savedGate) : 0;
+            setNoiseGateThreshold(noiseGateValue);
+
+            if (noiseGateValue > 0 && currentStream) {
+                const savedVol = localStorage.getItem('receiver-volume');
+                const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
+                setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
             }
         },
         getIsConnected: () => isConnected,
@@ -698,9 +698,26 @@ sensitivitySlider.addEventListener('input', () => {
 
 noiseGateSlider.addEventListener('input', () => {
     const value = parseInt(noiseGateSlider.value);
+    const wasRoutedThroughWebAudio = isAudioRoutedThroughWebAudio();
     updateNoiseGateDisplay(value);
     setNoiseGateThreshold(value);
     localStorage.setItem('receiver-noise-gate', value);
+
+    // Handle routing changes for Bluetooth compatibility
+    if (value === 0 && wasRoutedThroughWebAudio) {
+        // Threshold set to 0: disable Web Audio routing for better Bluetooth support
+        disableNoiseGateRouting(remoteVideo);
+        // Restore video element volume from saved setting
+        const savedVol = localStorage.getItem('receiver-volume');
+        if (savedVol !== null) {
+            remoteVideo.volume = parseInt(savedVol) / 100;
+        }
+    } else if (value > 0 && !wasRoutedThroughWebAudio && currentStream) {
+        // Threshold set to > 0: enable Web Audio routing for noise gate
+        const savedVol = localStorage.getItem('receiver-volume');
+        const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
+        setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
+    }
 });
 
 fullscreenBtn.addEventListener('click', () => {
@@ -755,18 +772,22 @@ musicPlaylistSelect.addEventListener('touchcancel', cancelLongPress);
 function onUserInteractionGlobal() {
     handleUserInteraction();
     ensureAudioContext(audioLevel);
-    // Set up noise gate after audio context is ready
-    const savedVol = localStorage.getItem('receiver-volume');
-    const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
-    // Use stream-based noise gate for better WebRTC compatibility
-    if (currentStream) {
-        setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
-    } else {
-        setupNoiseGate(remoteVideo, initialVolume);
-    }
+    // Only set up noise gate routing if threshold > 0
+    // When threshold is 0, audio plays directly from video element
+    // which provides better Bluetooth device switching support
     const savedGate = localStorage.getItem('receiver-noise-gate');
-    if (savedGate !== null) {
-        setNoiseGateThreshold(parseInt(savedGate));
+    const noiseGateValue = savedGate !== null ? parseInt(savedGate) : 0;
+    setNoiseGateThreshold(noiseGateValue);
+
+    if (noiseGateValue > 0) {
+        const savedVol = localStorage.getItem('receiver-volume');
+        const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
+        // Use stream-based noise gate for better WebRTC compatibility
+        if (currentStream) {
+            setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
+        } else {
+            setupNoiseGate(remoteVideo, initialVolume);
+        }
     }
 }
 document.addEventListener('click', onUserInteractionGlobal, { passive: true });
