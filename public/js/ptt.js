@@ -1,6 +1,9 @@
 /**
  * Push-to-Talk functionality for receiver
  * Audio ducking and renegotiation
+ *
+ * Uses the phone's built-in microphone (not Bluetooth) to avoid
+ * Bluetooth profile switches (A2DP ↔ HFP) that disrupt audio playback.
  */
 
 import {
@@ -16,6 +19,7 @@ const DUCKING_VOLUME = 0.15;
 let pttStream = null;
 let pttActive = false;
 let preDuckVolume = null;
+let builtInMicDeviceId = null; // Cached built-in mic device ID
 
 // Dependencies
 let remoteVideo = null;
@@ -38,18 +42,69 @@ export function initPTT(deps) {
 let pttStartSent = false;
 
 /**
- * Recover audio playback after Bluetooth profile switch.
- * Re-assigns srcObject to force the browser to re-evaluate
- * audio output routing, then resumes playback.
+ * Find the built-in microphone device ID by filtering out Bluetooth devices.
+ * This prevents Bluetooth A2DP → HFP profile switches when capturing audio.
+ * Returns null if no non-Bluetooth mic is found (will fall back to default).
  */
-function recoverAudioPlayback() {
-    if (!remoteVideo || !remoteVideo.srcObject) return;
+async function findBuiltInMic() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(d => d.kind === 'audioinput');
 
-    const stream = remoteVideo.srcObject;
-    remoteVideo.srcObject = null;
-    remoteVideo.srcObject = stream;
-    remoteVideo.play().catch(e => console.log('PTT: Audio recovery play failed:', e));
-    console.log('PTT: Audio playback recovered');
+        console.log('PTT: Available audio inputs:', audioInputs.map(d => `${d.label} (${d.deviceId.substring(0, 8)}...)`));
+
+        if (audioInputs.length <= 1) {
+            // Only one mic available, nothing to filter
+            return null;
+        }
+
+        // Filter out Bluetooth devices by label keywords
+        const btKeywords = ['bluetooth', 'bt ', 'wireless', 'airpod', 'galaxy buds',
+            'jabra', 'bose', 'sony wh', 'sony wf', 'beats', 'jbl',
+            'sennheiser', 'pixel buds', 'nothing ear'];
+        const nonBtDevices = audioInputs.filter(d => {
+            const label = d.label.toLowerCase();
+            return !btKeywords.some(kw => label.includes(kw));
+        });
+
+        if (nonBtDevices.length > 0) {
+            const chosen = nonBtDevices[0];
+            console.log('PTT: Selected built-in mic:', chosen.label || chosen.deviceId);
+            return chosen.deviceId;
+        }
+
+        // All devices look like Bluetooth - fall back to default
+        console.log('PTT: Could not identify built-in mic, will use default');
+        return null;
+    } catch (err) {
+        console.log('PTT: Could not enumerate devices:', err);
+        return null;
+    }
+}
+
+/**
+ * Get microphone constraints that prefer the built-in mic over Bluetooth.
+ */
+async function getMicConstraints() {
+    // Cache the device ID lookup
+    if (builtInMicDeviceId === null) {
+        builtInMicDeviceId = await findBuiltInMic() || '';
+    }
+
+    const constraints = {
+        audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+        }
+    };
+
+    if (builtInMicDeviceId) {
+        // Use exact to force built-in mic, preventing Bluetooth profile switch
+        constraints.audio.deviceId = { exact: builtInMicDeviceId };
+    }
+
+    return constraints;
 }
 
 /**
@@ -95,19 +150,10 @@ export async function startPTT(pttBtn, pttLabel) {
     console.log('PTT: Sent start notification');
 
     try {
-        console.log('PTT: Requesting microphone...');
-        pttStream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: false
-            }
-        });
+        const constraints = await getMicConstraints();
+        console.log('PTT: Requesting microphone with constraints:', JSON.stringify(constraints.audio.deviceId || 'default'));
+        pttStream = await navigator.mediaDevices.getUserMedia(constraints);
         console.log('PTT: Got microphone');
-
-        // Bluetooth profile switch (A2DP -> HFP) may have disrupted audio output
-        // Recover after a short delay to let the new profile settle
-        setTimeout(recoverAudioPlayback, 200);
 
         // Use replaceTrack for instant audio - no renegotiation needed!
         const audioTrack = pttStream.getAudioTracks()[0];
@@ -115,6 +161,26 @@ export async function startPTT(pttBtn, pttLabel) {
         console.log('PTT: Replaced track - audio now flowing');
 
     } catch (err) {
+        // If exact device constraint fails, retry without device preference
+        if (err.name === 'OverconstrainedError' && builtInMicDeviceId) {
+            console.log('PTT: Built-in mic not available, falling back to default');
+            builtInMicDeviceId = ''; // Clear cache so we don't retry
+            try {
+                pttStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    }
+                });
+                const audioTrack = pttStream.getAudioTracks()[0];
+                await pttSender.replaceTrack(audioTrack);
+                console.log('PTT: Fallback mic active - audio now flowing');
+                return;
+            } catch (fallbackErr) {
+                console.error('PTT fallback error:', fallbackErr);
+            }
+        }
         console.error('PTT error:', err);
         pttLabel.textContent = 'Mic access denied';
         stopPTT(pttBtn, pttLabel);
@@ -169,16 +235,12 @@ export async function stopPTT(pttBtn, pttLabel) {
         }
     }
 
-    // Stop microphone - releases Bluetooth back to A2DP for better playback quality
+    // Stop microphone
     if (pttStream) {
         pttStream.getTracks().forEach(track => track.stop());
         pttStream = null;
         console.log('PTT: Microphone stopped');
     }
-
-    // Bluetooth profile switch (HFP -> A2DP) needs time to settle
-    // Then recover audio playback on the new output route
-    setTimeout(recoverAudioPlayback, 500);
 
     console.log('PTT: Stopped');
 }
@@ -195,6 +257,13 @@ export function setupPTTButton(pttBtn, pttLabel) {
     if (navigator.permissions && navigator.permissions.query) {
         navigator.permissions.query({ name: 'microphone' }).then(result => {
             console.log('PTT: Microphone permission state:', result.state);
+            // If permission already granted, pre-discover the built-in mic
+            if (result.state === 'granted') {
+                findBuiltInMic().then(id => {
+                    builtInMicDeviceId = id || '';
+                    console.log('PTT: Pre-cached built-in mic:', builtInMicDeviceId ? 'found' : 'using default');
+                });
+            }
             result.onchange = () => {
                 console.log('PTT: Microphone permission changed to:', result.state);
             };
@@ -243,6 +312,9 @@ export function cleanupPTT() {
         pttStream.getTracks().forEach(track => track.stop());
         pttStream = null;
     }
+
+    // Clear cached device ID so it's re-discovered next time
+    builtInMicDeviceId = null;
 }
 
 // Getters
