@@ -143,18 +143,13 @@ export async function stopPTT(pttBtn, pttLabel) {
 
     // Bluetooth audio recovery: When releasing the mic, Bluetooth may switch
     // from HFP (headset) back to A2DP (audio) profile. This can disrupt playback.
-    // Give it a moment then "poke" the audio to resume.
+    // Give it a moment then try to ensure audio is playing.
     setTimeout(() => {
-        if (remoteVideo && remoteVideo.srcObject) {
-            console.log('PTT: Recovering audio playback after Bluetooth profile switch');
-            // Toggle play to recover audio routing
-            const wasPlaying = !remoteVideo.paused;
-            if (wasPlaying) {
-                remoteVideo.pause();
-                remoteVideo.play().catch(e => console.log('PTT: Audio recovery play failed:', e));
-            }
+        if (remoteVideo && remoteVideo.srcObject && remoteVideo.paused) {
+            console.log('PTT: Video paused after PTT, attempting to resume');
+            remoteVideo.play().catch(e => console.log('PTT: Audio recovery play failed:', e));
         }
-    }, 300);
+    }, 500);
 
     console.log('PTT: Stopped');
 }
