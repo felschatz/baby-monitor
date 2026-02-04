@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Timing is everything - signal readiness, not just presence.
+// Wisdom: Bluetooth audio profiles need gentle handling during transitions.
