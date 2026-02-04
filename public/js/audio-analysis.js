@@ -1,6 +1,13 @@
 /**
  * Audio Analysis for receiver
  * Volume detection, RMS calculation, loud sound alerts, and noise gate
+ *
+ * IMPORTANT: Audio playback goes through the native <video> element, NOT through
+ * Web Audio API. This is critical for Bluetooth compatibility - routing audio
+ * through Web Audio breaks Bluetooth (A2DP) playback on many devices.
+ *
+ * The noise gate works by muting/unmuting the video element based on analysis,
+ * rather than routing audio through a GainNode.
  */
 
 // State
@@ -9,13 +16,10 @@ let analyser = null;
 let audioStream = null;
 let audioAnalysisRunning = false;
 
-// Noise gate state
-let noiseGateGain = null;
-let volumeGain = null;
+// Noise gate state - uses video.muted instead of GainNode for Bluetooth compatibility
 let noiseGateThreshold = 0;
 let isGating = false;
-let streamAudioSource = null;  // MediaStreamSource for noise gate (more reliable than MediaElementSource)
-let videoElementSource = null; // Keep for backwards compatibility but prefer streamAudioSource
+let videoElement = null;  // Reference to video element for noise gate muting
 
 // Callbacks
 let onLoudSound = null;
@@ -37,11 +41,20 @@ export function initAudioAnalysis(callbacks) {
 }
 
 /**
- * Get current playback volume (for ducking)
+ * Set reference to video element for noise gate muting
+ * @param {HTMLVideoElement} element
+ */
+export function setVideoElement(element) {
+    videoElement = element;
+}
+
+/**
+ * Get current playback volume (for ducking during PTT)
+ * Returns the video element volume since we no longer route through Web Audio
  */
 export function getPlaybackVolume() {
-    if (volumeGain) {
-        return volumeGain.gain.value;
+    if (videoElement) {
+        return videoElement.volume;
     }
     return 1;
 }
@@ -51,6 +64,8 @@ let audioLevelElements = [];
 
 /**
  * Setup audio analysis for a stream
+ * NOTE: This ONLY sets up analysis (AnalyserNode) - audio playback goes through
+ * the native <video> element for Bluetooth compatibility.
  * @param {MediaStream} stream
  * @param {HTMLElement} audioLevelElement
  * @param {HTMLElement} [inlineAudioLevelElement] - Optional inline meter
@@ -75,6 +90,8 @@ export function setupAudioAnalysis(stream, audioLevelElement, inlineAudioLevelEl
 
 /**
  * Try to start audio analysis
+ * Creates an AnalyserNode for volume detection ONLY - does NOT route audio playback.
+ * Audio continues to play through the native <video> element for Bluetooth compatibility.
  */
 export async function tryStartAudioAnalysis(audioLevelElement) {
     if (audioAnalysisRunning) {
@@ -89,17 +106,7 @@ export async function tryStartAudioAnalysis(audioLevelElement) {
     try {
         if (!audioContext) {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            console.log('Created AudioContext, state:', audioContext.state);
-
-            // Try to set the AudioContext to follow the default system output device
-            // This ensures Bluetooth and other device changes are followed automatically
-            if (audioContext.setSinkId) {
-                audioContext.setSinkId({ type: 'default' }).then(() => {
-                    console.log('AudioContext set to follow default output device');
-                }).catch(err => {
-                    console.warn('Could not set AudioContext to follow default device:', err);
-                });
-            }
+            console.log('Created AudioContext for analysis, state:', audioContext.state);
 
             // Monitor for AudioContext suspension (e.g., when Bluetooth connects)
             audioContext.onstatechange = () => {
@@ -140,14 +147,21 @@ export async function tryStartAudioAnalysis(audioLevelElement) {
         }
 
         analyser = audioContext.createAnalyser();
+
+        // Create a MediaStreamSource ONLY for analysis - NOT connected to destination
+        // This allows volume detection without routing audio through Web Audio,
+        // which would break Bluetooth (A2DP) playback
         const source = audioContext.createMediaStreamSource(audioStream);
         source.connect(analyser);
+        // NOTE: We do NOT connect analyser to audioContext.destination
+        // Audio plays through the native <video> element instead
+
         analyser.fftSize = 256;
         analyser.smoothingTimeConstant = 0.3;
 
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
         audioAnalysisRunning = true;
-        console.log('Audio analysis started successfully');
+        console.log('Audio analysis started (analysis-only, not routing playback)');
 
         let frameCount = 0;
         function updateAudioLevel() {
@@ -169,23 +183,22 @@ export async function tryStartAudioAnalysis(audioLevelElement) {
                 if (el) el.style.width = percentage + '%';
             });
 
-            // Apply noise gate if threshold is set
-            if (noiseGateThreshold > 0) {
-                if (!noiseGateGain) {
-                    // Log every 100 frames to avoid spam
-                    if (frameCount % 100 === 1) {
-                        console.warn('Noise gate: threshold set but noiseGateGain not initialized - tap screen to enable');
+            // Apply noise gate by muting/unmuting video element
+            // This approach maintains Bluetooth compatibility
+            if (noiseGateThreshold > 0 && videoElement) {
+                const shouldGate = percentage < noiseGateThreshold;
+                if (shouldGate !== isGating) {
+                    isGating = shouldGate;
+                    // Mute/unmute video element for noise gate
+                    // Don't unmute if already muted by user or autoplay policy
+                    if (shouldGate) {
+                        videoElement.muted = true;
+                        console.log(`Noise gate: MUTING (level=${percentage.toFixed(1)}%, threshold=${noiseGateThreshold}%)`);
+                    } else {
+                        videoElement.muted = false;
+                        console.log(`Noise gate: UNMUTING (level=${percentage.toFixed(1)}%, threshold=${noiseGateThreshold}%)`);
                     }
-                } else {
-                    const shouldGate = percentage < noiseGateThreshold;
-                    if (shouldGate !== isGating) {
-                        isGating = shouldGate;
-                        // Smooth transition to avoid clicks
-                        const targetGain = shouldGate ? 0 : 1;
-                        noiseGateGain.gain.setTargetAtTime(targetGain, audioContext.currentTime, 0.01);
-                        console.log(`Noise gate: ${shouldGate ? 'MUTING' : 'UNMUTING'} (level=${percentage.toFixed(1)}%, threshold=${noiseGateThreshold}%)`);
-                        if (onGatingChange) onGatingChange(shouldGate);
-                    }
+                    if (onGatingChange) onGatingChange(shouldGate);
                 }
             }
 
@@ -266,19 +279,18 @@ export function getAudioContext() {
 
 /**
  * Set noise gate threshold
+ * Noise gate now works by muting/unmuting the video element based on audio level
  * @param {number} threshold - Percentage threshold (0-50), 0 = off
  */
 export function setNoiseGateThreshold(threshold) {
     noiseGateThreshold = threshold;
     console.log('Noise gate threshold set to:', threshold);
 
-    // If threshold is 0, ensure gate is open
-    if (threshold === 0 && noiseGateGain) {
-        noiseGateGain.gain.setTargetAtTime(1, audioContext.currentTime, 0.01);
-        if (isGating) {
-            isGating = false;
-            if (onGatingChange) onGatingChange(false);
-        }
+    // If threshold is 0, ensure video is unmuted (gate is open)
+    if (threshold === 0 && videoElement && isGating) {
+        videoElement.muted = false;
+        isGating = false;
+        if (onGatingChange) onGatingChange(false);
     }
 }
 
@@ -290,117 +302,13 @@ export function getNoiseGateThreshold() {
 }
 
 /**
- * Set up noise gate using MediaStream directly (more reliable for WebRTC)
- * Routes stream audio through Web Audio API with gain nodes for gating and volume
- * @param {MediaStream} stream - The media stream to gate
- * @param {HTMLVideoElement} videoElement - The video element (will be muted)
- * @param {number} initialVolume - Initial volume (0-1)
- */
-export function setupNoiseGateFromStream(stream, videoElement, initialVolume = 1) {
-    console.log('setupNoiseGateFromStream called, audioContext:', !!audioContext, 'streamAudioSource:', !!streamAudioSource);
-
-    if (!audioContext) {
-        console.warn('Noise gate: AudioContext not ready - will retry on next interaction');
-        return false;
-    }
-
-    // Only create the source once
-    if (streamAudioSource) {
-        console.log('Noise gate already set up (stream-based)');
-        return true;
-    }
-
-    if (!stream) {
-        console.warn('Noise gate: No stream provided');
-        return false;
-    }
-
-    try {
-        console.log('Creating MediaStreamSource for noise gate...');
-
-        // Mute the video element to avoid double playback
-        // Audio will come through Web Audio API instead
-        videoElement.muted = true;
-
-        // Create source from the stream directly (not the video element)
-        streamAudioSource = audioContext.createMediaStreamSource(stream);
-
-        // Create gain node for noise gating
-        noiseGateGain = audioContext.createGain();
-        noiseGateGain.gain.value = 1;
-
-        // Create gain node for volume control
-        volumeGain = audioContext.createGain();
-        volumeGain.gain.value = initialVolume;
-
-        // Connect: stream -> noiseGate -> volume -> destination
-        streamAudioSource.connect(noiseGateGain);
-        noiseGateGain.connect(volumeGain);
-        volumeGain.connect(audioContext.destination);
-
-        console.log('Noise gate set up successfully (stream-based), initial volume:', initialVolume);
-        return true;
-    } catch (err) {
-        console.error('Error setting up noise gate from stream:', err);
-        return false;
-    }
-}
-
-/**
- * Set up noise gate for video element audio (legacy method)
- * Routes video audio through Web Audio API with gain nodes for gating and volume
- * @param {HTMLVideoElement} videoElement - The video element to gate audio for
- * @param {number} initialVolume - Initial volume (0-1)
- * @deprecated Use setupNoiseGateFromStream instead for WebRTC streams
- */
-export function setupNoiseGate(videoElement, initialVolume = 1) {
-    console.log('setupNoiseGate called, audioContext:', !!audioContext, 'videoElementSource:', !!videoElementSource);
-
-    if (!audioContext) {
-        console.warn('Noise gate: AudioContext not ready - will retry on next interaction');
-        return false;
-    }
-
-    // Only create the source once per video element
-    if (videoElementSource || streamAudioSource) {
-        console.log('Noise gate already set up');
-        return true;
-    }
-
-    try {
-        console.log('Creating MediaElementSource for video element...');
-        // Create media element source (can only be done once per element)
-        videoElementSource = audioContext.createMediaElementSource(videoElement);
-
-        // Create gain node for noise gating
-        noiseGateGain = audioContext.createGain();
-        noiseGateGain.gain.value = 1;
-
-        // Create gain node for volume control
-        // (video.volume no longer works after createMediaElementSource)
-        volumeGain = audioContext.createGain();
-        volumeGain.gain.value = initialVolume;
-
-        // Connect: video -> noiseGate -> volume -> destination
-        videoElementSource.connect(noiseGateGain);
-        noiseGateGain.connect(volumeGain);
-        volumeGain.connect(audioContext.destination);
-
-        console.log('Noise gate set up successfully, initial volume:', initialVolume);
-        return true;
-    } catch (err) {
-        console.error('Error setting up noise gate:', err);
-        return false;
-    }
-}
-
-/**
- * Set playback volume (used when audio is routed through Web Audio API)
+ * Set playback volume
+ * Uses native video element volume for Bluetooth compatibility
  * @param {number} volume - Volume level (0-1)
  */
 export function setPlaybackVolume(volume) {
-    if (volumeGain) {
-        volumeGain.gain.setTargetAtTime(volume, audioContext.currentTime, 0.01);
+    if (videoElement) {
+        videoElement.volume = volume;
     }
 }
 
@@ -412,11 +320,12 @@ export function isNoiseGateActive() {
 }
 
 /**
- * Check if audio is routed through Web Audio API (for noise gate/volume control)
- * When true, the video element should stay muted and volume controlled via setPlaybackVolume
+ * Check if audio is routed through Web Audio API
+ * Returns false now since we no longer route playback through Web Audio
+ * (kept for API compatibility)
  */
 export function isAudioRoutedThroughWebAudio() {
-    return !!(streamAudioSource || videoElementSource);
+    return false;
 }
 
 /**
@@ -425,56 +334,21 @@ export function isAudioRoutedThroughWebAudio() {
 export function resetNoiseGate() {
     console.log('Resetting noise gate');
     isGating = false;
-
-    // Disconnect and reset stream source
-    if (streamAudioSource) {
-        try {
-            streamAudioSource.disconnect();
-        } catch (e) {}
-        streamAudioSource = null;
+    // Unmute video element if it was muted by noise gate
+    if (videoElement) {
+        videoElement.muted = false;
     }
-
-    // Reset gain nodes (don't disconnect - they may still be connected to video element source)
-    if (noiseGateGain) {
-        noiseGateGain.gain.value = 1;
-    }
-
-    // Note: We don't reset videoElementSource because createMediaElementSource
-    // can only be called once per element. The gain nodes remain connected.
 }
 
 /**
- * Disable noise gate audio routing (un-mute video element, disconnect Web Audio)
- * Call this when noise gate threshold is set to 0 to allow direct audio playback
- * which better supports Bluetooth device switching
- * @param {HTMLVideoElement} videoElement - The video element to un-mute
+ * Cleanup audio analysis resources
  */
-export function disableNoiseGateRouting(videoElement) {
-    console.log('Disabling noise gate routing for direct audio playback');
-
-    // Disconnect stream source if it exists
-    if (streamAudioSource) {
-        try {
-            streamAudioSource.disconnect();
-        } catch (e) {}
-        streamAudioSource = null;
-    }
-
-    // Reset gain nodes
-    if (noiseGateGain) {
-        noiseGateGain.gain.value = 1;
-        noiseGateGain = null;
-    }
-    if (volumeGain) {
-        volumeGain = null;
-    }
-
-    isGating = false;
-
-    // Un-mute the video element so audio plays directly
-    // This allows Bluetooth device switching to work properly
-    if (videoElement) {
-        videoElement.muted = false;
-        console.log('Video element unmuted for direct audio playback');
+export function destroyAudioAnalysis() {
+    audioAnalysisRunning = false;
+    analyser = null;
+    audioStream = null;
+    if (audioContext) {
+        audioContext.close().catch(() => {});
+        audioContext = null;
     }
 }

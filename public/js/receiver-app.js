@@ -12,13 +12,12 @@ import {
     ensureAudioContext,
     resetAudioAnalysis,
     setNoiseGateThreshold,
-    setupNoiseGate,
-    setupNoiseGateFromStream,
     setPlaybackVolume,
     resetNoiseGate,
     isAudioRoutedThroughWebAudio,
-    disableNoiseGateRouting,
-    getNoiseGateThreshold
+    getNoiseGateThreshold,
+    setVideoElement,
+    destroyAudioAnalysis
 } from './audio-analysis.js';
 import {
     initVideoPlayback,
@@ -34,7 +33,8 @@ import {
     setAudioOnlyMode,
     getRemoteVideo,
     setupAudioTrackMuteDetection,
-    resetMediaMutedState
+    resetMediaMutedState,
+    destroyVideoPlayback
 } from './video-playback.js';
 import {
     initPTT,
@@ -60,6 +60,10 @@ import {
     updateMediaSessionState,
     destroyMediaSession
 } from './media-session.js';
+
+import {
+    destroyKeepAwake
+} from './keep-awake.js';
 
 // DOM elements
 const sessionOverlay = document.getElementById('sessionOverlay');
@@ -170,6 +174,9 @@ if (savedNoiseGate !== null) {
 // Initialize audio-only toggle
 audioOnlyToggle.checked = getAudioOnlyMode();
 echoCancelToggle.checked = echoCancelEnabled;
+
+// Set video element reference for noise gate (uses video.muted for Bluetooth compatibility)
+setVideoElement(remoteVideo);
 
 // Initialize media session
 if (isMediaSessionSupported()) {
@@ -464,18 +471,10 @@ initVideoPlayback(
     {
         onUserInteraction: () => {
             ensureAudioContext(audioLevel);
-            // Only set up noise gate routing if threshold > 0
-            // When threshold is 0, audio plays directly from video element
-            // which provides better Bluetooth device switching support
+            // Set noise gate threshold from saved settings
             const savedGate = localStorage.getItem('receiver-noise-gate');
             const noiseGateValue = savedGate !== null ? parseInt(savedGate) : 0;
             setNoiseGateThreshold(noiseGateValue);
-
-            if (noiseGateValue > 0 && currentStream) {
-                const savedVol = localStorage.getItem('receiver-volume');
-                const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
-                setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
-            }
         },
         getIsConnected: () => isConnected,
         onMediaMuted: setMediaMutedState,
@@ -673,14 +672,9 @@ mediaSessionToggle.addEventListener('change', () => {
 function updateVolume(value) {
     const numValue = parseInt(value);
     const volumeLevel = numValue / 100;
+    // Always use video element volume directly (Bluetooth compatible)
     remoteVideo.volume = volumeLevel;
-    // Only un-mute video element if audio is NOT routed through Web Audio API
-    // (noise gate routes audio through Web Audio, keeping video muted)
-    if (!isAudioRoutedThroughWebAudio()) {
-        remoteVideo.muted = false;
-    }
-    // Also update Web Audio API volume (needed when noise gate is active)
-    setPlaybackVolume(volumeLevel);
+    remoteVideo.muted = false;
     volumeSlider.value = numValue;
     volumeValue.textContent = numValue + '%';
     volumeDisplay.textContent = numValue + '%';
@@ -698,26 +692,9 @@ sensitivitySlider.addEventListener('input', () => {
 
 noiseGateSlider.addEventListener('input', () => {
     const value = parseInt(noiseGateSlider.value);
-    const wasRoutedThroughWebAudio = isAudioRoutedThroughWebAudio();
     updateNoiseGateDisplay(value);
     setNoiseGateThreshold(value);
     localStorage.setItem('receiver-noise-gate', value);
-
-    // Handle routing changes for Bluetooth compatibility
-    if (value === 0 && wasRoutedThroughWebAudio) {
-        // Threshold set to 0: disable Web Audio routing for better Bluetooth support
-        disableNoiseGateRouting(remoteVideo);
-        // Restore video element volume from saved setting
-        const savedVol = localStorage.getItem('receiver-volume');
-        if (savedVol !== null) {
-            remoteVideo.volume = parseInt(savedVol) / 100;
-        }
-    } else if (value > 0 && !wasRoutedThroughWebAudio && currentStream) {
-        // Threshold set to > 0: enable Web Audio routing for noise gate
-        const savedVol = localStorage.getItem('receiver-volume');
-        const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
-        setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
-    }
 });
 
 fullscreenBtn.addEventListener('click', () => {
@@ -772,23 +749,10 @@ musicPlaylistSelect.addEventListener('touchcancel', cancelLongPress);
 function onUserInteractionGlobal() {
     handleUserInteraction();
     ensureAudioContext(audioLevel);
-    // Only set up noise gate routing if threshold > 0
-    // When threshold is 0, audio plays directly from video element
-    // which provides better Bluetooth device switching support
+    // Set noise gate threshold from saved settings
     const savedGate = localStorage.getItem('receiver-noise-gate');
     const noiseGateValue = savedGate !== null ? parseInt(savedGate) : 0;
     setNoiseGateThreshold(noiseGateValue);
-
-    if (noiseGateValue > 0) {
-        const savedVol = localStorage.getItem('receiver-volume');
-        const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
-        // Use stream-based noise gate for better WebRTC compatibility
-        if (currentStream) {
-            setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
-        } else {
-            setupNoiseGate(remoteVideo, initialVolume);
-        }
-    }
 }
 document.addEventListener('click', onUserInteractionGlobal, { passive: true });
 document.addEventListener('touchstart', onUserInteractionGlobal, { passive: true });

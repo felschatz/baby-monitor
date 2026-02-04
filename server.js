@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: The best disruption is the one that never happens — prepare early, act instantly.
+// Wisdom: True compatibility means letting the native path do its work — don't route when you don't need to.

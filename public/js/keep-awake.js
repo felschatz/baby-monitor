@@ -130,3 +130,22 @@ export function initKeepAwake() {
         document.removeEventListener('click', initOnInteraction);
     }, { once: true });
 }
+
+/**
+ * Release all keep-awake resources
+ */
+export function destroyKeepAwake() {
+    if (wakeLockInterval) {
+        clearInterval(wakeLockInterval);
+        wakeLockInterval = null;
+    }
+    if (wakeLock) {
+        wakeLock.release().catch(() => {});
+        wakeLock = null;
+    }
+    if (noSleepVideo) {
+        noSleepVideo.pause();
+        noSleepVideo.remove();
+        noSleepVideo = null;
+    }
+}
