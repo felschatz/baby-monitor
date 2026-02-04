@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: The built-in microphone is always closer than you think.
+// Wisdom: Recovery is not defeat, it is resilience in action.

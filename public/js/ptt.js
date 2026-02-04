@@ -83,6 +83,20 @@ async function findBuiltInMic() {
 }
 
 /**
+ * Recover audio playback after getUserMedia disrupts audio output routing.
+ * Re-assigns srcObject to force the browser to re-evaluate the output device.
+ */
+function recoverAudioPlayback() {
+    if (!remoteVideo || !remoteVideo.srcObject) return;
+
+    const stream = remoteVideo.srcObject;
+    remoteVideo.srcObject = null;
+    remoteVideo.srcObject = stream;
+    remoteVideo.play().catch(e => console.log('PTT: Audio recovery play failed:', e));
+    console.log('PTT: Audio playback recovered');
+}
+
+/**
  * Get microphone constraints that prefer the built-in mic over Bluetooth.
  */
 async function getMicConstraints() {
@@ -155,6 +169,9 @@ export async function startPTT(pttBtn, pttLabel) {
         pttStream = await navigator.mediaDevices.getUserMedia(constraints);
         console.log('PTT: Got microphone');
 
+        // getUserMedia may disrupt audio output routing - recover after settling
+        setTimeout(recoverAudioPlayback, 200);
+
         // Use replaceTrack for instant audio - no renegotiation needed!
         const audioTrack = pttStream.getAudioTracks()[0];
         await pttSender.replaceTrack(audioTrack);
@@ -176,6 +193,7 @@ export async function startPTT(pttBtn, pttLabel) {
                 const audioTrack = pttStream.getAudioTracks()[0];
                 await pttSender.replaceTrack(audioTrack);
                 console.log('PTT: Fallback mic active - audio now flowing');
+                setTimeout(recoverAudioPlayback, 200);
                 return;
             } catch (fallbackErr) {
                 console.error('PTT fallback error:', fallbackErr);
@@ -241,6 +259,9 @@ export async function stopPTT(pttBtn, pttLabel) {
         pttStream = null;
         console.log('PTT: Microphone stopped');
     }
+
+    // Stopping the mic may change audio output routing - recover after settling
+    setTimeout(recoverAudioPlayback, 500);
 
     console.log('PTT: Stopped');
 }
