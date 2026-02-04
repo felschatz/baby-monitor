@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A wise phone knows when to sleep, saving its energy for when it truly matters.
+// Wisdom: Never assume a timer is an object - in some lands, it's just a number with no pockets.

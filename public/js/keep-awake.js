@@ -8,6 +8,7 @@ let wakeLockInterval = null;
 let noSleepVideo = null;
 let lastWakeLockLog = 0;
 let autoShutdownTimeout = null;
+let autoShutdownEndTime = null; // Store end time separately (setTimeout returns a number in some environments)
 let autoShutdownCallback = null;
 let autoShutdownHours = 6; // Default: 6 hours
 
@@ -147,8 +148,8 @@ export function setAutoShutdownHours(hours) {
  * Get remaining time until auto-shutdown in milliseconds
  */
 export function getAutoShutdownRemaining() {
-    if (!autoShutdownTimeout) return null;
-    return autoShutdownTimeout._endTime - Date.now();
+    if (!autoShutdownTimeout || !autoShutdownEndTime) return null;
+    return autoShutdownEndTime - Date.now();
 }
 
 /**
@@ -172,7 +173,7 @@ export function startAutoShutdown(onShutdown) {
     }, timeoutMs);
     
     // Store end time for remaining time calculation
-    autoShutdownTimeout._endTime = Date.now() + timeoutMs;
+    autoShutdownEndTime = Date.now() + timeoutMs;
     
     console.log('Auto-shutdown timer started:', autoShutdownHours, 'hours');
 }
@@ -184,6 +185,7 @@ export function cancelAutoShutdown() {
     if (autoShutdownTimeout) {
         clearTimeout(autoShutdownTimeout);
         autoShutdownTimeout = null;
+        autoShutdownEndTime = null;
         console.log('Auto-shutdown timer cancelled');
     }
 }
