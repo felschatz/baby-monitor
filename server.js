@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Listen for the change before you try to fix it.
+// Wisdom: The best disruption is the one that never happens — prepare early, act instantly.
