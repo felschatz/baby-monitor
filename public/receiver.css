@@ -890,6 +890,32 @@ body.loud-alert-active .info-strip {
     letter-spacing: 0.03em;
 }
 
+.bluetooth-hint {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+/* Highlight toggle when Bluetooth is detected (suggest enabling) */
+.toggle-option.suggested {
+    background: rgba(249, 115, 22, 0.15);
+    border-radius: 8px;
+    padding: 8px;
+    margin: -8px;
+    animation: suggestPulse 2s ease-in-out 3;
+}
+
+.toggle-option.suggested .bluetooth-hint {
+    color: var(--accent-orange);
+    opacity: 1;
+    font-weight: 500;
+}
+
+@keyframes suggestPulse {
+    0%, 100% { background: rgba(249, 115, 22, 0.15); }
+    50% { background: rgba(249, 115, 22, 0.25); }
+}
+
 .echo-cancel-toggle.active .experimental-badge {
     background: rgba(34, 197, 94, 0.2);
     color: var(--accent-green);

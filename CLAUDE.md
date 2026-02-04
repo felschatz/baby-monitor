@@ -77,10 +77,20 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Session-based isolation: each session has its own sender and receivers
 - Session names are server-side only, never broadcast to clients
 - Single sender per session, multiple receivers supported
-- PTT (Push-to-Talk) works via WebRTC renegotiation
+- PTT (Push-to-Talk) works via WebRTC `replaceTrack()` (no renegotiation)
 - Audio ducking reduces baby audio to 15% during PTT
 - STUN servers: stunprotocol.org, nextcloud.com, sipgate.net
 - FFT-based spectral subtraction for music echo reduction
+
+### Bluetooth Mode
+
+When enabled on the receiver, PTT signals are sent but the microphone is **not acquired**.
+This prevents the Bluetooth A2DP→HFP profile switch that breaks audio playback on many devices.
+In this mode:
+- Sender sees "📱 Parent wants attention" (orange indicator)
+- Audio playback continues uninterrupted on the receiver
+- Volume controls keep working correctly
+- Trade-off: Parent cannot speak to baby (visual alert only)
 
 ## Visual States
 
@@ -89,7 +99,8 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 | Connected | Green background | Green background |
 | Disconnected | Red/black blink | Red/black overlay "CONNECTION LOST" |
 | Loud sound | - | Red/black overlay "LOUD SOUND DETECTED" |
-| PTT active | Blue pulsing "Parent is speaking..." | - |
+| PTT active | Blue pulsing "👂 Parent is speaking..." | - |
+| PTT (Bluetooth mode) | Orange pulsing "📱 Parent wants attention" | - |
 | Music playing | Purple pulsing "🎵 [track name]" | Track name + timer |
 | Screen dim | Black overlay after 5s | - |
 
@@ -130,9 +141,9 @@ Signaling messages sent via `/api/signal`:
 | `offer` | Sender → Receivers | WebRTC offer |
 | `answer` | Receiver → Sender | WebRTC answer |
 | `ice-candidate` | Both directions | ICE candidate exchange |
-| `ptt-start` | Receiver → Sender | PTT starting |
-| `ptt-offer` | Receiver → Sender | PTT renegotiation offer |
-| `ptt-answer` | Sender → Receivers | PTT renegotiation answer |
+| `ptt-start` | Receiver → Sender | PTT starting (includes `bluetoothMode` flag) |
+| `ptt-offer` | Receiver → Sender | PTT renegotiation offer (legacy, ignored) |
+| `ptt-answer` | Sender → Receivers | PTT renegotiation answer (legacy, ignored) |
 | `ptt-stop` | Receiver → Sender | PTT stopped |
 | `music-start` | Receiver → Sender | Start music playback |
 | `music-stop` | Receiver → Sender | Stop music playback |

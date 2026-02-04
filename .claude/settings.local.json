@@ -11,7 +11,9 @@
       "Bash(for file in *.js)",
       "Bash(do echo \"Checking $file...\")",
       "Bash(echo:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "WebSearch",
+      "WebFetch(domain:developer.chrome.com)"
     ]
   }
 }

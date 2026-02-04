@@ -12,11 +12,12 @@ import {
     ensureAudioContext,
     resetAudioAnalysis,
     setNoiseGateThreshold,
-    setupNoiseGate,
-    setupNoiseGateFromStream,
     setPlaybackVolume,
     resetNoiseGate,
-    isAudioRoutedThroughWebAudio
+    isAudioRoutedThroughWebAudio,
+    getNoiseGateThreshold,
+    setVideoElement,
+    destroyAudioAnalysis
 } from './audio-analysis.js';
 import {
     initVideoPlayback,
@@ -32,14 +33,18 @@ import {
     setAudioOnlyMode,
     getRemoteVideo,
     setupAudioTrackMuteDetection,
-    resetMediaMutedState
+    resetMediaMutedState,
+    destroyVideoPlayback
 } from './video-playback.js';
 import {
     initPTT,
     startPTT,
     stopPTT,
     setupPTTButton,
-    cleanupPTT
+    cleanupPTT,
+    setBluetoothMode,
+    getBluetoothMode,
+    isBluetoothAudioDetected
 } from './ptt.js';
 import {
     initReceiverWebRTC,
@@ -58,6 +63,10 @@ import {
     updateMediaSessionState,
     destroyMediaSession
 } from './media-session.js';
+
+import {
+    destroyKeepAwake
+} from './keep-awake.js';
 
 // DOM elements
 const sessionOverlay = document.getElementById('sessionOverlay');
@@ -88,6 +97,7 @@ const fullscreenBtn = document.getElementById('fullscreenBtn');
 const info = document.getElementById('info');
 const thresholdMarker = document.getElementById('thresholdMarker');
 const audioOnlyToggle = document.getElementById('audioOnlyToggle');
+const bluetoothModeToggle = document.getElementById('bluetoothModeToggle');
 const echoCancelToggle = document.getElementById('echoCancelToggle');
 const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
 const mediaSessionToggle = document.getElementById('mediaSessionToggle');
@@ -141,6 +151,7 @@ let loudSoundTimeout = null;
 let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
 let mediaSessionEnabled = localStorage.getItem('receiver-media-session') === 'true';
+let bluetoothModeEnabled = localStorage.getItem('receiver-bluetooth-mode') === 'true';
 
 // Initialize keep-awake
 initKeepAwake();
@@ -168,6 +179,29 @@ if (savedNoiseGate !== null) {
 // Initialize audio-only toggle
 audioOnlyToggle.checked = getAudioOnlyMode();
 echoCancelToggle.checked = echoCancelEnabled;
+
+// Initialize Bluetooth mode toggle - enables PTT without mic to avoid A2DP→HFP switch
+bluetoothModeToggle.checked = bluetoothModeEnabled;
+setBluetoothMode(bluetoothModeEnabled);
+// Update PTT label based on initial Bluetooth mode state
+if (bluetoothModeEnabled) {
+    pttLabel.textContent = 'Hold to alert sender';
+}
+
+// Show Bluetooth warning after a delay (to allow device detection)
+setTimeout(() => {
+    if (isBluetoothAudioDetected() && !bluetoothModeEnabled) {
+        console.log('Bluetooth audio output detected - PTT may disrupt audio');
+        // Highlight the Bluetooth mode toggle to suggest enabling it
+        const bluetoothLabel = document.getElementById('bluetoothModeLabel');
+        if (bluetoothLabel) {
+            bluetoothLabel.classList.add('suggested');
+        }
+    }
+}, 1500);
+
+// Set video element reference for noise gate (uses video.muted for Bluetooth compatibility)
+setVideoElement(remoteVideo);
 
 // Initialize media session
 if (isMediaSessionSupported()) {
@@ -462,20 +496,10 @@ initVideoPlayback(
     {
         onUserInteraction: () => {
             ensureAudioContext(audioLevel);
-            // Set up noise gate after audio context is ready
-            const savedVol = localStorage.getItem('receiver-volume');
-            const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
-            // Use stream-based noise gate for better WebRTC compatibility
-            if (currentStream) {
-                setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
-            } else {
-                setupNoiseGate(remoteVideo, initialVolume);
-            }
-            // Apply saved threshold
+            // Set noise gate threshold from saved settings
             const savedGate = localStorage.getItem('receiver-noise-gate');
-            if (savedGate !== null) {
-                setNoiseGateThreshold(parseInt(savedGate));
-            }
+            const noiseGateValue = savedGate !== null ? parseInt(savedGate) : 0;
+            setNoiseGateThreshold(noiseGateValue);
         },
         getIsConnected: () => isConnected,
         onMediaMuted: setMediaMutedState,
@@ -652,6 +676,15 @@ audioOnlyToggle.addEventListener('change', () => {
     signaling.sendSignal({ type: 'video-request', enabled: !getAudioOnlyMode() });
 });
 
+bluetoothModeToggle.addEventListener('change', () => {
+    bluetoothModeEnabled = bluetoothModeToggle.checked;
+    localStorage.setItem('receiver-bluetooth-mode', bluetoothModeEnabled);
+    setBluetoothMode(bluetoothModeEnabled);
+    // Update PTT label to reflect mode change
+    pttLabel.textContent = bluetoothModeEnabled ? 'Hold to alert sender' : 'Hold to talk to baby';
+    console.log('Bluetooth mode:', bluetoothModeEnabled);
+});
+
 echoCancelToggle.addEventListener('change', () => {
     echoCancelEnabled = echoCancelToggle.checked;
     localStorage.setItem('receiver-echo-cancel', echoCancelEnabled);
@@ -673,14 +706,9 @@ mediaSessionToggle.addEventListener('change', () => {
 function updateVolume(value) {
     const numValue = parseInt(value);
     const volumeLevel = numValue / 100;
+    // Always use video element volume directly (Bluetooth compatible)
     remoteVideo.volume = volumeLevel;
-    // Only un-mute video element if audio is NOT routed through Web Audio API
-    // (noise gate routes audio through Web Audio, keeping video muted)
-    if (!isAudioRoutedThroughWebAudio()) {
-        remoteVideo.muted = false;
-    }
-    // Also update Web Audio API volume (needed when noise gate is active)
-    setPlaybackVolume(volumeLevel);
+    remoteVideo.muted = false;
     volumeSlider.value = numValue;
     volumeValue.textContent = numValue + '%';
     volumeDisplay.textContent = numValue + '%';
@@ -755,19 +783,10 @@ musicPlaylistSelect.addEventListener('touchcancel', cancelLongPress);
 function onUserInteractionGlobal() {
     handleUserInteraction();
     ensureAudioContext(audioLevel);
-    // Set up noise gate after audio context is ready
-    const savedVol = localStorage.getItem('receiver-volume');
-    const initialVolume = savedVol !== null ? parseInt(savedVol) / 100 : 1;
-    // Use stream-based noise gate for better WebRTC compatibility
-    if (currentStream) {
-        setupNoiseGateFromStream(currentStream, remoteVideo, initialVolume);
-    } else {
-        setupNoiseGate(remoteVideo, initialVolume);
-    }
+    // Set noise gate threshold from saved settings
     const savedGate = localStorage.getItem('receiver-noise-gate');
-    if (savedGate !== null) {
-        setNoiseGateThreshold(parseInt(savedGate));
-    }
+    const noiseGateValue = savedGate !== null ? parseInt(savedGate) : 0;
+    setNoiseGateThreshold(noiseGateValue);
 }
 document.addEventListener('click', onUserInteractionGlobal, { passive: true });
 document.addEventListener('touchstart', onUserInteractionGlobal, { passive: true });

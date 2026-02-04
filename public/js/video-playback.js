@@ -137,13 +137,11 @@ export function hideOverlay() {
 }
 
 /**
- * Safely unmute video element, but only if audio is not routed through Web Audio
- * (noise gate routes audio through Web Audio and keeps video muted)
+ * Safely unmute video element
+ * Audio always plays directly through the video element for Bluetooth compatibility
  */
 function safeUnmuteVideo() {
-    if (!isAudioRoutedThroughWebAudio || !isAudioRoutedThroughWebAudio()) {
-        remoteVideo.muted = false;
-    }
+    remoteVideo.muted = false;
 }
 
 /**
@@ -319,3 +317,14 @@ export function setAudioOnlyMode(value) {
     localStorage.setItem('receiver-audio-only', value);
 }
 export function getRemoteVideo() { return remoteVideo; }
+
+/**
+ * Cleanup video playback resources
+ */
+export function destroyVideoPlayback() {
+    clearTimeout(mediaMutedTimeout);
+    userHasInteracted = false;
+    hasVideoTrack = false;
+    videoTrackMuted = false;
+    audioTrackMuted = false;
+}
