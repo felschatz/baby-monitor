@@ -38,7 +38,8 @@ import {
     initPTT,
     startPTT,
     stopPTT,
-    setupPTTButton
+    setupPTTButton,
+    cleanupPTT
 } from './ptt.js';
 import {
     initReceiverWebRTC,
@@ -50,6 +51,13 @@ import {
     requestOffer,
     getPTTAudioSender
 } from './receiver-webrtc.js';
+import {
+    isMediaSessionSupported,
+    initMediaSession,
+    setMediaSessionEnabled,
+    updateMediaSessionState,
+    destroyMediaSession
+} from './media-session.js';
 
 // DOM elements
 const sessionOverlay = document.getElementById('sessionOverlay');
@@ -82,6 +90,8 @@ const thresholdMarker = document.getElementById('thresholdMarker');
 const audioOnlyToggle = document.getElementById('audioOnlyToggle');
 const echoCancelToggle = document.getElementById('echoCancelToggle');
 const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
+const mediaSessionToggle = document.getElementById('mediaSessionToggle');
+const mediaSessionToggleLabel = document.getElementById('mediaSessionToggleLabel');
 
 // Music elements
 const musicContainer = document.getElementById('musicContainer');
@@ -130,6 +140,7 @@ let playlistsUnlocked = localStorage.getItem('receiver-playlists-unlocked') === 
 let loudSoundTimeout = null;
 let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
+let mediaSessionEnabled = localStorage.getItem('receiver-media-session') === 'true';
 
 // Initialize keep-awake
 initKeepAwake();
@@ -158,6 +169,18 @@ if (savedNoiseGate !== null) {
 audioOnlyToggle.checked = getAudioOnlyMode();
 echoCancelToggle.checked = echoCancelEnabled;
 
+// Initialize media session
+if (isMediaSessionSupported()) {
+    initMediaSession({ videoElement: remoteVideo, sessionName });
+    mediaSessionToggle.checked = mediaSessionEnabled;
+    if (mediaSessionEnabled) {
+        setMediaSessionEnabled(true);
+    }
+} else {
+    // Hide toggle if not supported
+    mediaSessionToggleLabel.style.display = 'none';
+}
+
 // Helper functions
 function setConnectedState(connected) {
     isConnected = connected;
@@ -170,6 +193,7 @@ function setConnectedState(connected) {
         pttBtn.disabled = false;
         sessionStorage.setItem('receiver-streaming', 'true');
         updateAudioOnlyIndicator();
+        updateMediaSessionState(true);
     } else {
         document.body.classList.remove('connected');
         statusDot.classList.remove('connected');
@@ -178,6 +202,7 @@ function setConnectedState(connected) {
         pttBtn.disabled = true;
         stopPTT(pttBtn, pttLabel);
         audioOnlyIndicator.classList.remove('active');
+        updateMediaSessionState(false);
     }
 }
 
@@ -198,6 +223,7 @@ function setDisconnectedState() {
     audioOnlyIndicator.classList.remove('active');
     noiseGateInfoItem.classList.remove('gating');
     resetMusicUI();
+    updateMediaSessionState(false);
 }
 
 function setMediaMutedState(muted) {
@@ -537,6 +563,15 @@ async function handleMessage(message) {
             break;
 
         case 'sender-available':
+            // If we were previously connected (sender refreshed), reload for clean reconnection
+            // This is more reliable than trying to manually reset all state
+            if (sessionStorage.getItem('receiver-streaming') === 'true') {
+                console.log('Sender reconnected - reloading for clean state');
+                sessionStorage.removeItem('receiver-streaming');
+                window.location.reload();
+                return;
+            }
+            // First connection - request stream normally
             overlayText.textContent = 'Sender started. Requesting stream...';
             signaling.sendSignal({ type: 'request-offer', videoEnabled: !getAudioOnlyMode() });
             if (echoCancelEnabled) {
@@ -594,6 +629,17 @@ async function handleMessage(message) {
             info.textContent = 'Sender video unavailable';
             break;
 
+        case 'sender-ready':
+            // Sender's stream is now ready - request an offer
+            // This handles the case where our earlier request-offer arrived before sender was ready
+            console.log('Sender ready, requesting stream');
+            overlayText.textContent = 'Sender ready. Requesting stream...';
+            signaling.sendSignal({ type: 'request-offer', videoEnabled: !getAudioOnlyMode() });
+            if (echoCancelEnabled) {
+                signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
+            }
+            break;
+
         case 'heartbeat':
             break;
     }
@@ -611,6 +657,16 @@ echoCancelToggle.addEventListener('change', () => {
     localStorage.setItem('receiver-echo-cancel', echoCancelEnabled);
     console.log('Echo cancel mode:', echoCancelEnabled);
     signaling.sendSignal({ type: 'echo-cancel-enable', enabled: echoCancelEnabled });
+});
+
+mediaSessionToggle.addEventListener('change', () => {
+    mediaSessionEnabled = mediaSessionToggle.checked;
+    localStorage.setItem('receiver-media-session', mediaSessionEnabled);
+    console.log('Media session mode:', mediaSessionEnabled);
+    setMediaSessionEnabled(mediaSessionEnabled);
+    if (mediaSessionEnabled) {
+        updateMediaSessionState(isConnected);
+    }
 });
 
 // Shared volume update function
@@ -755,6 +811,24 @@ document.addEventListener('click', (e) => {
         document.body.classList.remove('drawer-open');
     }
 }, { passive: true });
+
+// Page unload cleanup
+window.addEventListener('beforeunload', () => {
+    // Clear any pending timeouts
+    if (loudSoundTimeout) {
+        clearTimeout(loudSoundTimeout);
+    }
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+    }
+    cleanupPTT();
+    destroyKeepAwake();
+    destroyAudioAnalysis();
+    destroyVideoPlayback();
+    destroyMediaSession();
+    closePeerConnection();
+    signaling.disconnect();
+});
 
 // Initialize
 updateThresholdMarker();

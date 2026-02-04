@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - dev
 
 jobs:
   deploy:
@@ -32,7 +33,7 @@ jobs:
           security: loose
           timeout: 60000
           local-dir: ./
-          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          server-dir: ${{ github.ref == 'refs/heads/main' && secrets.FTP_SERVER_DIR || secrets.FTP_SERVER_DIR_DEV }}
           exclude: |
             **/.git*
             **/.git*/**

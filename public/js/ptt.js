@@ -28,6 +28,9 @@ export function initPTT(deps) {
     getPTTAudioSender = deps.getPTTAudioSender;
 }
 
+// Track if we sent ptt-start (to ensure we always send ptt-stop)
+let pttStartSent = false;
+
 /**
  * Start push-to-talk
  * @param {HTMLElement} pttBtn
@@ -39,7 +42,7 @@ export async function startPTT(pttBtn, pttLabel) {
         return;
     }
     if (!getIsConnected()) {
-        console.log('PTT: Not connected');
+        console.log('PTT: Not connected, isConnected:', getIsConnected());
         return;
     }
 
@@ -49,21 +52,22 @@ export async function startPTT(pttBtn, pttLabel) {
         return;
     }
 
+    // All checks passed - activate PTT
     pttActive = true;
+    pttBtn.classList.add('active');
+    pttLabel.textContent = 'Speaking...';
+
+    // Audio ducking - lower baby audio to prevent echo
+    preDuckVolume = remoteVideo.volume;
+    remoteVideo.volume = Math.min(remoteVideo.volume, DUCKING_VOLUME);
+    console.log('PTT: Ducked audio from', preDuckVolume, 'to', remoteVideo.volume);
+
+    // Notify sender that PTT is starting
+    sendSignal({ type: 'ptt-start' });
+    pttStartSent = true;
+    console.log('PTT: Sent start notification');
 
     try {
-        pttBtn.classList.add('active');
-        pttLabel.textContent = 'Speaking...';
-
-        // Audio ducking - lower baby audio to prevent echo
-        preDuckVolume = remoteVideo.volume;
-        remoteVideo.volume = Math.min(remoteVideo.volume, DUCKING_VOLUME);
-        console.log('PTT: Ducked audio from', preDuckVolume, 'to', remoteVideo.volume);
-
-        // Notify sender that PTT is starting
-        sendSignal({ type: 'ptt-start' });
-        console.log('PTT: Sent start notification');
-
         // Get microphone access
         console.log('PTT: Requesting microphone...');
         pttStream = await navigator.mediaDevices.getUserMedia({
@@ -93,12 +97,24 @@ export async function startPTT(pttBtn, pttLabel) {
  * @param {HTMLElement} pttLabel
  */
 export async function stopPTT(pttBtn, pttLabel) {
-    if (!pttActive) return;
+    // Always reset visual state
+    pttBtn.classList.remove('active');
+    pttLabel.textContent = 'Hold to talk to baby';
+
+    // Always send ptt-stop if we sent ptt-start (even if pttActive is false due to race)
+    if (pttStartSent) {
+        sendSignal({ type: 'ptt-stop' });
+        console.log('PTT: Sent stop notification');
+        pttStartSent = false;
+    }
+
+    if (!pttActive) {
+        console.log('PTT: stopPTT called but not active');
+        return;
+    }
     pttActive = false;
 
     console.log('PTT: Stopping...');
-    pttBtn.classList.remove('active');
-    pttLabel.textContent = 'Hold to talk to baby';
 
     // Restore audio volume (un-duck)
     if (preDuckVolume !== null) {
@@ -106,10 +122,6 @@ export async function stopPTT(pttBtn, pttLabel) {
         console.log('PTT: Restored audio to', preDuckVolume);
         preDuckVolume = null;
     }
-
-    // Notify sender that PTT has stopped
-    sendSignal({ type: 'ptt-stop' });
-    console.log('PTT: Sent stop notification');
 
     // Clear the track from the sender (no renegotiation needed)
     const pttSender = getPTTAudioSender?.();
@@ -129,6 +141,21 @@ export async function stopPTT(pttBtn, pttLabel) {
         console.log('PTT: Microphone stopped');
     }
 
+    // Bluetooth audio recovery: When releasing the mic, Bluetooth may switch
+    // from HFP (headset) back to A2DP (audio) profile. This can disrupt playback.
+    // Give it a moment then "poke" the audio to resume.
+    setTimeout(() => {
+        if (remoteVideo && remoteVideo.srcObject) {
+            console.log('PTT: Recovering audio playback after Bluetooth profile switch');
+            // Toggle play to recover audio routing
+            const wasPlaying = !remoteVideo.paused;
+            if (wasPlaying) {
+                remoteVideo.pause();
+                remoteVideo.play().catch(e => console.log('PTT: Audio recovery play failed:', e));
+            }
+        }
+    }, 300);
+
     console.log('PTT: Stopped');
 }
 
@@ -138,8 +165,21 @@ export async function stopPTT(pttBtn, pttLabel) {
  * @param {HTMLElement} pttLabel
  */
 export function setupPTTButton(pttBtn, pttLabel) {
+    console.log('PTT: Button setup complete');
+
+    // Check microphone permission on setup
+    if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'microphone' }).then(result => {
+            console.log('PTT: Microphone permission state:', result.state);
+            result.onchange = () => {
+                console.log('PTT: Microphone permission changed to:', result.state);
+            };
+        }).catch(e => console.log('PTT: Could not query mic permission:', e));
+    }
+
     // Mouse events
     pttBtn.addEventListener('mousedown', (e) => {
+        console.log('PTT: mousedown event');
         e.preventDefault();
         startPTT(pttBtn, pttLabel);
     });
@@ -149,6 +189,7 @@ export function setupPTTButton(pttBtn, pttLabel) {
 
     // Touch events
     pttBtn.addEventListener('touchstart', (e) => {
+        console.log('PTT: touchstart event');
         e.preventDefault();
         startPTT(pttBtn, pttLabel);
     });
@@ -159,6 +200,25 @@ export function setupPTTButton(pttBtn, pttLabel) {
     });
 
     pttBtn.addEventListener('touchcancel', () => stopPTT(pttBtn, pttLabel));
+}
+
+/**
+ * Cleanup PTT state (call on disconnect/unload)
+ */
+export function cleanupPTT() {
+    // Send ptt-stop if we had started
+    if (pttStartSent && sendSignal) {
+        sendSignal({ type: 'ptt-stop' });
+        console.log('PTT: Cleanup - sent stop notification');
+        pttStartSent = false;
+    }
+    pttActive = false;
+
+    // Stop microphone if active
+    if (pttStream) {
+        pttStream.getTracks().forEach(track => track.stop());
+        pttStream = null;
+    }
 }
 
 // Getters

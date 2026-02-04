@@ -128,6 +128,20 @@ async function handleSignal(req, res) {
             });
             break;
 
+        case 'sender-ready':
+            // Sender -> Receivers: sender's stream is ready, request offers now
+            broadcastToReceivers(sessionName, { type: 'sender-ready' });
+            break;
+
+        case 'video-unavailable':
+            // Sender -> Receiver: video capture not available
+            if (message.receiverId) {
+                sendToReceiver(sessionName, message.receiverId, { type: 'video-unavailable' });
+            } else {
+                broadcastToReceivers(sessionName, { type: 'video-unavailable' });
+            }
+            break;
+
         case 'ice-candidate':
             if (message.role === 'sender') {
                 // If receiverId is specified, send only to that receiver; otherwise broadcast

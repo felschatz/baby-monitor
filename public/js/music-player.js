@@ -192,10 +192,8 @@ function updateVolumeUI(value) {
     // Update tooltip
     if (volumeTooltip) {
         volumeTooltip.textContent = value + '%';
-        // Position tooltip based on slider value
-        const sliderWidth = musicVolumeSlider.offsetWidth;
-        const thumbOffset = (value / 100) * sliderWidth;
-        volumeTooltip.style.left = thumbOffset + 'px';
+        // Position tooltip based on slider value (percentage-based to work when hidden)
+        volumeTooltip.style.left = value + '%';
     }
 }
 

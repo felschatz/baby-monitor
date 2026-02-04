@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Patience in rendering ensures all elements find their place.
+// Wisdom: Bluetooth audio profiles need gentle handling during transitions.

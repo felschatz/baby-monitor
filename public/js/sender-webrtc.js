@@ -19,7 +19,7 @@ let analyser = null;
 // PTT state per receiver
 const pttActiveReceivers = new Set(); // Set of receiverIds with active PTT
 let pttTimeout = null;
-const PTT_TIMEOUT_MS = 30000;
+const PTT_TIMEOUT_MS = 5000; // Auto-hide after 5s as safety (ptt-stop should arrive much sooner)
 
 // Callbacks
 let sendSignal = null;

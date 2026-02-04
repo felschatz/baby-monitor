@@ -488,9 +488,10 @@ async function startStreamingHandler() {
 
         enableAudioPlayback();
 
-        // Don't create offer here - wait for receivers to request one
-        // Each receiver will send request-offer with their receiverId
-        console.log('Stream ready, waiting for receiver requests');
+        // Notify receivers that we're ready - they may have sent request-offer
+        // before our stream was ready, so tell them to request again
+        console.log('Stream ready, notifying receivers');
+        signaling.sendSignal({ type: 'sender-ready' });
     } catch (err) {
         console.error('Error starting stream:', err);
         alert('Failed to access camera/microphone: ' + err.message);
