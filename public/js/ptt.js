@@ -13,7 +13,7 @@ import {
 const DUCKING_VOLUME = 0.15;
 
 // State
-let pttStream = null;  // Kept alive between PTT presses to avoid Bluetooth issues
+let pttStream = null;
 let pttActive = false;
 let preDuckVolume = null;
 
@@ -36,6 +36,21 @@ export function initPTT(deps) {
 
 // Track if we sent ptt-start (to ensure we always send ptt-stop)
 let pttStartSent = false;
+
+/**
+ * Recover audio playback after Bluetooth profile switch.
+ * Re-assigns srcObject to force the browser to re-evaluate
+ * audio output routing, then resumes playback.
+ */
+function recoverAudioPlayback() {
+    if (!remoteVideo || !remoteVideo.srcObject) return;
+
+    const stream = remoteVideo.srcObject;
+    remoteVideo.srcObject = null;
+    remoteVideo.srcObject = stream;
+    remoteVideo.play().catch(e => console.log('PTT: Audio recovery play failed:', e));
+    console.log('PTT: Audio playback recovered');
+}
 
 /**
  * Start push-to-talk
@@ -64,7 +79,6 @@ export async function startPTT(pttBtn, pttLabel) {
     pttLabel.textContent = 'Speaking...';
 
     // Audio ducking - lower baby audio to prevent echo
-    // Check if audio is routed through Web Audio API (for noise gate)
     if (isAudioRoutedThroughWebAudio()) {
         preDuckVolume = getPlaybackVolume();
         setPlaybackVolume(Math.min(preDuckVolume, DUCKING_VOLUME));
@@ -81,29 +95,19 @@ export async function startPTT(pttBtn, pttLabel) {
     console.log('PTT: Sent start notification');
 
     try {
-        // Reuse existing mic stream if available (avoids Bluetooth profile switch)
-        if (!pttStream) {
-            console.log('PTT: Requesting microphone...');
-            pttStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false
-                }
-            });
-            console.log('PTT: Got microphone (keeping alive for future PTT)');
+        console.log('PTT: Requesting microphone...');
+        pttStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false
+            }
+        });
+        console.log('PTT: Got microphone');
 
-            // Bluetooth profile switch may have disrupted audio playback
-            // Resume video after a moment to recover audio
-            setTimeout(() => {
-                if (remoteVideo && remoteVideo.srcObject) {
-                    console.log('PTT: Recovering audio after Bluetooth profile switch');
-                    remoteVideo.play().catch(e => console.log('PTT: Could not resume video:', e));
-                }
-            }, 150);
-        } else {
-            console.log('PTT: Reusing existing microphone stream');
-        }
+        // Bluetooth profile switch (A2DP -> HFP) may have disrupted audio output
+        // Recover after a short delay to let the new profile settle
+        setTimeout(recoverAudioPlayback, 200);
 
         // Use replaceTrack for instant audio - no renegotiation needed!
         const audioTrack = pttStream.getAudioTracks()[0];
@@ -165,9 +169,18 @@ export async function stopPTT(pttBtn, pttLabel) {
         }
     }
 
-    // Don't stop the microphone - keep it alive to avoid Bluetooth profile switch
-    // The replaceTrack(null) above already stopped audio from being sent
-    console.log('PTT: Stopped (mic kept alive)');
+    // Stop microphone - releases Bluetooth back to A2DP for better playback quality
+    if (pttStream) {
+        pttStream.getTracks().forEach(track => track.stop());
+        pttStream = null;
+        console.log('PTT: Microphone stopped');
+    }
+
+    // Bluetooth profile switch (HFP -> A2DP) needs time to settle
+    // Then recover audio playback on the new output route
+    setTimeout(recoverAudioPlayback, 500);
+
+    console.log('PTT: Stopped');
 }
 
 /**

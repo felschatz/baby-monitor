@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Sometimes the simplest fix is just to try playing again after the disruption.
+// Wisdom: When Bluetooth switches profiles, reassigning the stream forces the browser to find the right output again.
