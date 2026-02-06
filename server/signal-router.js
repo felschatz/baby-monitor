@@ -139,6 +139,22 @@ async function handleSignal(req, res) {
             }
             break;
 
+        case 'shutdown-now':
+            // Receiver -> Sender: trigger immediate shutdown (30s countdown)
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, { type: 'shutdown-now' });
+            }
+            break;
+
+        case 'shutdown-status':
+            // Sender -> Receivers: broadcast shutdown timer status
+            broadcastToReceivers(sessionName, {
+                type: 'shutdown-status',
+                active: message.active,
+                remainingMs: message.remainingMs
+            });
+            break;
+
         case 'sender-ready':
             // Sender -> Receivers: sender's stream is ready, request offers now
             broadcastToReceivers(sessionName, { type: 'sender-ready' });

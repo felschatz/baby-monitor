@@ -7,9 +7,10 @@ let wakeLock = null;
 let wakeLockInterval = null;
 let noSleepVideo = null;
 let lastWakeLockLog = 0;
-let autoShutdownTimeout = null;
-let autoShutdownEndTime = null; // Store end time separately (setTimeout returns a number in some environments)
+let autoShutdownInterval = null;
+let autoShutdownEndTime = null;
 let autoShutdownCallback = null;
+let autoShutdownStatusCallback = null;
 let autoShutdownHours = 6; // Default: 6 hours (or seconds in debug mode)
 let autoShutdownUnit = 'hours'; // 'hours' or 'seconds'
 
@@ -156,8 +157,23 @@ export function setAutoShutdownHours(hours) {
  * Get remaining time until auto-shutdown in milliseconds
  */
 export function getAutoShutdownRemaining() {
-    if (!autoShutdownTimeout || !autoShutdownEndTime) return null;
-    return autoShutdownEndTime - Date.now();
+    if (!autoShutdownInterval || !autoShutdownEndTime) return null;
+    return Math.max(0, autoShutdownEndTime - Date.now());
+}
+
+/**
+ * Check if auto-shutdown timer is currently running
+ */
+export function getAutoShutdownActive() {
+    return autoShutdownInterval !== null && autoShutdownEndTime !== null;
+}
+
+/**
+ * Register a callback that fires every second with shutdown status
+ * @param {Function} callback - Called with {active, remainingMs}
+ */
+export function setShutdownStatusCallback(callback) {
+    autoShutdownStatusCallback = callback;
 }
 
 /**
@@ -167,6 +183,11 @@ export function getAutoShutdownRemaining() {
 export function startAutoShutdown(onShutdown) {
     if (autoShutdownHours <= 0) {
         console.log('Auto-shutdown disabled');
+        cancelAutoShutdown();
+        // Notify that shutdown is now inactive
+        if (autoShutdownStatusCallback) {
+            autoShutdownStatusCallback({ active: false, remainingMs: 0 });
+        }
         return;
     }
 
@@ -176,15 +197,25 @@ export function startAutoShutdown(onShutdown) {
     const timeoutMs = autoShutdownUnit === 'seconds'
         ? autoShutdownHours * 1000
         : autoShutdownHours * 60 * 60 * 1000;
-    
-    autoShutdownTimeout = setTimeout(() => {
-        console.log('Auto-shutdown triggered after', autoShutdownHours, autoShutdownUnit);
-        triggerAutoShutdown();
-    }, timeoutMs);
-    
-    // Store end time for remaining time calculation
+
     autoShutdownEndTime = Date.now() + timeoutMs;
-    
+
+    // Use setInterval (1s tick) so we can broadcast status and detect expiry
+    autoShutdownInterval = setInterval(() => {
+        const remaining = autoShutdownEndTime - Date.now();
+        if (remaining <= 0) {
+            console.log('Auto-shutdown triggered after', autoShutdownHours, autoShutdownUnit);
+            triggerAutoShutdown();
+        } else if (autoShutdownStatusCallback) {
+            autoShutdownStatusCallback({ active: true, remainingMs: remaining });
+        }
+    }, 1000);
+
+    // Fire initial status immediately
+    if (autoShutdownStatusCallback) {
+        autoShutdownStatusCallback({ active: true, remainingMs: timeoutMs });
+    }
+
     console.log('Auto-shutdown timer started:', autoShutdownHours, autoShutdownUnit);
 }
 
@@ -192,9 +223,9 @@ export function startAutoShutdown(onShutdown) {
  * Cancel the auto-shutdown timer
  */
 export function cancelAutoShutdown() {
-    if (autoShutdownTimeout) {
-        clearTimeout(autoShutdownTimeout);
-        autoShutdownTimeout = null;
+    if (autoShutdownInterval) {
+        clearInterval(autoShutdownInterval);
+        autoShutdownInterval = null;
         autoShutdownEndTime = null;
         console.log('Auto-shutdown timer cancelled');
     }
@@ -205,7 +236,12 @@ export function cancelAutoShutdown() {
  */
 function triggerAutoShutdown() {
     console.log('Triggering auto-shutdown to save battery');
-    
+
+    // Notify status callback that shutdown fired
+    if (autoShutdownStatusCallback) {
+        autoShutdownStatusCallback({ active: false, remainingMs: 0 });
+    }
+
     // First call the callback (which should stop streaming)
     if (autoShutdownCallback) {
         try {
@@ -214,7 +250,7 @@ function triggerAutoShutdown() {
             console.error('Auto-shutdown callback error:', e);
         }
     }
-    
+
     // Then release all keep-awake resources
     destroyKeepAwake();
 }

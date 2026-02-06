@@ -90,7 +90,11 @@ const audioOnlyToggle = document.getElementById('audioOnlyToggle');
 const echoCancelToggle = document.getElementById('echoCancelToggle');
 const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
 const shutdownTimerSelect = document.getElementById('shutdownTimerSelect');
-const shutdownTimerStatus = document.getElementById('shutdownTimerStatus');
+const shutdownBtn = document.getElementById('shutdownBtn');
+const shutdownResetBtn = document.getElementById('shutdownResetBtn');
+const shutdownStatus = document.getElementById('shutdownStatus');
+const shutdownInfoItem = document.getElementById('shutdownInfoItem');
+const shutdownStatusDisplay = document.getElementById('shutdownStatusDisplay');
 
 // Music elements
 const musicContainer = document.getElementById('musicContainer');
@@ -436,6 +440,36 @@ function handleEchoCancelStatus(message) {
     }
 }
 
+// Shutdown status functions
+let shutdownActive = false;
+
+function formatShutdownTime(ms) {
+    const totalSec = Math.ceil(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function handleShutdownStatus(message) {
+    shutdownActive = message.active;
+    if (message.active && message.remainingMs > 0) {
+        const timeStr = formatShutdownTime(message.remainingMs);
+        shutdownStatus.textContent = timeStr + ' remaining';
+        shutdownStatusDisplay.textContent = timeStr;
+        shutdownInfoItem.style.display = 'flex';
+        shutdownResetBtn.style.display = 'inline-block';
+        shutdownBtn.classList.add('active');
+    } else {
+        shutdownStatus.textContent = '';
+        shutdownStatusDisplay.textContent = '—';
+        shutdownInfoItem.style.display = 'none';
+        shutdownResetBtn.style.display = 'none';
+        shutdownBtn.classList.remove('active');
+    }
+}
+
 // Create signaling manager
 const signaling = createSignalingManager({
     sessionName,
@@ -594,6 +628,7 @@ async function handleMessage(message) {
 
         case 'sender-disconnected':
             setDisconnectedState();
+            handleShutdownStatus({ active: false, remainingMs: 0 });
             closePeerConnection();
             resetAudioAnalysis();
             resetNoiseGate();
@@ -631,6 +666,10 @@ async function handleMessage(message) {
         case 'echo-cancel-status':
             console.log('Received echo cancel status:', message);
             handleEchoCancelStatus(message);
+            break;
+
+        case 'shutdown-status':
+            handleShutdownStatus(message);
             break;
 
         case 'video-unavailable':
@@ -677,6 +716,21 @@ shutdownTimerSelect.addEventListener('change', () => {
     localStorage.setItem('receiver-shutdown-timer', shutdownTimerValue);
     console.log('Shutdown timer changed:', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
     // Send new shutdown timeout to sender
+    signaling.sendSignal({
+        type: 'shutdown-timeout',
+        value: shutdownTimerValue,
+        unit: debugTimerMode ? 'seconds' : 'hours'
+    });
+});
+
+shutdownBtn.addEventListener('click', () => {
+    console.log('Shutdown now requested');
+    signaling.sendSignal({ type: 'shutdown-now' });
+});
+
+shutdownResetBtn.addEventListener('click', () => {
+    if (!shutdownActive) return;
+    console.log('Resetting shutdown timer to', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
     signaling.sendSignal({
         type: 'shutdown-timeout',
         value: shutdownTimerValue,

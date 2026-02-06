@@ -860,6 +860,82 @@ body.loud-alert-active .info-strip {
     min-height: 1.2em;
 }
 
+/* Shutdown section - orange/amber accent */
+.shutdown-section .control-label {
+    color: #fb923c;
+}
+
+.shutdown-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.shutdown-btn {
+    background: linear-gradient(135deg, #ea580c, #c2410c);
+    border: none;
+    color: white;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    font-size: 1.3rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s, box-shadow 0.15s;
+    flex-shrink: 0;
+}
+
+.shutdown-btn:active {
+    transform: scale(0.95);
+}
+
+.shutdown-btn.active {
+    background: linear-gradient(135deg, var(--accent-red), #dc2626);
+    transform: scale(1.05);
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.5);
+    animation: shutdownBtnPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes shutdownBtnPulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.4); }
+    50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.6); }
+}
+
+.shutdown-reset-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.shutdown-reset-btn:active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.shutdown-status {
+    font-size: 0.8rem;
+    color: #fb923c;
+    min-height: 1.2em;
+}
+
+/* Shutdown info strip item */
+.shutdown-info {
+    background: rgba(234, 88, 12, 0.25) !important;
+    border-color: rgba(234, 88, 12, 0.5) !important;
+}
+
+.shutdown-info span:not(.info-icon) {
+    color: #fb923c !important;
+    text-shadow: 0 0 10px rgba(234, 88, 12, 0.5) !important;
+}
+
 /* Toggles section */
 .toggles-section {
     display: flex;

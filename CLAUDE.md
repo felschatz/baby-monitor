@@ -92,6 +92,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 | Loud sound | - | Red/black overlay "LOUD SOUND DETECTED" |
 | PTT active | Blue pulsing "👂 Parent is speaking..." | - |
 | Music playing | Purple pulsing "🎵 [track name]" | Track name + timer |
+| Shutdown active | Orange "⏻ Shutdown in H:MM:SS" | Orange info strip + countdown in drawer |
 | Screen dim | Black overlay after 5s | - |
 
 ## Implementation Details
@@ -143,6 +144,8 @@ Signaling messages sent via `/api/signal`:
 | `echo-cancel-enable` | Receiver → Sender | Toggle spectral subtraction |
 | `echo-cancel-status` | Sender → Receivers | Echo cancel status (enabled, active) |
 | `shutdown-timeout` | Receiver → Sender | Set auto-shutdown timeout (value, unit) |
+| `shutdown-now` | Receiver → Sender | Trigger immediate 30s shutdown countdown |
+| `shutdown-status` | Sender → Receivers | Shutdown timer status (active, remainingMs) |
 
 ## Music/Playlist Structure
 
