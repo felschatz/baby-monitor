@@ -499,7 +499,8 @@ async function handleMessage(message) {
                 startAutoShutdown(() => {
                     console.log('Auto-shutdown triggered by receiver setting');
                     stopStreamingHandler();
-                    info.textContent = 'Auto-stopped to save battery. Tap Start to restart.';
+                    info.textContent = 'Auto-shutdown complete. Redirecting...';
+                    setTimeout(() => { window.location.href = '/'; }, 3000);
                 });
             }
             break;
@@ -512,7 +513,8 @@ async function handleMessage(message) {
                 startAutoShutdown(() => {
                     console.log('Immediate shutdown triggered by receiver');
                     stopStreamingHandler();
-                    info.textContent = 'Shut down by receiver. Tap Start to restart.';
+                    info.textContent = 'Shut down by receiver. Redirecting...';
+                    setTimeout(() => { window.location.href = '/'; }, 3000);
                 });
             }
             break;
@@ -569,7 +571,8 @@ async function startStreamingHandler() {
         startAutoShutdown(() => {
             console.log('Auto-shutdown: stopping stream to save battery');
             stopStreamingHandler();
-            info.textContent = 'Auto-stopped to save battery. Tap Start to restart.';
+            info.textContent = 'Auto-shutdown complete. Redirecting...';
+            setTimeout(() => { window.location.href = '/'; }, 3000);
         });
 
         // Notify receivers that we're ready - they may have sent request-offer

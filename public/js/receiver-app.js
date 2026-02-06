@@ -442,6 +442,8 @@ function handleEchoCancelStatus(message) {
 
 // Shutdown status functions
 let shutdownActive = false;
+let shutdownEndTime = null;  // Local end time for smooth countdown
+let shutdownCountdownInterval = null;
 
 function formatShutdownTime(ms) {
     const totalSec = Math.ceil(ms / 1000);
@@ -452,16 +454,38 @@ function formatShutdownTime(ms) {
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+function updateShutdownDisplay() {
+    if (!shutdownActive || !shutdownEndTime) return;
+    const remaining = Math.max(0, shutdownEndTime - Date.now());
+    const timeStr = formatShutdownTime(remaining);
+    shutdownStatus.textContent = timeStr + ' remaining';
+    shutdownStatusDisplay.textContent = timeStr;
+    if (remaining <= 0) {
+        handleShutdownStatus({ active: false, remainingMs: 0 });
+    }
+}
+
 function handleShutdownStatus(message) {
     shutdownActive = message.active;
     if (message.active && message.remainingMs > 0) {
+        // Store end time for local countdown interpolation
+        shutdownEndTime = Date.now() + message.remainingMs;
         const timeStr = formatShutdownTime(message.remainingMs);
         shutdownStatus.textContent = timeStr + ' remaining';
         shutdownStatusDisplay.textContent = timeStr;
         shutdownInfoItem.style.display = 'flex';
         shutdownResetBtn.style.display = 'inline-block';
         shutdownBtn.classList.add('active');
+        // Start local countdown interval for smooth display
+        if (!shutdownCountdownInterval) {
+            shutdownCountdownInterval = setInterval(updateShutdownDisplay, 1000);
+        }
     } else {
+        shutdownEndTime = null;
+        if (shutdownCountdownInterval) {
+            clearInterval(shutdownCountdownInterval);
+            shutdownCountdownInterval = null;
+        }
         shutdownStatus.textContent = '';
         shutdownStatusDisplay.textContent = '—';
         shutdownInfoItem.style.display = 'none';
@@ -726,6 +750,7 @@ shutdownTimerSelect.addEventListener('change', () => {
 shutdownBtn.addEventListener('click', () => {
     console.log('Shutdown now requested');
     signaling.sendSignal({ type: 'shutdown-now' });
+    shutdownStatus.textContent = 'Shutdown signal sent (30s)';
 });
 
 shutdownResetBtn.addEventListener('click', () => {
@@ -875,6 +900,9 @@ window.addEventListener('beforeunload', () => {
     }
     if (longPressTimer) {
         clearTimeout(longPressTimer);
+    }
+    if (shutdownCountdownInterval) {
+        clearInterval(shutdownCountdownInterval);
     }
     cleanupPTT();
     destroyKeepAwake();

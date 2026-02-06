@@ -92,7 +92,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 | Loud sound | - | Red/black overlay "LOUD SOUND DETECTED" |
 | PTT active | Blue pulsing "👂 Parent is speaking..." | - |
 | Music playing | Purple pulsing "🎵 [track name]" | Track name + timer |
-| Shutdown active | Orange "⏻ Shutdown in H:MM:SS" | Orange info strip + countdown in drawer |
+| Shutdown active | Orange "🌙 Shutdown in H:MM:SS" | Orange info strip + countdown in drawer |
 | Screen dim | Black overlay after 5s | - |
 
 ## Implementation Details

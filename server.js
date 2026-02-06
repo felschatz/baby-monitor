@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A countdown visible to both sides turns a silent timeout into a shared understanding.
+// Wisdom: The moon emoji works on every phone, but the power symbol only dreams of such reach.
