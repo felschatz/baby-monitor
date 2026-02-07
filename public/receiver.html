@@ -158,7 +158,7 @@
             <div class="control-section shutdown-section" id="shutdownContainer">
                 <label class="control-label">Auto-shutdown</label>
                 <div class="shutdown-controls">
-                    <button class="shutdown-btn" id="shutdownBtn" title="Shutdown now">🌙</button>
+                    <button class="shutdown-btn" id="shutdownBtn" title="Set auto-shutdown">Set</button>
                     <select class="timer-select" id="shutdownTimerSelect">
                         <option value="0">Disabled</option>
                         <option value="4">4 hours</option>
@@ -166,13 +166,20 @@
                         <option value="8">8 hours</option>
                         <option value="10">10 hours</option>
                     </select>
-                    <button class="shutdown-reset-btn" id="shutdownResetBtn" style="display: none;">Reset</button>
                 </div>
                 <div class="shutdown-status" id="shutdownStatus"></div>
-                <div class="control-hint">Sender stops streaming after this time</div>
+                <div class="control-hint">Choose a time, then tap Set or Reset</div>
+            </div>
+
+
+            <div class="control-section test-sound-section">
+                <label class="control-label">Test Sound</label>
+                <button class="test-sound-btn" id="testSoundBtn" disabled>Send test ping</button>
+                <div class="control-hint">Injects a short ping into the baby audio stream</div>
             </div>
 
             <button class="fullscreen-btn" id="fullscreenBtn">⛶ Fullscreen</button>
+            <div class="wisdom-text" id="receiverWisdom">Wisdom - Feb 7, 2026: Quiet rooms keep the best watch.</div>
         </div>
     </div>
 

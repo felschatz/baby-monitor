@@ -91,10 +91,10 @@ const echoCancelToggle = document.getElementById('echoCancelToggle');
 const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
 const shutdownTimerSelect = document.getElementById('shutdownTimerSelect');
 const shutdownBtn = document.getElementById('shutdownBtn');
-const shutdownResetBtn = document.getElementById('shutdownResetBtn');
 const shutdownStatus = document.getElementById('shutdownStatus');
 const shutdownInfoItem = document.getElementById('shutdownInfoItem');
 const shutdownStatusDisplay = document.getElementById('shutdownStatusDisplay');
+const testSoundBtn = document.getElementById('testSoundBtn');
 
 // Music elements
 const musicContainer = document.getElementById('musicContainer');
@@ -145,6 +145,11 @@ let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
 let debugTimerMode = false; // Will be set from /api/music response
 let shutdownTimerValue = parseInt(localStorage.getItem('receiver-shutdown-timer') || '6');
+let testSoundResetTimer = null;
+const testSoundButtonLabel = testSoundBtn ? testSoundBtn.textContent : 'Send test ping';
+let shutdownActive = false;
+let shutdownEndTime = null;  // Local end time for smooth countdown
+let shutdownCountdownInterval = null;
 
 // Initialize keep-awake
 initKeepAwake();
@@ -178,6 +183,7 @@ setVideoElement(remoteVideo);
 
 // Initialize shutdown timer select
 shutdownTimerSelect.value = shutdownTimerValue.toString();
+updateShutdownButtonState();
 
 // Helper functions
 function setConnectedState(connected) {
@@ -200,6 +206,7 @@ function setConnectedState(connected) {
         stopPTT(pttBtn, pttLabel);
         audioOnlyIndicator.classList.remove('active');
     }
+    updateTestSoundButton();
 }
 
 function setDisconnectedState() {
@@ -219,6 +226,69 @@ function setDisconnectedState() {
     audioOnlyIndicator.classList.remove('active');
     noiseGateInfoItem.classList.remove('gating');
     resetMusicUI();
+    resetTestSoundButton();
+}
+
+function resetTestSoundButton() {
+    if (!testSoundBtn) return;
+    if (testSoundResetTimer) {
+        clearTimeout(testSoundResetTimer);
+        testSoundResetTimer = null;
+    }
+    testSoundBtn.classList.remove('active');
+    testSoundBtn.textContent = testSoundButtonLabel;
+    testSoundBtn.disabled = !isConnected;
+}
+
+function updateTestSoundButton() {
+    if (!testSoundBtn) return;
+    testSoundBtn.disabled = !isConnected;
+}
+
+function handleTestSoundStatus(message) {
+    if (!testSoundBtn) return;
+    if (testSoundResetTimer) {
+        clearTimeout(testSoundResetTimer);
+        testSoundResetTimer = null;
+    }
+
+    let label = testSoundButtonLabel;
+    switch (message.status) {
+        case 'received':
+            label = 'Sender received';
+            break;
+        case 'playing':
+            label = 'Playing ping';
+            break;
+        case 'complete':
+            label = 'Ping sent';
+            break;
+        case 'ignored':
+            if (message.detail === 'no-stream') {
+                label = 'Sender idle';
+            } else if (message.detail === 'no-audio-track') {
+                label = 'Audio off';
+            } else {
+                label = 'Ignored';
+            }
+            break;
+        case 'failed':
+            label = 'Ping failed';
+            break;
+        case 'busy':
+            label = 'Sender busy';
+            break;
+        default:
+            label = 'Ping status';
+            break;
+    }
+
+    testSoundBtn.disabled = true;
+    testSoundBtn.classList.add('active');
+    testSoundBtn.textContent = label;
+    testSoundResetTimer = setTimeout(() => {
+        resetTestSoundButton();
+    }, 1800);
 }
 
 function setMediaMutedState(muted) {
@@ -441,9 +511,13 @@ function handleEchoCancelStatus(message) {
 }
 
 // Shutdown status functions
-let shutdownActive = false;
-let shutdownEndTime = null;  // Local end time for smooth countdown
-let shutdownCountdownInterval = null;
+function updateShutdownButtonState() {
+    const label = shutdownActive ? 'Reset' : 'Set';
+    shutdownBtn.textContent = label;
+    shutdownBtn.title = shutdownActive
+        ? 'Reset auto-shutdown countdown'
+        : 'Set auto-shutdown countdown';
+}
 
 function formatShutdownTime(ms) {
     const totalSec = Math.ceil(ms / 1000);
@@ -474,7 +548,6 @@ function handleShutdownStatus(message) {
         shutdownStatus.textContent = timeStr + ' remaining';
         shutdownStatusDisplay.textContent = timeStr;
         shutdownInfoItem.style.display = 'flex';
-        shutdownResetBtn.style.display = 'inline-block';
         shutdownBtn.classList.add('active');
         // Start local countdown interval for smooth display
         if (!shutdownCountdownInterval) {
@@ -489,9 +562,9 @@ function handleShutdownStatus(message) {
         shutdownStatus.textContent = '';
         shutdownStatusDisplay.textContent = '—';
         shutdownInfoItem.style.display = 'none';
-        shutdownResetBtn.style.display = 'none';
         shutdownBtn.classList.remove('active');
     }
+    updateShutdownButtonState();
 }
 
 // Create signaling manager
@@ -716,6 +789,11 @@ async function handleMessage(message) {
             }
             break;
 
+        case 'test-sound-status':
+            console.log('Test sound status:', message.status, message.detail || '');
+            handleTestSoundStatus(message);
+            break;
+
         case 'heartbeat':
             break;
     }
@@ -739,29 +817,34 @@ shutdownTimerSelect.addEventListener('change', () => {
     shutdownTimerValue = parseInt(shutdownTimerSelect.value);
     localStorage.setItem('receiver-shutdown-timer', shutdownTimerValue);
     console.log('Shutdown timer changed:', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
-    // Send new shutdown timeout to sender
-    signaling.sendSignal({
-        type: 'shutdown-timeout',
-        value: shutdownTimerValue,
-        unit: debugTimerMode ? 'seconds' : 'hours'
-    });
+    updateShutdownButtonState();
 });
 
 shutdownBtn.addEventListener('click', () => {
-    console.log('Shutdown now requested');
-    signaling.sendSignal({ type: 'shutdown-now' });
-    shutdownStatus.textContent = 'Shutdown signal sent (30s)';
-});
-
-shutdownResetBtn.addEventListener('click', () => {
-    if (!shutdownActive) return;
-    console.log('Resetting shutdown timer to', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
+    console.log('Setting shutdown timer to', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
     signaling.sendSignal({
         type: 'shutdown-timeout',
         value: shutdownTimerValue,
         unit: debugTimerMode ? 'seconds' : 'hours'
     });
 });
+
+if (testSoundBtn) {
+    testSoundBtn.addEventListener('click', () => {
+        if (!isConnected || testSoundBtn.disabled) return;
+        console.log('Sending test sound ping');
+        signaling.sendSignal({ type: 'test-sound' });
+        testSoundBtn.disabled = true;
+        testSoundBtn.classList.add('active');
+        testSoundBtn.textContent = 'Sending...';
+        if (testSoundResetTimer) {
+            clearTimeout(testSoundResetTimer);
+        }
+        testSoundResetTimer = setTimeout(() => {
+            resetTestSoundButton();
+        }, 1400);
+    });
+}
 
 // Shared volume update function
 function updateVolume(value) {
@@ -900,6 +983,9 @@ window.addEventListener('beforeunload', () => {
     }
     if (longPressTimer) {
         clearTimeout(longPressTimer);
+    }
+    if (testSoundResetTimer) {
+        clearTimeout(testSoundResetTimer);
     }
     if (shutdownCountdownInterval) {
         clearInterval(shutdownCountdownInterval);

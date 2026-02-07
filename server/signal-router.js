@@ -119,6 +119,32 @@ async function handleSignal(req, res) {
             }
             break;
 
+        case 'test-sound':
+            // Receiver -> Sender: trigger a short ping through the outgoing audio stream
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, { type: 'test-sound', receiverId: message.receiverId });
+            } else {
+                console.log('Test sound ignored: no sender in session', sessionName);
+                return sendJson(res, { error: 'Sender not connected' }, 409);
+            }
+            break;
+        case 'test-sound-status':
+            // Sender -> Receiver(s): report test sound status
+            if (message.receiverId) {
+                sendToReceiver(sessionName, message.receiverId, {
+                    type: 'test-sound-status',
+                    status: message.status,
+                    detail: message.detail
+                });
+            } else {
+                broadcastToReceivers(sessionName, {
+                    type: 'test-sound-status',
+                    status: message.status,
+                    detail: message.detail
+                });
+            }
+            break;
+
         case 'echo-cancel-status':
             // Sender -> Receivers: acknowledge state
             broadcastToReceivers(sessionName, {

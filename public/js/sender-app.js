@@ -124,6 +124,13 @@ qualityBadge.classList.add(videoQuality);
 let isStreaming = false;
 let audioEnabled = false;
 let shutdownUnit = 'hours'; // Will be updated by receiver
+let testSoundInProgress = false;
+let testSoundBuffer = null;
+let testSoundContext = null;
+let reclaimTimer = null;
+let reclaimPending = false;
+let reclaimAttempts = 0;
+const RECLAIM_DELAY_MS = 2000;
 
 // Initialize keep-awake (auto-shutdown will be configured by receiver)
 initKeepAwake();
@@ -229,21 +236,184 @@ function updateStreamingStatus() {
     }
 }
 
-function enableAudioPlayback() {
-    if (audioEnabled) return;
-    audioEnabled = true;
-    console.log('Audio playback enabled');
+function enableAudioPlayback(fromUserGesture = false) {
+    if (!audioEnabled) {
+        audioEnabled = true;
+        console.log('Audio playback enabled');
 
-    const silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
-    silentAudio.play().catch(e => {});
+        const silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+        silentAudio.play().catch(() => {});
+    }
 
     const ctx = getAudioContext();
     if (ctx && ctx.state === 'suspended') {
-        ctx.resume();
+        ctx.resume().catch(() => {});
+    }
+
+    if (fromUserGesture) {
+        if (!testSoundContext || testSoundContext.state === 'closed') {
+            testSoundContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (testSoundContext.state === 'suspended') {
+            testSoundContext.resume().catch(() => {});
+        }
     }
 
     if (pttAudio.srcObject) {
         pttAudio.play().catch(e => console.log('PTT play after enable:', e));
+    }
+}
+
+function clearReclaimTimer() {
+    if (reclaimTimer) {
+        clearTimeout(reclaimTimer);
+        reclaimTimer = null;
+    }
+}
+
+async function attemptReclaim() {
+    if (!reclaimPending || signaling.isConnected()) return;
+    reclaimAttempts += 1;
+    let senderActive = false;
+    try {
+        const response = await fetch(`/api/status/${encodeURIComponent(sessionName)}`);
+        if (response.ok) {
+            const status = await response.json();
+            senderActive = status.senderActive;
+        }
+    } catch (err) {
+        console.log('Reclaim status check failed:', err.message || err);
+    }
+
+    if (senderActive) {
+        console.log('Reclaim waiting - another sender still active (attempt', reclaimAttempts, ')');
+        scheduleReclaim();
+        return;
+    }
+
+    console.log('Attempting to reclaim sender role (attempt', reclaimAttempts, ')');
+    signaling.connect();
+    scheduleReclaim();
+}
+
+function scheduleReclaim() {
+    if (!reclaimPending) return;
+    clearReclaimTimer();
+    reclaimTimer = setTimeout(() => {
+        attemptReclaim();
+    }, RECLAIM_DELAY_MS);
+}
+
+function getOutboundAudioTrackForRestore() {
+    const localStream = getLocalStream();
+    const localTrack = localStream ? localStream.getAudioTracks()[0] : null;
+
+    if (isEchoCancelActive()) {
+        return getProcessedAudioTrack() || localTrack;
+    }
+
+    return localTrack || getOriginalAudioTrack();
+}
+
+async function ensureTestSoundBuffer(ctx) {
+    if (testSoundBuffer) return testSoundBuffer;
+    const response = await fetch('/ping.mp3');
+    if (!response.ok) {
+        throw new Error(`Failed to load ping.mp3: ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    testSoundBuffer = await ctx.decodeAudioData(arrayBuffer);
+    return testSoundBuffer;
+}
+
+async function playTestSound(receiverId) {
+    const sendTestSoundStatus = (status, detail) => {
+        if (!signaling.isConnected()) return;
+        signaling.sendSignal({
+            type: 'test-sound-status',
+            receiverId,
+            status,
+            detail
+        });
+    };
+
+    if (testSoundInProgress) {
+        console.log('Test sound already in progress');
+        sendTestSoundStatus('busy');
+        return;
+    }
+    if (!isStreaming || !getLocalStream()) {
+        console.log('Test sound ignored: no active stream');
+        sendTestSoundStatus('ignored', 'no-stream');
+        return;
+    }
+
+    const restoreTrack = getOutboundAudioTrackForRestore();
+    if (!restoreTrack) {
+        console.log('Test sound ignored: no outbound audio track');
+        sendTestSoundStatus('ignored', 'no-audio-track');
+        return;
+    }
+
+    testSoundInProgress = true;
+    let source = null;
+    let testTrack = null;
+
+    try {
+        sendTestSoundStatus('received');
+        let ctx = testSoundContext;
+        if (!ctx || ctx.state === 'closed') {
+            ctx = getAudioContext();
+        }
+        if (!ctx || ctx.state === 'closed') {
+            testSoundContext = new (window.AudioContext || window.webkitAudioContext)();
+            ctx = testSoundContext;
+        }
+
+        if (ctx.state === 'suspended') {
+            try {
+                await ctx.resume();
+            } catch (err) {
+                console.log('Test sound: audio context resume blocked');
+            }
+        }
+
+        const buffer = await ensureTestSoundBuffer(ctx);
+        const destination = ctx.createMediaStreamDestination();
+        source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(destination);
+
+        testTrack = destination.stream.getAudioTracks()[0];
+        sendTestSoundStatus('playing');
+        await replaceAudioTrack(testTrack);
+
+        await new Promise(resolve => {
+            source.onended = resolve;
+            source.start(0);
+        });
+
+        testTrack.stop();
+        await replaceAudioTrack(restoreTrack);
+        console.log('Test sound complete');
+        sendTestSoundStatus('complete');
+    } catch (err) {
+        console.error('Test sound failed:', err);
+        sendTestSoundStatus('failed', err.message);
+        try {
+            if (restoreTrack) {
+                await replaceAudioTrack(restoreTrack);
+            }
+        } catch (restoreErr) {
+            console.error('Failed to restore audio track after test sound:', restoreErr);
+        }
+    } finally {
+        if (source) {
+            try {
+                source.disconnect();
+            } catch (e) {}
+        }
+        testSoundInProgress = false;
     }
 }
 
@@ -371,6 +541,28 @@ async function handleMessage(message) {
             } else {
                 console.log('Already streaming, skipping auto-start');
             }
+            if (reclaimPending && isStreaming) {
+                console.log('Reclaim successful - continuing stream');
+                clearReclaimTimer();
+                reclaimPending = false;
+                reclaimAttempts = 0;
+                setConnectedState(true);
+                info.textContent = 'Reclaimed sender role. Continuing stream...';
+                const localStream = getLocalStream();
+                const hasLiveTrack = localStream && localStream.getTracks().some(track => track.readyState === 'live');
+                if (!localStream || !hasLiveTrack) {
+                    console.log('No live local stream after reclaim - restarting stream');
+                    setTimeout(() => {
+                        if (!isStreaming) return;
+                        startStreamingHandler();
+                    }, 100);
+                }
+                setTimeout(() => {
+                    if (signaling.isConnected()) {
+                        signaling.sendSignal({ type: 'sender-ready' });
+                    }
+                }, 250);
+            }
             setTimeout(() => {
                 broadcastMusicStatus();
                 broadcastEchoCancelStatus();
@@ -385,8 +577,17 @@ async function handleMessage(message) {
         case 'replaced':
             console.log('Replaced by another sender');
             signaling.setConnected(false);
-            info.textContent = 'Another device took over as sender. Refresh to reclaim.';
             setDisconnectedState();
+            if (isStreaming) {
+                reclaimPending = true;
+                reclaimAttempts = 0;
+                clearReclaimTimer();
+                info.textContent = 'Another device took over. Reclaiming in 2 seconds...';
+                signaling.disconnect();
+                scheduleReclaim();
+            } else {
+                info.textContent = 'Another device took over as sender. Refresh to reclaim.';
+            }
             break;
 
         case 'request-offer':
@@ -500,6 +701,11 @@ async function handleMessage(message) {
             await handleEchoCancelToggle(message.enabled);
             break;
 
+        case 'test-sound':
+            console.log('Received test sound request');
+            await playTestSound(message.receiverId);
+            break;
+
         case 'shutdown-timeout':
             console.log('Received shutdown timeout:', message.value, message.unit);
             shutdownUnit = message.unit || 'hours';
@@ -600,6 +806,9 @@ function stopStreamingHandler() {
     // Cancel auto-shutdown timer and notify receivers
     cancelAutoShutdown();
     updateShutdownUI({ active: false, remainingMs: 0 });
+    reclaimPending = false;
+    clearReclaimTimer();
+    reclaimAttempts = 0;
     if (signaling.isConnected()) {
         signaling.sendSignal({ type: 'shutdown-status', active: false, remainingMs: 0 });
     }
@@ -637,9 +846,9 @@ function stopStreamingHandler() {
 startBtn.addEventListener('click', startStreamingHandler);
 stopBtn.addEventListener('click', stopStreamingHandler);
 
-document.addEventListener('click', enableAudioPlayback, { passive: true });
-document.addEventListener('touchstart', enableAudioPlayback, { passive: true });
-document.addEventListener('touchend', enableAudioPlayback, { passive: true });
+document.addEventListener('click', () => enableAudioPlayback(true), { passive: true });
+document.addEventListener('touchstart', () => enableAudioPlayback(true), { passive: true });
+document.addEventListener('touchend', () => enableAudioPlayback(true), { passive: true });
 
 // Initialize - connect SSE immediately
 signaling.connect();
