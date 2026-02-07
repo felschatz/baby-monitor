@@ -274,23 +274,6 @@ function clearReclaimTimer() {
 async function attemptReclaim() {
     if (!reclaimPending || signaling.isConnected()) return;
     reclaimAttempts += 1;
-    let senderActive = false;
-    try {
-        const response = await fetch(`/api/status/${encodeURIComponent(sessionName)}`);
-        if (response.ok) {
-            const status = await response.json();
-            senderActive = status.senderActive;
-        }
-    } catch (err) {
-        console.log('Reclaim status check failed:', err.message || err);
-    }
-
-    if (senderActive) {
-        console.log('Reclaim waiting - another sender still active (attempt', reclaimAttempts, ')');
-        scheduleReclaim();
-        return;
-    }
-
     console.log('Attempting to reclaim sender role (attempt', reclaimAttempts, ')');
     signaling.connect();
     scheduleReclaim();
