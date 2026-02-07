@@ -282,19 +282,32 @@ async function ensureTestSoundBuffer(ctx) {
     return testSoundBuffer;
 }
 
-async function playTestSound() {
+async function playTestSound(receiverId) {
+    const sendTestSoundStatus = (status, detail) => {
+        if (!signaling.isConnected()) return;
+        signaling.sendSignal({
+            type: 'test-sound-status',
+            receiverId,
+            status,
+            detail
+        });
+    };
+
     if (testSoundInProgress) {
         console.log('Test sound already in progress');
+        sendTestSoundStatus('busy');
         return;
     }
     if (!isStreaming || !getLocalStream()) {
         console.log('Test sound ignored: no active stream');
+        sendTestSoundStatus('ignored', 'no-stream');
         return;
     }
 
     const restoreTrack = getOutboundAudioTrackForRestore();
     if (!restoreTrack) {
         console.log('Test sound ignored: no outbound audio track');
+        sendTestSoundStatus('ignored', 'no-audio-track');
         return;
     }
 
@@ -303,6 +316,7 @@ async function playTestSound() {
     let testTrack = null;
 
     try {
+        sendTestSoundStatus('received');
         let ctx = testSoundContext;
         if (!ctx || ctx.state === 'closed') {
             ctx = getAudioContext();
@@ -327,6 +341,7 @@ async function playTestSound() {
         source.connect(destination);
 
         testTrack = destination.stream.getAudioTracks()[0];
+        sendTestSoundStatus('playing');
         await replaceAudioTrack(testTrack);
 
         await new Promise(resolve => {
@@ -337,8 +352,10 @@ async function playTestSound() {
         testTrack.stop();
         await replaceAudioTrack(restoreTrack);
         console.log('Test sound complete');
+        sendTestSoundStatus('complete');
     } catch (err) {
         console.error('Test sound failed:', err);
+        sendTestSoundStatus('failed', err.message);
         try {
             if (restoreTrack) {
                 await replaceAudioTrack(restoreTrack);
@@ -611,7 +628,7 @@ async function handleMessage(message) {
 
         case 'test-sound':
             console.log('Received test sound request');
-            await playTestSound();
+            await playTestSound(message.receiverId);
             break;
 
         case 'shutdown-timeout':

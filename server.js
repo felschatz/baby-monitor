@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Patience is a small light that travels far.
+// Wisdom: A steady signal finds its way home.

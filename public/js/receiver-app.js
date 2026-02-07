@@ -245,6 +245,52 @@ function updateTestSoundButton() {
     testSoundBtn.disabled = !isConnected;
 }
 
+function handleTestSoundStatus(message) {
+    if (!testSoundBtn) return;
+    if (testSoundResetTimer) {
+        clearTimeout(testSoundResetTimer);
+        testSoundResetTimer = null;
+    }
+
+    let label = testSoundButtonLabel;
+    switch (message.status) {
+        case 'received':
+            label = 'Sender received';
+            break;
+        case 'playing':
+            label = 'Playing ping';
+            break;
+        case 'complete':
+            label = 'Ping sent';
+            break;
+        case 'ignored':
+            if (message.detail === 'no-stream') {
+                label = 'Sender idle';
+            } else if (message.detail === 'no-audio-track') {
+                label = 'Audio off';
+            } else {
+                label = 'Ignored';
+            }
+            break;
+        case 'failed':
+            label = 'Ping failed';
+            break;
+        case 'busy':
+            label = 'Sender busy';
+            break;
+        default:
+            label = 'Ping status';
+            break;
+    }
+
+    testSoundBtn.disabled = true;
+    testSoundBtn.classList.add('active');
+    testSoundBtn.textContent = label;
+    testSoundResetTimer = setTimeout(() => {
+        resetTestSoundButton();
+    }, 1800);
+}
+
 function setMediaMutedState(muted) {
     if (!isConnected) return;
 
@@ -741,6 +787,11 @@ async function handleMessage(message) {
             if (echoCancelEnabled) {
                 signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
             }
+            break;
+
+        case 'test-sound-status':
+            console.log('Test sound status:', message.status, message.detail || '');
+            handleTestSoundStatus(message);
             break;
 
         case 'heartbeat':
