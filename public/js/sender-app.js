@@ -182,11 +182,21 @@ function updateShutdownUI(status) {
 
 // Register shutdown status callback - broadcasts to receivers every 5 seconds
 let lastShutdownBroadcast = 0;
+let lastShutdownActive = false;
+let lastShutdownRemaining = 0;
 setShutdownStatusCallback((status) => {
     updateShutdownUI(status);
-    // Broadcast to receivers every 5 seconds (or on state change)
+    // Broadcast to receivers every 5 seconds (or on state/timer change)
     const now = Date.now();
-    if (!status.active || now - lastShutdownBroadcast >= 5000) {
+    // Detect timer reset: remaining time increased (timer was restarted)
+    const timerReset = status.active && status.remainingMs > lastShutdownRemaining + 1000;
+    // Detect state change: active/inactive transition
+    const stateChanged = status.active !== lastShutdownActive;
+    // Update tracking vars
+    lastShutdownActive = status.active;
+    lastShutdownRemaining = status.remainingMs;
+    // Broadcast immediately on state change, timer reset, or every 5 seconds
+    if (stateChanged || timerReset || now - lastShutdownBroadcast >= 5000) {
         lastShutdownBroadcast = now;
         if (signaling.isConnected()) {
             signaling.sendSignal({

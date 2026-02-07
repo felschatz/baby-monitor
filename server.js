@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: The moon emoji works on every phone, but the power symbol only dreams of such reach.
+// Wisdom: A timer reset should echo instantly across the digital divide.
