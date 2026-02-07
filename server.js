@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A steady signal finds its way home.
+// Wisdom: Quiet rooms keep the best watch.
