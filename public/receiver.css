@@ -876,10 +876,11 @@ body.loud-alert-active .info-strip {
     background: linear-gradient(135deg, #ea580c, #c2410c);
     border: none;
     color: white;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    font-size: 1.3rem;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    min-width: 84px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -889,7 +890,7 @@ body.loud-alert-active .info-strip {
 }
 
 .shutdown-btn:active {
-    transform: scale(0.95);
+    transform: scale(0.98);
 }
 
 .shutdown-btn.active {
@@ -902,21 +903,6 @@ body.loud-alert-active .info-strip {
 @keyframes shutdownBtnPulse {
     0%, 100% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.4); }
     50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.6); }
-}
-
-.shutdown-reset-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid var(--border-subtle);
-    color: var(--text-primary);
-    padding: 10px 14px;
-    border-radius: 10px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.shutdown-reset-btn:active {
-    background: rgba(255, 255, 255, 0.2);
 }
 
 .shutdown-status {

@@ -91,7 +91,6 @@ const echoCancelToggle = document.getElementById('echoCancelToggle');
 const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
 const shutdownTimerSelect = document.getElementById('shutdownTimerSelect');
 const shutdownBtn = document.getElementById('shutdownBtn');
-const shutdownResetBtn = document.getElementById('shutdownResetBtn');
 const shutdownStatus = document.getElementById('shutdownStatus');
 const shutdownInfoItem = document.getElementById('shutdownInfoItem');
 const shutdownStatusDisplay = document.getElementById('shutdownStatusDisplay');
@@ -181,6 +180,7 @@ setVideoElement(remoteVideo);
 
 // Initialize shutdown timer select
 shutdownTimerSelect.value = shutdownTimerValue.toString();
+updateShutdownButtonState();
 
 // Helper functions
 function setConnectedState(connected) {
@@ -466,6 +466,14 @@ let shutdownActive = false;
 let shutdownEndTime = null;  // Local end time for smooth countdown
 let shutdownCountdownInterval = null;
 
+function updateShutdownButtonState() {
+    const label = shutdownActive ? 'Reset' : 'Set';
+    shutdownBtn.textContent = label;
+    shutdownBtn.title = shutdownActive
+        ? 'Reset auto-shutdown countdown'
+        : 'Set auto-shutdown countdown';
+}
+
 function formatShutdownTime(ms) {
     const totalSec = Math.ceil(ms / 1000);
     const h = Math.floor(totalSec / 3600);
@@ -495,7 +503,6 @@ function handleShutdownStatus(message) {
         shutdownStatus.textContent = timeStr + ' remaining';
         shutdownStatusDisplay.textContent = timeStr;
         shutdownInfoItem.style.display = 'flex';
-        shutdownResetBtn.style.display = 'inline-block';
         shutdownBtn.classList.add('active');
         // Start local countdown interval for smooth display
         if (!shutdownCountdownInterval) {
@@ -510,9 +517,9 @@ function handleShutdownStatus(message) {
         shutdownStatus.textContent = '';
         shutdownStatusDisplay.textContent = '—';
         shutdownInfoItem.style.display = 'none';
-        shutdownResetBtn.style.display = 'none';
         shutdownBtn.classList.remove('active');
     }
+    updateShutdownButtonState();
 }
 
 // Create signaling manager
@@ -760,23 +767,11 @@ shutdownTimerSelect.addEventListener('change', () => {
     shutdownTimerValue = parseInt(shutdownTimerSelect.value);
     localStorage.setItem('receiver-shutdown-timer', shutdownTimerValue);
     console.log('Shutdown timer changed:', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
-    // Send new shutdown timeout to sender
-    signaling.sendSignal({
-        type: 'shutdown-timeout',
-        value: shutdownTimerValue,
-        unit: debugTimerMode ? 'seconds' : 'hours'
-    });
+    updateShutdownButtonState();
 });
 
 shutdownBtn.addEventListener('click', () => {
-    console.log('Shutdown now requested');
-    signaling.sendSignal({ type: 'shutdown-now' });
-    shutdownStatus.textContent = 'Shutdown signal sent (30s)';
-});
-
-shutdownResetBtn.addEventListener('click', () => {
-    if (!shutdownActive) return;
-    console.log('Resetting shutdown timer to', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
+    console.log('Setting shutdown timer to', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
     signaling.sendSignal({
         type: 'shutdown-timeout',
         value: shutdownTimerValue,
