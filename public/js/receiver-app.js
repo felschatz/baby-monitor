@@ -41,10 +41,7 @@ import {
     startPTT,
     stopPTT,
     setupPTTButton,
-    cleanupPTT,
-    setBluetoothMode,
-    getBluetoothMode,
-    isBluetoothAudioDetected
+    cleanupPTT
 } from './ptt.js';
 import {
     initReceiverWebRTC,
@@ -56,13 +53,6 @@ import {
     requestOffer,
     getPTTAudioSender
 } from './receiver-webrtc.js';
-import {
-    isMediaSessionSupported,
-    initMediaSession,
-    setMediaSessionEnabled,
-    updateMediaSessionState,
-    destroyMediaSession
-} from './media-session.js';
 
 import {
     destroyKeepAwake
@@ -97,11 +87,14 @@ const fullscreenBtn = document.getElementById('fullscreenBtn');
 const info = document.getElementById('info');
 const thresholdMarker = document.getElementById('thresholdMarker');
 const audioOnlyToggle = document.getElementById('audioOnlyToggle');
-const bluetoothModeToggle = document.getElementById('bluetoothModeToggle');
 const echoCancelToggle = document.getElementById('echoCancelToggle');
 const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
-const mediaSessionToggle = document.getElementById('mediaSessionToggle');
-const mediaSessionToggleLabel = document.getElementById('mediaSessionToggleLabel');
+const shutdownTimerSelect = document.getElementById('shutdownTimerSelect');
+const shutdownBtn = document.getElementById('shutdownBtn');
+const shutdownResetBtn = document.getElementById('shutdownResetBtn');
+const shutdownStatus = document.getElementById('shutdownStatus');
+const shutdownInfoItem = document.getElementById('shutdownInfoItem');
+const shutdownStatusDisplay = document.getElementById('shutdownStatusDisplay');
 
 // Music elements
 const musicContainer = document.getElementById('musicContainer');
@@ -150,8 +143,8 @@ let playlistsUnlocked = localStorage.getItem('receiver-playlists-unlocked') === 
 let loudSoundTimeout = null;
 let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
-let mediaSessionEnabled = localStorage.getItem('receiver-media-session') === 'true';
-let bluetoothModeEnabled = localStorage.getItem('receiver-bluetooth-mode') === 'true';
+let debugTimerMode = false; // Will be set from /api/music response
+let shutdownTimerValue = parseInt(localStorage.getItem('receiver-shutdown-timer') || '6');
 
 // Initialize keep-awake
 initKeepAwake();
@@ -180,40 +173,11 @@ if (savedNoiseGate !== null) {
 audioOnlyToggle.checked = getAudioOnlyMode();
 echoCancelToggle.checked = echoCancelEnabled;
 
-// Initialize Bluetooth mode toggle - enables PTT without mic to avoid A2DP→HFP switch
-bluetoothModeToggle.checked = bluetoothModeEnabled;
-setBluetoothMode(bluetoothModeEnabled);
-// Update PTT label based on initial Bluetooth mode state
-if (bluetoothModeEnabled) {
-    pttLabel.textContent = 'Hold to alert sender';
-}
-
-// Show Bluetooth warning after a delay (to allow device detection)
-setTimeout(() => {
-    if (isBluetoothAudioDetected() && !bluetoothModeEnabled) {
-        console.log('Bluetooth audio output detected - PTT may disrupt audio');
-        // Highlight the Bluetooth mode toggle to suggest enabling it
-        const bluetoothLabel = document.getElementById('bluetoothModeLabel');
-        if (bluetoothLabel) {
-            bluetoothLabel.classList.add('suggested');
-        }
-    }
-}, 1500);
-
-// Set video element reference for noise gate (uses video.muted for Bluetooth compatibility)
+// Set video element reference for noise gate
 setVideoElement(remoteVideo);
 
-// Initialize media session
-if (isMediaSessionSupported()) {
-    initMediaSession({ videoElement: remoteVideo, sessionName });
-    mediaSessionToggle.checked = mediaSessionEnabled;
-    if (mediaSessionEnabled) {
-        setMediaSessionEnabled(true);
-    }
-} else {
-    // Hide toggle if not supported
-    mediaSessionToggleLabel.style.display = 'none';
-}
+// Initialize shutdown timer select
+shutdownTimerSelect.value = shutdownTimerValue.toString();
 
 // Helper functions
 function setConnectedState(connected) {
@@ -227,7 +191,6 @@ function setConnectedState(connected) {
         pttBtn.disabled = false;
         sessionStorage.setItem('receiver-streaming', 'true');
         updateAudioOnlyIndicator();
-        updateMediaSessionState(true);
     } else {
         document.body.classList.remove('connected');
         statusDot.classList.remove('connected');
@@ -236,7 +199,6 @@ function setConnectedState(connected) {
         pttBtn.disabled = true;
         stopPTT(pttBtn, pttLabel);
         audioOnlyIndicator.classList.remove('active');
-        updateMediaSessionState(false);
     }
 }
 
@@ -257,7 +219,6 @@ function setDisconnectedState() {
     audioOnlyIndicator.classList.remove('active');
     noiseGateInfoItem.classList.remove('gating');
     resetMusicUI();
-    updateMediaSessionState(false);
 }
 
 function setMediaMutedState(muted) {
@@ -391,6 +352,20 @@ async function checkMusicAvailability() {
             musicTimerSelect.insertBefore(debugOption, musicTimerSelect.firstChild);
         }
 
+        // Setup shutdown timer based on debug mode
+        if (data.debugTimer) {
+            debugTimerMode = true;
+            // Replace hours with seconds in shutdown timer for debug mode
+            shutdownTimerSelect.innerHTML = `
+                <option value="0">Disabled</option>
+                <option value="10">10 sec</option>
+                <option value="30">30 sec</option>
+                <option value="60">60 sec</option>
+                <option value="120">2 min</option>
+            `;
+            shutdownTimerSelect.value = shutdownTimerValue.toString();
+        }
+
         if ((data.files && data.files.length > 0) || musicPlaylists.length > 0) {
             musicAvailable = true;
             musicContainer.style.display = 'block';
@@ -462,6 +437,60 @@ function handleEchoCancelStatus(message) {
         echoCancelToggleLabel.classList.add('active');
     } else {
         echoCancelToggleLabel.classList.remove('active');
+    }
+}
+
+// Shutdown status functions
+let shutdownActive = false;
+let shutdownEndTime = null;  // Local end time for smooth countdown
+let shutdownCountdownInterval = null;
+
+function formatShutdownTime(ms) {
+    const totalSec = Math.ceil(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function updateShutdownDisplay() {
+    if (!shutdownActive || !shutdownEndTime) return;
+    const remaining = Math.max(0, shutdownEndTime - Date.now());
+    const timeStr = formatShutdownTime(remaining);
+    shutdownStatus.textContent = timeStr + ' remaining';
+    shutdownStatusDisplay.textContent = timeStr;
+    if (remaining <= 0) {
+        handleShutdownStatus({ active: false, remainingMs: 0 });
+    }
+}
+
+function handleShutdownStatus(message) {
+    shutdownActive = message.active;
+    if (message.active && message.remainingMs > 0) {
+        // Store end time for local countdown interpolation
+        shutdownEndTime = Date.now() + message.remainingMs;
+        const timeStr = formatShutdownTime(message.remainingMs);
+        shutdownStatus.textContent = timeStr + ' remaining';
+        shutdownStatusDisplay.textContent = timeStr;
+        shutdownInfoItem.style.display = 'flex';
+        shutdownResetBtn.style.display = 'inline-block';
+        shutdownBtn.classList.add('active');
+        // Start local countdown interval for smooth display
+        if (!shutdownCountdownInterval) {
+            shutdownCountdownInterval = setInterval(updateShutdownDisplay, 1000);
+        }
+    } else {
+        shutdownEndTime = null;
+        if (shutdownCountdownInterval) {
+            clearInterval(shutdownCountdownInterval);
+            shutdownCountdownInterval = null;
+        }
+        shutdownStatus.textContent = '';
+        shutdownStatusDisplay.textContent = '—';
+        shutdownInfoItem.style.display = 'none';
+        shutdownResetBtn.style.display = 'none';
+        shutdownBtn.classList.remove('active');
     }
 }
 
@@ -560,6 +589,12 @@ initReceiverWebRTC({
                 setConnectedState(true);
                 info.textContent = 'Streaming (audio only)';
                 updateAudioOnlyIndicator();
+                // For audio-only streams, we need to explicitly play the video element
+                // (which acts as the audio player) since handleVideoTrack isn't called
+                remoteVideo.play().then(() => {
+                    console.log('Audio-only stream playing');
+                    overlay.classList.add('hidden');
+                }).catch(e => console.log('Audio-only play error:', e));
             }
             setupAudioAnalysis(currentStream, audioLevel, audioLevelInline);
             setupAudioTrackMuteDetection(event.track);
@@ -581,6 +616,12 @@ async function handleMessage(message) {
                 if (echoCancelEnabled) {
                     signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
                 }
+                // Send shutdown timer setting to sender
+                signaling.sendSignal({
+                    type: 'shutdown-timeout',
+                    value: shutdownTimerValue,
+                    unit: debugTimerMode ? 'seconds' : 'hours'
+                });
             } else {
                 overlayText.textContent = 'Waiting for sender to start streaming...';
             }
@@ -601,10 +642,17 @@ async function handleMessage(message) {
             if (echoCancelEnabled) {
                 signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
             }
+            // Send shutdown timer setting to sender
+            signaling.sendSignal({
+                type: 'shutdown-timeout',
+                value: shutdownTimerValue,
+                unit: debugTimerMode ? 'seconds' : 'hours'
+            });
             break;
 
         case 'sender-disconnected':
             setDisconnectedState();
+            handleShutdownStatus({ active: false, remainingMs: 0 });
             closePeerConnection();
             resetAudioAnalysis();
             resetNoiseGate();
@@ -644,6 +692,10 @@ async function handleMessage(message) {
             handleEchoCancelStatus(message);
             break;
 
+        case 'shutdown-status':
+            handleShutdownStatus(message);
+            break;
+
         case 'video-unavailable':
             console.log('Sender video is unavailable');
             // Auto-enable audio-only mode and disable toggle
@@ -676,15 +728,6 @@ audioOnlyToggle.addEventListener('change', () => {
     signaling.sendSignal({ type: 'video-request', enabled: !getAudioOnlyMode() });
 });
 
-bluetoothModeToggle.addEventListener('change', () => {
-    bluetoothModeEnabled = bluetoothModeToggle.checked;
-    localStorage.setItem('receiver-bluetooth-mode', bluetoothModeEnabled);
-    setBluetoothMode(bluetoothModeEnabled);
-    // Update PTT label to reflect mode change
-    pttLabel.textContent = bluetoothModeEnabled ? 'Hold to alert sender' : 'Hold to talk to baby';
-    console.log('Bluetooth mode:', bluetoothModeEnabled);
-});
-
 echoCancelToggle.addEventListener('change', () => {
     echoCancelEnabled = echoCancelToggle.checked;
     localStorage.setItem('receiver-echo-cancel', echoCancelEnabled);
@@ -692,14 +735,32 @@ echoCancelToggle.addEventListener('change', () => {
     signaling.sendSignal({ type: 'echo-cancel-enable', enabled: echoCancelEnabled });
 });
 
-mediaSessionToggle.addEventListener('change', () => {
-    mediaSessionEnabled = mediaSessionToggle.checked;
-    localStorage.setItem('receiver-media-session', mediaSessionEnabled);
-    console.log('Media session mode:', mediaSessionEnabled);
-    setMediaSessionEnabled(mediaSessionEnabled);
-    if (mediaSessionEnabled) {
-        updateMediaSessionState(isConnected);
-    }
+shutdownTimerSelect.addEventListener('change', () => {
+    shutdownTimerValue = parseInt(shutdownTimerSelect.value);
+    localStorage.setItem('receiver-shutdown-timer', shutdownTimerValue);
+    console.log('Shutdown timer changed:', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
+    // Send new shutdown timeout to sender
+    signaling.sendSignal({
+        type: 'shutdown-timeout',
+        value: shutdownTimerValue,
+        unit: debugTimerMode ? 'seconds' : 'hours'
+    });
+});
+
+shutdownBtn.addEventListener('click', () => {
+    console.log('Shutdown now requested');
+    signaling.sendSignal({ type: 'shutdown-now' });
+    shutdownStatus.textContent = 'Shutdown signal sent (30s)';
+});
+
+shutdownResetBtn.addEventListener('click', () => {
+    if (!shutdownActive) return;
+    console.log('Resetting shutdown timer to', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
+    signaling.sendSignal({
+        type: 'shutdown-timeout',
+        value: shutdownTimerValue,
+        unit: debugTimerMode ? 'seconds' : 'hours'
+    });
 });
 
 // Shared volume update function
@@ -840,11 +901,13 @@ window.addEventListener('beforeunload', () => {
     if (longPressTimer) {
         clearTimeout(longPressTimer);
     }
+    if (shutdownCountdownInterval) {
+        clearInterval(shutdownCountdownInterval);
+    }
     cleanupPTT();
     destroyKeepAwake();
     destroyAudioAnalysis();
     destroyVideoPlayback();
-    destroyMediaSession();
     closePeerConnection();
     signaling.disconnect();
 });

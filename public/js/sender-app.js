@@ -3,7 +3,7 @@
  * Wires together all modules for the sender page
  */
 
-import { initKeepAwake } from './keep-awake.js';
+import { initKeepAwake, startAutoShutdown, cancelAutoShutdown, destroyKeepAwake, setAutoShutdownTime, setShutdownStatusCallback, getAutoShutdownRemaining } from './keep-awake.js';
 import { initSession } from './session.js';
 import { createSignalingManager } from './signaling.js';
 import { initScreenDimming } from './screen-dimming.js';
@@ -86,6 +86,10 @@ const musicResetBtn = document.getElementById('musicResetBtn');
 const musicVolumeSlider = document.getElementById('musicVolume');
 const musicLabel = document.getElementById('musicLabel');
 
+// Shutdown elements
+const shutdownStatusBar = document.getElementById('shutdownStatusBar');
+const shutdownTimeRemaining = document.getElementById('shutdownTimeRemaining');
+
 // Enhanced volume slider elements
 const volumeSliderContainer = document.getElementById('volumeSliderContainer');
 const volumeTrackFill = document.getElementById('volumeTrackFill');
@@ -119,8 +123,9 @@ qualityBadge.classList.add(videoQuality);
 // State
 let isStreaming = false;
 let audioEnabled = false;
+let shutdownUnit = 'hours'; // Will be updated by receiver
 
-// Initialize keep-awake
+// Initialize keep-awake (auto-shutdown will be configured by receiver)
 initKeepAwake();
 
 // Initialize screen dimming
@@ -150,6 +155,58 @@ function setDisconnectedState() {
     statusDot.classList.remove('connected');
     statusText.textContent = 'Disconnected!';
 }
+
+function formatShutdownTime(ms) {
+    const totalSec = Math.ceil(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function updateShutdownUI(status) {
+    if (status.active && status.remainingMs > 0) {
+        shutdownStatusBar.classList.add('active');
+        shutdownTimeRemaining.textContent = 'Shutdown in ' + formatShutdownTime(status.remainingMs);
+        // Urgent mode in last 60 seconds
+        if (status.remainingMs <= 60000) {
+            shutdownStatusBar.classList.add('urgent');
+        } else {
+            shutdownStatusBar.classList.remove('urgent');
+        }
+    } else {
+        shutdownStatusBar.classList.remove('active', 'urgent');
+    }
+}
+
+// Register shutdown status callback - broadcasts to receivers every 5 seconds
+let lastShutdownBroadcast = 0;
+let lastShutdownActive = false;
+let lastShutdownRemaining = 0;
+setShutdownStatusCallback((status) => {
+    updateShutdownUI(status);
+    // Broadcast to receivers every 5 seconds (or on state/timer change)
+    const now = Date.now();
+    // Detect timer reset: remaining time increased (timer was restarted)
+    const timerReset = status.active && status.remainingMs > lastShutdownRemaining + 1000;
+    // Detect state change: active/inactive transition
+    const stateChanged = status.active !== lastShutdownActive;
+    // Update tracking vars
+    lastShutdownActive = status.active;
+    lastShutdownRemaining = status.remainingMs;
+    // Broadcast immediately on state change, timer reset, or every 5 seconds
+    if (stateChanged || timerReset || now - lastShutdownBroadcast >= 5000) {
+        lastShutdownBroadcast = now;
+        if (signaling.isConnected()) {
+            signaling.sendSignal({
+                type: 'shutdown-status',
+                active: status.active,
+                remainingMs: status.remainingMs
+            });
+        }
+    }
+});
 
 function updateStreamingStatus() {
     if (!isStreaming) return;
@@ -443,6 +500,35 @@ async function handleMessage(message) {
             await handleEchoCancelToggle(message.enabled);
             break;
 
+        case 'shutdown-timeout':
+            console.log('Received shutdown timeout:', message.value, message.unit);
+            shutdownUnit = message.unit || 'hours';
+            setAutoShutdownTime(message.value, shutdownUnit);
+            // Restart the timer if streaming
+            if (isStreaming) {
+                startAutoShutdown(() => {
+                    console.log('Auto-shutdown triggered by receiver setting');
+                    stopStreamingHandler();
+                    info.textContent = 'Auto-shutdown complete. Redirecting...';
+                    setTimeout(() => { window.location.href = '/'; }, 3000);
+                });
+            }
+            break;
+
+        case 'shutdown-now':
+            console.log('Received shutdown-now from receiver');
+            shutdownUnit = 'seconds';
+            setAutoShutdownTime(30, 'seconds');
+            if (isStreaming) {
+                startAutoShutdown(() => {
+                    console.log('Immediate shutdown triggered by receiver');
+                    stopStreamingHandler();
+                    info.textContent = 'Shut down by receiver. Redirecting...';
+                    setTimeout(() => { window.location.href = '/'; }, 3000);
+                });
+            }
+            break;
+
         case 'heartbeat':
             break;
     }
@@ -491,6 +577,14 @@ async function startStreamingHandler() {
 
         enableAudioPlayback();
 
+        // Start auto-shutdown timer to save battery after long periods
+        startAutoShutdown(() => {
+            console.log('Auto-shutdown: stopping stream to save battery');
+            stopStreamingHandler();
+            info.textContent = 'Auto-shutdown complete. Redirecting...';
+            setTimeout(() => { window.location.href = '/'; }, 3000);
+        });
+
         // Notify receivers that we're ready - they may have sent request-offer
         // before our stream was ready, so tell them to request again
         console.log('Stream ready, notifying receivers');
@@ -503,6 +597,13 @@ async function startStreamingHandler() {
 
 // Stop streaming handler
 function stopStreamingHandler() {
+    // Cancel auto-shutdown timer and notify receivers
+    cancelAutoShutdown();
+    updateShutdownUI({ active: false, remainingMs: 0 });
+    if (signaling.isConnected()) {
+        signaling.sendSignal({ type: 'shutdown-status', active: false, remainingMs: 0 });
+    }
+
     if (isEchoCancelActive()) {
         teardownEchoCancellation();
     }
@@ -527,6 +628,9 @@ function stopStreamingHandler() {
 
     setConnectedState(false);
     info.textContent = 'Streaming stopped.';
+
+    // Release keep-awake resources so phone can sleep
+    destroyKeepAwake();
 }
 
 // Event listeners

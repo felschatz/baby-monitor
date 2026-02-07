@@ -7,6 +7,12 @@ let wakeLock = null;
 let wakeLockInterval = null;
 let noSleepVideo = null;
 let lastWakeLockLog = 0;
+let autoShutdownInterval = null;
+let autoShutdownEndTime = null;
+let autoShutdownCallback = null;
+let autoShutdownStatusCallback = null;
+let autoShutdownHours = 6; // Default: 6 hours (or seconds in debug mode)
+let autoShutdownUnit = 'hours'; // 'hours' or 'seconds'
 
 /**
  * Rate-limited logging for wake lock events
@@ -132,9 +138,129 @@ export function initKeepAwake() {
 }
 
 /**
+ * Set the auto-shutdown timeout
+ * @param {number} value - Time before auto-shutdown (0 to disable)
+ * @param {string} unit - 'hours' or 'seconds'
+ */
+export function setAutoShutdownTime(value, unit = 'hours') {
+    autoShutdownHours = value;
+    autoShutdownUnit = unit;
+    console.log('Auto-shutdown set to', value, unit);
+}
+
+// Legacy function for backwards compatibility
+export function setAutoShutdownHours(hours) {
+    setAutoShutdownTime(hours, 'hours');
+}
+
+/**
+ * Get remaining time until auto-shutdown in milliseconds
+ */
+export function getAutoShutdownRemaining() {
+    if (!autoShutdownInterval || !autoShutdownEndTime) return null;
+    return Math.max(0, autoShutdownEndTime - Date.now());
+}
+
+/**
+ * Check if auto-shutdown timer is currently running
+ */
+export function getAutoShutdownActive() {
+    return autoShutdownInterval !== null && autoShutdownEndTime !== null;
+}
+
+/**
+ * Register a callback that fires every second with shutdown status
+ * @param {Function} callback - Called with {active, remainingMs}
+ */
+export function setShutdownStatusCallback(callback) {
+    autoShutdownStatusCallback = callback;
+}
+
+/**
+ * Start the auto-shutdown timer
+ * @param {Function} onShutdown - Callback when shutdown is triggered
+ */
+export function startAutoShutdown(onShutdown) {
+    if (autoShutdownHours <= 0) {
+        console.log('Auto-shutdown disabled');
+        cancelAutoShutdown();
+        // Notify that shutdown is now inactive
+        if (autoShutdownStatusCallback) {
+            autoShutdownStatusCallback({ active: false, remainingMs: 0 });
+        }
+        return;
+    }
+
+    cancelAutoShutdown();
+
+    autoShutdownCallback = onShutdown;
+    const timeoutMs = autoShutdownUnit === 'seconds'
+        ? autoShutdownHours * 1000
+        : autoShutdownHours * 60 * 60 * 1000;
+
+    autoShutdownEndTime = Date.now() + timeoutMs;
+
+    // Use setInterval (1s tick) so we can broadcast status and detect expiry
+    autoShutdownInterval = setInterval(() => {
+        const remaining = autoShutdownEndTime - Date.now();
+        if (remaining <= 0) {
+            console.log('Auto-shutdown triggered after', autoShutdownHours, autoShutdownUnit);
+            triggerAutoShutdown();
+        } else if (autoShutdownStatusCallback) {
+            autoShutdownStatusCallback({ active: true, remainingMs: remaining });
+        }
+    }, 1000);
+
+    // Fire initial status immediately
+    if (autoShutdownStatusCallback) {
+        autoShutdownStatusCallback({ active: true, remainingMs: timeoutMs });
+    }
+
+    console.log('Auto-shutdown timer started:', autoShutdownHours, autoShutdownUnit);
+}
+
+/**
+ * Cancel the auto-shutdown timer
+ */
+export function cancelAutoShutdown() {
+    if (autoShutdownInterval) {
+        clearInterval(autoShutdownInterval);
+        autoShutdownInterval = null;
+        autoShutdownEndTime = null;
+        console.log('Auto-shutdown timer cancelled');
+    }
+}
+
+/**
+ * Trigger auto-shutdown - release all resources and call callback
+ */
+function triggerAutoShutdown() {
+    console.log('Triggering auto-shutdown to save battery');
+
+    // Notify status callback that shutdown fired
+    if (autoShutdownStatusCallback) {
+        autoShutdownStatusCallback({ active: false, remainingMs: 0 });
+    }
+
+    // First call the callback (which should stop streaming)
+    if (autoShutdownCallback) {
+        try {
+            autoShutdownCallback();
+        } catch (e) {
+            console.error('Auto-shutdown callback error:', e);
+        }
+    }
+
+    // Then release all keep-awake resources
+    destroyKeepAwake();
+}
+
+/**
  * Release all keep-awake resources
  */
 export function destroyKeepAwake() {
+    cancelAutoShutdown();
+    
     if (wakeLockInterval) {
         clearInterval(wakeLockInterval);
         wakeLockInterval = null;
@@ -148,4 +274,5 @@ export function destroyKeepAwake() {
         noSleepVideo.remove();
         noSleepVideo = null;
     }
+    console.log('Keep-awake resources released - phone can sleep now');
 }

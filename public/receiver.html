@@ -88,6 +88,10 @@
             <span class="info-icon">🎵</span>
             <span id="musicStatusDisplay">—</span>
         </div>
+        <div class="info-item shutdown-info" id="shutdownInfoItem" style="display: none;">
+            <span class="info-icon">🌙</span>
+            <span id="shutdownStatusDisplay">—</span>
+        </div>
         <span class="info-status" id="info">Waiting...</span>
     </div>
 
@@ -144,21 +148,28 @@
                     <input type="checkbox" id="audioOnlyToggle">
                     <span>Audio only mode</span>
                 </label>
-                <label class="toggle-option" id="bluetoothModeLabel">
-                    <input type="checkbox" id="bluetoothModeToggle">
-                    <span>Bluetooth mode</span>
-                    <span class="bluetooth-hint">(enable if PTT breaks audio)</span>
-                </label>
                 <label class="toggle-option" id="echoCancelToggleLabel">
                     <input type="checkbox" id="echoCancelToggle">
                     <span>Reduce music echo</span>
                     <span class="experimental-badge">Beta</span>
                 </label>
-                <label class="toggle-option" id="mediaSessionToggleLabel" for="mediaSessionToggle">
-                    <input type="checkbox" id="mediaSessionToggle" aria-label="Enable background audio mode (beta feature)">
-                    <span>Background audio</span>
-                    <span class="experimental-badge">Beta</span>
-                </label>
+            </div>
+
+            <div class="control-section shutdown-section" id="shutdownContainer">
+                <label class="control-label">Auto-shutdown</label>
+                <div class="shutdown-controls">
+                    <button class="shutdown-btn" id="shutdownBtn" title="Shutdown now">🌙</button>
+                    <select class="timer-select" id="shutdownTimerSelect">
+                        <option value="0">Disabled</option>
+                        <option value="4">4 hours</option>
+                        <option value="6" selected>6 hours</option>
+                        <option value="8">8 hours</option>
+                        <option value="10">10 hours</option>
+                    </select>
+                    <button class="shutdown-reset-btn" id="shutdownResetBtn" style="display: none;">Reset</button>
+                </div>
+                <div class="shutdown-status" id="shutdownStatus"></div>
+                <div class="control-hint">Sender stops streaming after this time</div>
             </div>
 
             <button class="fullscreen-btn" id="fullscreenBtn">⛶ Fullscreen</button>

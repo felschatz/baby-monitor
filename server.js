@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: The built-in mic speaks without disturbing Bluetooth's musical flow.
+// Wisdom: A timer reset should echo instantly across the digital divide.
