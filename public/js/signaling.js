@@ -20,6 +20,8 @@ export function createSignalingManager(options) {
     let eventSource = null;
     let connected = false;
     let receiverId = null;
+    let autoReconnect = true;
+    let reconnectTimer = null;
 
     /**
      * Send signal via HTTP POST
@@ -53,6 +55,11 @@ export function createSignalingManager(options) {
         if (eventSource) {
             eventSource.close();
         }
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        autoReconnect = true;
 
         const sseUrl = `${sseEndpoint}/${encodeURIComponent(sessionName)}`;
         console.log('Connecting to SSE:', sseUrl);
@@ -87,8 +94,10 @@ export function createSignalingManager(options) {
             connected = false;
             eventSource.close();
             if (onError) onError(err);
-            // Reconnect after delay
-            setTimeout(connect, 3000);
+            if (autoReconnect) {
+                if (reconnectTimer) clearTimeout(reconnectTimer);
+                reconnectTimer = setTimeout(connect, 3000);
+            }
         };
     }
 
@@ -96,6 +105,11 @@ export function createSignalingManager(options) {
      * Disconnect SSE
      */
     function disconnect() {
+        autoReconnect = false;
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
         if (eventSource) {
             eventSource.close();
             eventSource = null;

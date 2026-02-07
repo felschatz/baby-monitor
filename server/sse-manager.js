@@ -118,6 +118,7 @@ function handleSenderSSE(req, res, sessionName) {
         } catch (e) {
             // Old connection might already be dead
         }
+        broadcastToReceivers(sessionName, { type: 'sender-disconnected' });
         session.sender = null;
         session.senderRes = null;
     }
