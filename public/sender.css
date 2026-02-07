@@ -219,6 +219,13 @@ body.disconnected {
     opacity: 0.7;
 }
 
+.wisdom-subtle {
+    text-align: center;
+    font-size: 0.7rem;
+    opacity: 0.35;
+    letter-spacing: 0.03em;
+}
+
 .back-link {
     color: white;
     text-decoration: none;
