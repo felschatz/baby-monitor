@@ -546,7 +546,17 @@ async function handleMessage(message) {
                 clearReclaimTimer();
                 reclaimPending = false;
                 reclaimAttempts = 0;
+                setConnectedState(true);
                 info.textContent = 'Reclaimed sender role. Continuing stream...';
+                const localStream = getLocalStream();
+                const hasLiveTrack = localStream && localStream.getTracks().some(track => track.readyState === 'live');
+                if (!localStream || !hasLiveTrack) {
+                    console.log('No live local stream after reclaim - restarting stream');
+                    setTimeout(() => {
+                        if (!isStreaming) return;
+                        startStreamingHandler();
+                    }, 100);
+                }
                 setTimeout(() => {
                     if (signaling.isConnected()) {
                         signaling.sendSignal({ type: 'sender-ready' });
