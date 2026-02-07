@@ -147,6 +147,9 @@ let debugTimerMode = false; // Will be set from /api/music response
 let shutdownTimerValue = parseInt(localStorage.getItem('receiver-shutdown-timer') || '6');
 let testSoundResetTimer = null;
 const testSoundButtonLabel = testSoundBtn ? testSoundBtn.textContent : 'Send test ping';
+let shutdownActive = false;
+let shutdownEndTime = null;  // Local end time for smooth countdown
+let shutdownCountdownInterval = null;
 
 // Initialize keep-awake
 initKeepAwake();
@@ -462,10 +465,6 @@ function handleEchoCancelStatus(message) {
 }
 
 // Shutdown status functions
-let shutdownActive = false;
-let shutdownEndTime = null;  // Local end time for smooth countdown
-let shutdownCountdownInterval = null;
-
 function updateShutdownButtonState() {
     const label = shutdownActive ? 'Reset' : 'Set';
     shutdownBtn.textContent = label;
