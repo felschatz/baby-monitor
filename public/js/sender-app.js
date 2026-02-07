@@ -127,6 +127,10 @@ let shutdownUnit = 'hours'; // Will be updated by receiver
 let testSoundInProgress = false;
 let testSoundBuffer = null;
 let testSoundContext = null;
+let reclaimTimer = null;
+let reclaimPending = false;
+let reclaimAttempts = 0;
+const RECLAIM_DELAY_MS = 2000;
 
 // Initialize keep-awake (auto-shutdown will be configured by receiver)
 initKeepAwake();
@@ -258,6 +262,46 @@ function enableAudioPlayback(fromUserGesture = false) {
     if (pttAudio.srcObject) {
         pttAudio.play().catch(e => console.log('PTT play after enable:', e));
     }
+}
+
+function clearReclaimTimer() {
+    if (reclaimTimer) {
+        clearTimeout(reclaimTimer);
+        reclaimTimer = null;
+    }
+}
+
+async function attemptReclaim() {
+    if (!reclaimPending || signaling.isConnected()) return;
+
+    let senderActive = false;
+    try {
+        const response = await fetch(`/api/status/${encodeURIComponent(sessionName)}`);
+        if (response.ok) {
+            const status = await response.json();
+            senderActive = status.senderActive;
+        }
+    } catch (err) {
+        console.log('Reclaim status check failed:', err.message || err);
+    }
+
+    if (senderActive) {
+        reclaimAttempts += 1;
+        console.log('Reclaim deferred - another sender still active (attempt', reclaimAttempts, ')');
+        scheduleReclaim();
+        return;
+    }
+
+    console.log('Attempting to reclaim sender role');
+    signaling.connect();
+}
+
+function scheduleReclaim() {
+    if (!reclaimPending) return;
+    clearReclaimTimer();
+    reclaimTimer = setTimeout(() => {
+        attemptReclaim();
+    }, RECLAIM_DELAY_MS);
 }
 
 function getOutboundAudioTrackForRestore() {
@@ -497,6 +541,18 @@ async function handleMessage(message) {
             } else {
                 console.log('Already streaming, skipping auto-start');
             }
+            if (reclaimPending && isStreaming) {
+                console.log('Reclaim successful - continuing stream');
+                clearReclaimTimer();
+                reclaimPending = false;
+                reclaimAttempts = 0;
+                info.textContent = 'Reclaimed sender role. Continuing stream...';
+                setTimeout(() => {
+                    if (signaling.isConnected()) {
+                        signaling.sendSignal({ type: 'sender-ready' });
+                    }
+                }, 250);
+            }
             setTimeout(() => {
                 broadcastMusicStatus();
                 broadcastEchoCancelStatus();
@@ -511,8 +567,17 @@ async function handleMessage(message) {
         case 'replaced':
             console.log('Replaced by another sender');
             signaling.setConnected(false);
-            info.textContent = 'Another device took over as sender. Refresh to reclaim.';
             setDisconnectedState();
+            if (isStreaming) {
+                reclaimPending = true;
+                reclaimAttempts = 0;
+                clearReclaimTimer();
+                info.textContent = 'Another device took over. Reclaiming in 2 seconds...';
+                signaling.disconnect();
+                scheduleReclaim();
+            } else {
+                info.textContent = 'Another device took over as sender. Refresh to reclaim.';
+            }
             break;
 
         case 'request-offer':
@@ -731,6 +796,9 @@ function stopStreamingHandler() {
     // Cancel auto-shutdown timer and notify receivers
     cancelAutoShutdown();
     updateShutdownUI({ active: false, remainingMs: 0 });
+    reclaimPending = false;
+    clearReclaimTimer();
+    reclaimAttempts = 0;
     if (signaling.isConnected()) {
         signaling.sendSignal({ type: 'shutdown-status', active: false, remainingMs: 0 });
     }
