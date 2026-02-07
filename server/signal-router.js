@@ -119,6 +119,13 @@ async function handleSignal(req, res) {
             }
             break;
 
+        case 'test-sound':
+            // Receiver -> Sender: trigger a short ping through the outgoing audio stream
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, { type: 'test-sound' });
+            }
+            break;
+
         case 'echo-cancel-status':
             // Sender -> Receivers: acknowledge state
             broadcastToReceivers(sessionName, {

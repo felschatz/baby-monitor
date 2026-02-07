@@ -124,6 +124,9 @@ qualityBadge.classList.add(videoQuality);
 let isStreaming = false;
 let audioEnabled = false;
 let shutdownUnit = 'hours'; // Will be updated by receiver
+let testSoundInProgress = false;
+let testSoundBuffer = null;
+let testSoundContext = null;
 
 // Initialize keep-awake (auto-shutdown will be configured by receiver)
 initKeepAwake();
@@ -244,6 +247,101 @@ function enableAudioPlayback() {
 
     if (pttAudio.srcObject) {
         pttAudio.play().catch(e => console.log('PTT play after enable:', e));
+    }
+}
+
+function getOutboundAudioTrackForRestore() {
+    const localStream = getLocalStream();
+    const localTrack = localStream ? localStream.getAudioTracks()[0] : null;
+
+    if (isEchoCancelActive()) {
+        return getProcessedAudioTrack() || localTrack;
+    }
+
+    return localTrack || getOriginalAudioTrack();
+}
+
+async function ensureTestSoundBuffer(ctx) {
+    if (testSoundBuffer) return testSoundBuffer;
+    const response = await fetch('/ping.mp3');
+    if (!response.ok) {
+        throw new Error(`Failed to load ping.mp3: ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    testSoundBuffer = await ctx.decodeAudioData(arrayBuffer);
+    return testSoundBuffer;
+}
+
+async function playTestSound() {
+    if (testSoundInProgress) {
+        console.log('Test sound already in progress');
+        return;
+    }
+    if (!isStreaming || !getLocalStream()) {
+        console.log('Test sound ignored: no active stream');
+        return;
+    }
+
+    const restoreTrack = getOutboundAudioTrackForRestore();
+    if (!restoreTrack) {
+        console.log('Test sound ignored: no outbound audio track');
+        return;
+    }
+
+    testSoundInProgress = true;
+    let source = null;
+    let testTrack = null;
+
+    try {
+        let ctx = getAudioContext();
+        if (!ctx || ctx.state === 'closed') {
+            if (!testSoundContext || testSoundContext.state === 'closed') {
+                testSoundContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            ctx = testSoundContext;
+        }
+
+        if (ctx.state === 'suspended') {
+            try {
+                await ctx.resume();
+            } catch (err) {
+                console.log('Test sound: audio context resume blocked');
+            }
+        }
+
+        const buffer = await ensureTestSoundBuffer(ctx);
+        const destination = ctx.createMediaStreamDestination();
+        source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(destination);
+
+        testTrack = destination.stream.getAudioTracks()[0];
+        await replaceAudioTrack(testTrack);
+
+        await new Promise(resolve => {
+            source.onended = resolve;
+            source.start(0);
+        });
+
+        testTrack.stop();
+        await replaceAudioTrack(restoreTrack);
+        console.log('Test sound complete');
+    } catch (err) {
+        console.error('Test sound failed:', err);
+        try {
+            if (restoreTrack) {
+                await replaceAudioTrack(restoreTrack);
+            }
+        } catch (restoreErr) {
+            console.error('Failed to restore audio track after test sound:', restoreErr);
+        }
+    } finally {
+        if (source) {
+            try {
+                source.disconnect();
+            } catch (e) {}
+        }
+        testSoundInProgress = false;
     }
 }
 
@@ -498,6 +596,11 @@ async function handleMessage(message) {
         case 'echo-cancel-enable':
             console.log('Received echo cancel toggle:', message.enabled);
             await handleEchoCancelToggle(message.enabled);
+            break;
+
+        case 'test-sound':
+            console.log('Received test sound request');
+            await playTestSound();
             break;
 
         case 'shutdown-timeout':

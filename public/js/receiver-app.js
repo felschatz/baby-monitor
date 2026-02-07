@@ -95,6 +95,7 @@ const shutdownResetBtn = document.getElementById('shutdownResetBtn');
 const shutdownStatus = document.getElementById('shutdownStatus');
 const shutdownInfoItem = document.getElementById('shutdownInfoItem');
 const shutdownStatusDisplay = document.getElementById('shutdownStatusDisplay');
+const testSoundBtn = document.getElementById('testSoundBtn');
 
 // Music elements
 const musicContainer = document.getElementById('musicContainer');
@@ -145,6 +146,8 @@ let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
 let debugTimerMode = false; // Will be set from /api/music response
 let shutdownTimerValue = parseInt(localStorage.getItem('receiver-shutdown-timer') || '6');
+let testSoundResetTimer = null;
+const testSoundButtonLabel = testSoundBtn ? testSoundBtn.textContent : 'Send test ping';
 
 // Initialize keep-awake
 initKeepAwake();
@@ -200,6 +203,7 @@ function setConnectedState(connected) {
         stopPTT(pttBtn, pttLabel);
         audioOnlyIndicator.classList.remove('active');
     }
+    updateTestSoundButton();
 }
 
 function setDisconnectedState() {
@@ -219,6 +223,23 @@ function setDisconnectedState() {
     audioOnlyIndicator.classList.remove('active');
     noiseGateInfoItem.classList.remove('gating');
     resetMusicUI();
+    resetTestSoundButton();
+}
+
+function resetTestSoundButton() {
+    if (!testSoundBtn) return;
+    if (testSoundResetTimer) {
+        clearTimeout(testSoundResetTimer);
+        testSoundResetTimer = null;
+    }
+    testSoundBtn.classList.remove('active');
+    testSoundBtn.textContent = testSoundButtonLabel;
+    testSoundBtn.disabled = !isConnected;
+}
+
+function updateTestSoundButton() {
+    if (!testSoundBtn) return;
+    testSoundBtn.disabled = !isConnected;
 }
 
 function setMediaMutedState(muted) {
@@ -763,6 +784,23 @@ shutdownResetBtn.addEventListener('click', () => {
     });
 });
 
+if (testSoundBtn) {
+    testSoundBtn.addEventListener('click', () => {
+        if (!isConnected || testSoundBtn.disabled) return;
+        console.log('Sending test sound ping');
+        signaling.sendSignal({ type: 'test-sound' });
+        testSoundBtn.disabled = true;
+        testSoundBtn.classList.add('active');
+        testSoundBtn.textContent = 'Sending...';
+        if (testSoundResetTimer) {
+            clearTimeout(testSoundResetTimer);
+        }
+        testSoundResetTimer = setTimeout(() => {
+            resetTestSoundButton();
+        }, 1400);
+    });
+}
+
 // Shared volume update function
 function updateVolume(value) {
     const numValue = parseInt(value);
@@ -900,6 +938,9 @@ window.addEventListener('beforeunload', () => {
     }
     if (longPressTimer) {
         clearTimeout(longPressTimer);
+    }
+    if (testSoundResetTimer) {
+        clearTimeout(testSoundResetTimer);
     }
     if (shutdownCountdownInterval) {
         clearInterval(shutdownCountdownInterval);
