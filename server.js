@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A timer reset should echo instantly across the digital divide.
+// Wisdom: Even a soft ping can steady a sleepy night.

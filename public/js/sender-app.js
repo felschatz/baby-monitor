@@ -232,17 +232,27 @@ function updateStreamingStatus() {
     }
 }
 
-function enableAudioPlayback() {
-    if (audioEnabled) return;
-    audioEnabled = true;
-    console.log('Audio playback enabled');
+function enableAudioPlayback(fromUserGesture = false) {
+    if (!audioEnabled) {
+        audioEnabled = true;
+        console.log('Audio playback enabled');
 
-    const silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
-    silentAudio.play().catch(e => {});
+        const silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+        silentAudio.play().catch(() => {});
+    }
 
     const ctx = getAudioContext();
     if (ctx && ctx.state === 'suspended') {
-        ctx.resume();
+        ctx.resume().catch(() => {});
+    }
+
+    if (fromUserGesture) {
+        if (!testSoundContext || testSoundContext.state === 'closed') {
+            testSoundContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (testSoundContext.state === 'suspended') {
+            testSoundContext.resume().catch(() => {});
+        }
     }
 
     if (pttAudio.srcObject) {
@@ -293,11 +303,12 @@ async function playTestSound() {
     let testTrack = null;
 
     try {
-        let ctx = getAudioContext();
+        let ctx = testSoundContext;
         if (!ctx || ctx.state === 'closed') {
-            if (!testSoundContext || testSoundContext.state === 'closed') {
-                testSoundContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
+            ctx = getAudioContext();
+        }
+        if (!ctx || ctx.state === 'closed') {
+            testSoundContext = new (window.AudioContext || window.webkitAudioContext)();
             ctx = testSoundContext;
         }
 
@@ -740,9 +751,9 @@ function stopStreamingHandler() {
 startBtn.addEventListener('click', startStreamingHandler);
 stopBtn.addEventListener('click', stopStreamingHandler);
 
-document.addEventListener('click', enableAudioPlayback, { passive: true });
-document.addEventListener('touchstart', enableAudioPlayback, { passive: true });
-document.addEventListener('touchend', enableAudioPlayback, { passive: true });
+document.addEventListener('click', () => enableAudioPlayback(true), { passive: true });
+document.addEventListener('touchstart', () => enableAudioPlayback(true), { passive: true });
+document.addEventListener('touchend', () => enableAudioPlayback(true), { passive: true });
 
 // Initialize - connect SSE immediately
 signaling.connect();
