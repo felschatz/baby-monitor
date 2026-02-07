@@ -13,11 +13,15 @@ const { getSession, hasSender, cleanupSession } = require('./session-manager');
  * @returns {boolean} Whether message was sent successfully
  */
 function sendSSE(res, data) {
-    if (res && !res.writableEnded) {
+    if (!res || res.writableEnded || res.destroyed || res.socket?.destroyed) {
+        return false;
+    }
+    try {
         res.write(`data: ${JSON.stringify(data)}\n\n`);
         return true;
+    } catch (err) {
+        return false;
     }
-    return false;
 }
 
 /**
@@ -134,6 +138,12 @@ function handleSenderSSE(req, res, sessionName) {
     const heartbeat = setInterval(() => {
         if (!sendSSE(res, { type: 'heartbeat' })) {
             clearInterval(heartbeat);
+            if (session.sender === id) {
+                session.sender = null;
+                session.senderRes = null;
+                broadcastToReceivers(sessionName, { type: 'sender-disconnected' });
+                cleanupSession(sessionName);
+            }
         }
     }, 15000);
 
