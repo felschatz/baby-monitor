@@ -51,6 +51,8 @@ function sendToSender(sessionName, message) {
         if (!sendSSE(session.senderRes, message)) {
             session.sender = null;
             session.senderRes = null;
+            broadcastToReceivers(sessionName, { type: 'sender-disconnected' });
+            cleanupSession(sessionName);
         }
     }
 }

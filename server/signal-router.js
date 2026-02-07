@@ -123,6 +123,9 @@ async function handleSignal(req, res) {
             // Receiver -> Sender: trigger a short ping through the outgoing audio stream
             if (hasSender(sessionName)) {
                 sendToSender(sessionName, { type: 'test-sound' });
+            } else {
+                console.log('Test sound ignored: no sender in session', sessionName);
+                return sendJson(res, { error: 'Sender not connected' }, 409);
             }
             break;
 

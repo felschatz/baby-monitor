@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Even a soft ping can steady a sleepy night.
+// Wisdom: Patience is a small light that travels far.
