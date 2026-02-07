@@ -110,10 +110,13 @@ export async function tryStartAudioAnalysis(audioLevelElement) {
 
             // Monitor for AudioContext suspension (e.g., when Bluetooth connects)
             audioContext.onstatechange = () => {
+                // Guard against the context being cleared during teardown
+                if (!audioContext) return;
                 console.log('AudioContext state changed to:', audioContext.state);
                 if (audioContext.state === 'suspended') {
                     console.log('AudioContext suspended (device change?), attempting resume...');
                     audioContext.resume().then(() => {
+                        if (!audioContext) return;
                         console.log('AudioContext resumed after suspension, state:', audioContext.state);
                     }).catch(err => {
                         console.warn('Could not auto-resume AudioContext:', err);
@@ -348,6 +351,7 @@ export function destroyAudioAnalysis() {
     analyser = null;
     audioStream = null;
     if (audioContext) {
+        audioContext.onstatechange = null;
         audioContext.close().catch(() => {});
         audioContext = null;
     }
