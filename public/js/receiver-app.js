@@ -430,8 +430,8 @@ async function checkMusicAvailability() {
                 <option value="0">Disabled</option>
                 <option value="10">10 sec</option>
                 <option value="30">30 sec</option>
-                <option value="60">60 sec</option>
-                <option value="120">2 min</option>
+                <option value="300">5 min</option>
+                <option value="3600">1h</option>
             `;
             shutdownTimerSelect.value = shutdownTimerValue.toString();
         }
