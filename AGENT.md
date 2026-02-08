@@ -177,6 +177,7 @@ mp3/
 
 ## When Making Changes
 
+0. Ask if you want to make any changes, which could affect the receivers sound. The whole routing/context-switch/bluetooth stuff is pretty delicate and breaks easily
 1. Keep it dependency-free (no frameworks, pure Node.js)
 2. No WebSockets - use SSE + HTTP POST
 3. No data storage - everything is peer-to-peer
