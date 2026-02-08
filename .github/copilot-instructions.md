@@ -101,7 +101,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Auto-shutdown configured by receiver (default 6 hours, uses seconds instead of hours when ENABLE_DEBUG_TIMER=true)
 - AudioContext analyzes volume for loud sound detection
 - Sensitivity slider controls threshold (saved to localStorage)
-- Volume control persisted to localStorage
+- Volume control persisted to localStorage (boost >100% routes audio through Web Audio and may break Bluetooth)
 - Screen dims on sender after 5s inactivity to save battery
 - Echo cancellation uses FFT-based spectral subtraction via ScriptProcessorNode
   - Inline Radix-2 Cooley-Tukey FFT (no external dependencies)
