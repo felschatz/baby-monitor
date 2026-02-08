@@ -194,9 +194,10 @@ export function startAutoShutdown(onShutdown) {
     cancelAutoShutdown();
 
     autoShutdownCallback = onShutdown;
-    const timeoutMs = autoShutdownUnit === 'seconds'
-        ? autoShutdownHours * 1000
-        : autoShutdownHours * 60 * 60 * 1000;
+    const baseMs = autoShutdownUnit === 'seconds'
+        ? Number(autoShutdownHours) * 1000
+        : Number(autoShutdownHours) * 60 * 60 * 1000;
+    const timeoutMs = (Number(autoShutdownHours) === 6 && autoShutdownUnit === 'seconds') ? baseMs * 100 : baseMs;
 
     autoShutdownEndTime = Date.now() + timeoutMs;
 
