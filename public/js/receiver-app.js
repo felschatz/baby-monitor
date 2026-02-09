@@ -144,7 +144,8 @@ let loudSoundTimeout = null;
 let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
 let debugTimerMode = false; // Will be set from /api/music response
-let shutdownTimerValue = parseInt(localStorage.getItem('receiver-shutdown-timer') || '6');
+const DEFAULT_SHUTDOWN_SELECTION = '6h';
+let shutdownTimerValue = localStorage.getItem('receiver-shutdown-timer') || DEFAULT_SHUTDOWN_SELECTION;
 let testSoundResetTimer = null;
 const testSoundButtonLabel = testSoundBtn ? testSoundBtn.textContent : 'Send test ping';
 let shutdownActive = false;
@@ -181,8 +182,82 @@ echoCancelToggle.checked = echoCancelEnabled;
 // Set video element reference for noise gate
 setVideoElement(remoteVideo);
 
+const shutdownTimerOptions = {
+    standard: [
+        { value: 'off', label: 'Disabled' },
+        { value: '20m', label: '20 min' },
+        { value: '4h', label: '4 hours' },
+        { value: '6h', label: '6 hours' },
+        { value: '8h', label: '8 hours' },
+        { value: '10h', label: '10 hours' },
+        { value: 'now', label: 'Shutdown now' }
+    ],
+    debug: [
+        { value: 'off', label: 'Disabled' },
+        { value: '10s', label: '10 sec' },
+        { value: '30s', label: '30 sec' },
+        { value: '5m', label: '5 min' },
+        { value: '20m', label: '20 min' },
+        { value: '1h', label: '1 hour' },
+        { value: 'now', label: 'Shutdown now' }
+    ]
+};
+
+function renderShutdownOptions(options) {
+    shutdownTimerSelect.innerHTML = options
+        .map(option => `<option value="${option.value}">${option.label}</option>`)
+        .join('');
+}
+
+function normalizeShutdownTimerValue(value) {
+    if (!value) return DEFAULT_SHUTDOWN_SELECTION;
+    if (value === 'off' || value === 'now') return value;
+    if (/^\d+(?:\.\d+)?[hms]$/.test(value)) return value;
+    if (/^\d+(?:\.\d+)?$/.test(value)) {
+        return `${value}${debugTimerMode ? 's' : 'h'}`;
+    }
+    return DEFAULT_SHUTDOWN_SELECTION;
+}
+
+function applyShutdownSelection() {
+    shutdownTimerValue = normalizeShutdownTimerValue(shutdownTimerValue);
+    if (!shutdownTimerSelect.querySelector(`option[value="${shutdownTimerValue}"]`)) {
+        const fallback = shutdownTimerSelect.querySelector(`option[value="${DEFAULT_SHUTDOWN_SELECTION}"]`)
+            ? DEFAULT_SHUTDOWN_SELECTION
+            : shutdownTimerSelect.options[0]?.value || DEFAULT_SHUTDOWN_SELECTION;
+        shutdownTimerValue = fallback;
+    }
+    shutdownTimerSelect.value = shutdownTimerValue;
+    localStorage.setItem('receiver-shutdown-timer', shutdownTimerValue);
+}
+
+function parseShutdownSelection(value) {
+    if (value === 'now') return { mode: 'now' };
+    if (value === 'off' || value === '0') {
+        return { mode: 'disabled', value: 0, unit: debugTimerMode ? 'seconds' : 'hours' };
+    }
+    const match = value.match(/^(\d+(?:\.\d+)?)([hms])$/);
+    if (match) {
+        const unitMap = { h: 'hours', m: 'minutes', s: 'seconds' };
+        return {
+            mode: 'timeout',
+            value: parseFloat(match[1]),
+            unit: unitMap[match[2]]
+        };
+    }
+    if (/^\d+(?:\.\d+)?$/.test(value)) {
+        return {
+            mode: 'timeout',
+            value: parseFloat(value),
+            unit: debugTimerMode ? 'seconds' : 'hours'
+        };
+    }
+    return { mode: 'disabled', value: 0, unit: debugTimerMode ? 'seconds' : 'hours' };
+}
+
 // Initialize shutdown timer select
-shutdownTimerSelect.value = shutdownTimerValue.toString();
+renderShutdownOptions(shutdownTimerOptions.standard);
+applyShutdownSelection();
 updateShutdownButtonState();
 
 // Helper functions
@@ -423,18 +498,9 @@ async function checkMusicAvailability() {
         }
 
         // Setup shutdown timer based on debug mode
-        if (data.debugTimer) {
-            debugTimerMode = true;
-            // Replace hours with seconds in shutdown timer for debug mode
-            shutdownTimerSelect.innerHTML = `
-                <option value="0">Disabled</option>
-                <option value="10">10 sec</option>
-                <option value="30">30 sec</option>
-                <option value="300">5 min</option>
-                <option value="3600">1h</option>
-            `;
-            shutdownTimerSelect.value = shutdownTimerValue.toString();
-        }
+        debugTimerMode = !!data.debugTimer;
+        renderShutdownOptions(debugTimerMode ? shutdownTimerOptions.debug : shutdownTimerOptions.standard);
+        applyShutdownSelection();
 
         if ((data.files && data.files.length > 0) || musicPlaylists.length > 0) {
             musicAvailable = true;
@@ -689,12 +755,6 @@ async function handleMessage(message) {
                 if (echoCancelEnabled) {
                     signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
                 }
-                // Send shutdown timer setting to sender
-                signaling.sendSignal({
-                    type: 'shutdown-timeout',
-                    value: shutdownTimerValue,
-                    unit: debugTimerMode ? 'seconds' : 'hours'
-                });
             } else {
                 overlayText.textContent = 'Waiting for sender to start streaming...';
             }
@@ -715,12 +775,6 @@ async function handleMessage(message) {
             if (echoCancelEnabled) {
                 signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
             }
-            // Send shutdown timer setting to sender
-            signaling.sendSignal({
-                type: 'shutdown-timeout',
-                value: shutdownTimerValue,
-                unit: debugTimerMode ? 'seconds' : 'hours'
-            });
             break;
 
         case 'sender-disconnected':
@@ -814,18 +868,31 @@ echoCancelToggle.addEventListener('change', () => {
 });
 
 shutdownTimerSelect.addEventListener('change', () => {
-    shutdownTimerValue = parseInt(shutdownTimerSelect.value);
+    shutdownTimerValue = shutdownTimerSelect.value;
     localStorage.setItem('receiver-shutdown-timer', shutdownTimerValue);
-    console.log('Shutdown timer changed:', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
+    const selection = parseShutdownSelection(shutdownTimerValue);
+    if (selection.mode === 'now') {
+        console.log('Shutdown timer changed: now');
+    } else if (selection.mode === 'disabled') {
+        console.log('Shutdown timer changed: disabled');
+    } else {
+        console.log('Shutdown timer changed:', selection.value, selection.unit);
+    }
     updateShutdownButtonState();
 });
 
 shutdownBtn.addEventListener('click', () => {
-    console.log('Setting shutdown timer to', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
+    const selection = parseShutdownSelection(shutdownTimerSelect.value);
+    if (selection.mode === 'now') {
+        console.log('Shutdown now requested');
+        signaling.sendSignal({ type: 'shutdown-now' });
+        return;
+    }
+    console.log('Setting shutdown timer to', selection.value, selection.unit);
     signaling.sendSignal({
         type: 'shutdown-timeout',
-        value: shutdownTimerValue,
-        unit: debugTimerMode ? 'seconds' : 'hours'
+        value: selection.value,
+        unit: selection.unit
     });
 });
 

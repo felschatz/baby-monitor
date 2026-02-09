@@ -12,7 +12,7 @@ let autoShutdownEndTime = null;
 let autoShutdownCallback = null;
 let autoShutdownStatusCallback = null;
 let autoShutdownHours = 6; // Default: 6 hours (or seconds in debug mode)
-let autoShutdownUnit = 'hours'; // 'hours' or 'seconds'
+let autoShutdownUnit = 'hours'; // 'hours', 'minutes', or 'seconds'
 
 /**
  * Rate-limited logging for wake lock events
@@ -140,7 +140,7 @@ export function initKeepAwake() {
 /**
  * Set the auto-shutdown timeout
  * @param {number} value - Time before auto-shutdown (0 to disable)
- * @param {string} unit - 'hours' or 'seconds'
+ * @param {string} unit - 'hours', 'minutes', or 'seconds'
  */
 export function setAutoShutdownTime(value, unit = 'hours') {
     autoShutdownHours = value;

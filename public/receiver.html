@@ -138,6 +138,7 @@
                         <option value="45">45 min</option>
                         <option value="60">1 hour</option>
                         <option value="105" selected>1:45</option>
+                        <option value="120">2 hours</option>
                     </select>
                     <button class="music-reset-btn" id="musicResetBtn" style="display: none;">Reset</button>
                 </div>
@@ -161,11 +162,13 @@
                 <div class="shutdown-controls">
                     <button class="shutdown-btn" id="shutdownBtn" title="Set auto-shutdown">Set</button>
                     <select class="timer-select" id="shutdownTimerSelect">
-                        <option value="0">Disabled</option>
-                        <option value="4">4 hours</option>
-                        <option value="6" selected>6 hours</option>
-                        <option value="8">8 hours</option>
-                        <option value="10">10 hours</option>
+                        <option value="off">Disabled</option>
+                        <option value="20m">20 min</option>
+                        <option value="4h">4 hours</option>
+                        <option value="6h" selected>6 hours</option>
+                        <option value="8h">8 hours</option>
+                        <option value="10h">10 hours</option>
+                        <option value="now">Shutdown now</option>
                     </select>
                 </div>
                 <div class="shutdown-status" id="shutdownStatus"></div>
@@ -180,7 +183,7 @@
             </div>
 
             <button class="fullscreen-btn" id="fullscreenBtn">⛶ Fullscreen</button>
-            <div class="wisdom-text" id="receiverWisdom">Wisdom - Feb 8, 2026: Small gains make the night easier.</div>
+            <div class="wisdom-text" id="receiverWisdom">Wisdom - Feb 9, 2026: Steady nights start with steady care.</div>
         </div>
     </div>
 

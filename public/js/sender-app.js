@@ -124,6 +124,7 @@ qualityBadge.classList.add(videoQuality);
 let isStreaming = false;
 let audioEnabled = false;
 let shutdownUnit = 'hours'; // Will be updated by receiver
+let shutdownConfigured = false;
 let testSoundInProgress = false;
 let testSoundBuffer = null;
 let testSoundContext = null;
@@ -709,7 +710,10 @@ async function handleMessage(message) {
         case 'shutdown-timeout':
             console.log('Received shutdown timeout:', message.value, message.unit);
             shutdownUnit = message.unit || 'hours';
-            setAutoShutdownTime(message.value, shutdownUnit);
+            const timeoutValue = Number(message.value);
+            const safeValue = Number.isFinite(timeoutValue) ? timeoutValue : 0;
+            setAutoShutdownTime(safeValue, shutdownUnit);
+            shutdownConfigured = safeValue > 0;
             // Restart the timer if streaming
             if (isStreaming) {
                 startAutoShutdown(() => {
@@ -724,6 +728,7 @@ async function handleMessage(message) {
         case 'shutdown-now':
             console.log('Received shutdown-now from receiver');
             shutdownUnit = 'seconds';
+            shutdownConfigured = false;
             setAutoShutdownTime(30, 'seconds');
             if (isStreaming) {
                 startAutoShutdown(() => {
