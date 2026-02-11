@@ -261,6 +261,7 @@ body.loud-alert-active .info-strip {
     justify-content: center;
     background: rgba(0, 0, 0, 0.7);
     cursor: pointer;
+    z-index: 20;
 }
 
 .overlay-content {
@@ -289,6 +290,7 @@ body.loud-alert-active .info-strip {
     display: none;
     z-index: 10;
     border: 1px solid var(--border-subtle);
+    pointer-events: none;
 }
 
 .audio-only-indicator.active {
