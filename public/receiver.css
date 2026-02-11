@@ -146,6 +146,38 @@ body.connected {
     display: flex;
 }
 
+/* Debug banner (enabled via ?debug=1) */
+.debug-banner {
+    position: fixed;
+    top: 62px;
+    left: 12px;
+    right: 12px;
+    background: rgba(15, 15, 20, 0.88);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 8px 12px;
+    z-index: 10002;
+    font-size: 0.72rem;
+    pointer-events: none;
+    backdrop-filter: blur(6px);
+}
+
+.debug-title {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent-orange);
+    margin-bottom: 4px;
+}
+
+.debug-text {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    color: var(--text-secondary);
+    display: grid;
+    gap: 2px;
+}
+
 .disconnect-alert {
     background: rgba(180, 0, 0, 0.95);
     color: white;

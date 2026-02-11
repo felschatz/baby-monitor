@@ -11,6 +11,7 @@ import {
     setupAudioAnalysis,
     ensureAudioContext,
     resetAudioAnalysis,
+    getAudioContext,
     setNoiseGateThreshold,
     setPlaybackVolume,
     resetNoiseGate,
@@ -95,6 +96,8 @@ const shutdownStatus = document.getElementById('shutdownStatus');
 const shutdownInfoItem = document.getElementById('shutdownInfoItem');
 const shutdownStatusDisplay = document.getElementById('shutdownStatusDisplay');
 const testSoundBtn = document.getElementById('testSoundBtn');
+const debugBanner = document.getElementById('debugBanner');
+const debugText = document.getElementById('debugText');
 
 // Music elements
 const musicContainer = document.getElementById('musicContainer');
@@ -151,9 +154,16 @@ const testSoundButtonLabel = testSoundBtn ? testSoundBtn.textContent : 'Send tes
 let shutdownActive = false;
 let shutdownEndTime = null;  // Local end time for smooth countdown
 let shutdownCountdownInterval = null;
+let debugInterval = null;
 
 // Initialize keep-awake
 initKeepAwake();
+
+const debugParams = new URLSearchParams(window.location.search);
+const debugEnabled = debugParams.get('debug') === '1' || debugParams.get('debug') === 'true';
+if (debugBanner) {
+    debugBanner.style.display = debugEnabled ? 'block' : 'none';
+}
 
 // Load saved settings
 const savedVolume = localStorage.getItem('receiver-volume');
@@ -1071,6 +1081,9 @@ window.addEventListener('beforeunload', () => {
     if (shutdownCountdownInterval) {
         clearInterval(shutdownCountdownInterval);
     }
+    if (debugInterval) {
+        clearInterval(debugInterval);
+    }
     cleanupPTT();
     destroyKeepAwake();
     destroyAudioAnalysis();
@@ -1079,7 +1092,46 @@ window.addEventListener('beforeunload', () => {
     signaling.disconnect();
 });
 
+function formatTrackState(track) {
+    if (!track) return 'none';
+    const muted = track.muted ? 'muted' : 'unmuted';
+    return `${track.readyState}, ${muted}`;
+}
+
+function updateDebugBanner() {
+    if (!debugEnabled || !debugText) return;
+
+    const stream = remoteVideo?.srcObject || null;
+    const audioTracks = stream ? stream.getAudioTracks() : [];
+    const videoTracks = stream ? stream.getVideoTracks() : [];
+    const audioTrack = audioTracks[0] || null;
+    const videoTrack = videoTracks[0] || null;
+    const ctx = getAudioContext();
+    const volume = typeof remoteVideo?.volume === 'number' ? remoteVideo.volume.toFixed(2) : 'n/a';
+    const muted = remoteVideo ? remoteVideo.muted : 'n/a';
+    const paused = remoteVideo ? remoteVideo.paused : 'n/a';
+    const overlayState = overlay?.classList.contains('hidden') ? 'hidden' : 'shown';
+
+    const lines = [
+        `connected: ${isConnected}`,
+        `stream: ${stream ? 'yes' : 'no'} active=${stream ? stream.active : 'n/a'}`,
+        `audioTrack: ${audioTracks.length} (${formatTrackState(audioTrack)})`,
+        `videoTrack: ${videoTracks.length} (${formatTrackState(videoTrack)})`,
+        `video: muted=${muted} vol=${volume} paused=${paused}`,
+        `audioOnlyMode: ${getAudioOnlyMode()} hasVideoTrack: ${getHasVideoTrack()}`,
+        `overlay: ${overlayState}`,
+        `audioCtx: ${ctx ? ctx.state : 'none'}`
+    ];
+
+    debugText.innerHTML = lines.map(line => `<div>${line}</div>`).join('');
+}
+
 // Initialize
 updateThresholdMarker();
 checkMusicAvailability();
 signaling.connect();
+
+if (debugEnabled) {
+    updateDebugBanner();
+    debugInterval = setInterval(updateDebugBanner, 1000);
+}
