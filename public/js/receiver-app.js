@@ -824,25 +824,23 @@ initReceiverWebRTC({
                 setConnectedState(true);
                 info.textContent = 'Streaming (audio only)';
                 updateAudioOnlyIndicator();
-                // For audio-only streams, we need to explicitly play the video element
-                // (which acts as the audio player) since handleVideoTrack isn't called
-                remoteVideo.muted = true;
+                // For audio-only streams, explicitly start the <video> element as audio player.
+                // First attempt unmuted playback; if autoplay blocks it, keep stream alive muted
+                // and prompt the user to tap for sound.
+                remoteVideo.muted = false;
                 remoteVideo.play().then(() => {
                     console.log('Audio-only stream playing');
-                    if (hasUserInteracted()) {
-                        remoteVideo.muted = false;
-                        remoteVideo.play().then(() => {
-                            overlay.classList.add('hidden');
-                        }).catch(err => {
-                            console.log('Audio-only unmute play failed:', err);
-                            showPlayOverlay('Tap to enable sound');
-                        });
-                    } else {
+                    overlay.classList.add('hidden');
+                }).catch(err => {
+                    console.log('Audio-only play with sound failed, retrying muted:', err);
+                    remoteVideo.muted = true;
+                    remoteVideo.play().then(() => {
+                        console.log('Audio-only stream playing muted; waiting for user tap to enable sound');
                         showPlayOverlay('Tap to enable sound');
-                    }
-                }).catch(e => {
-                    console.log('Audio-only play error:', e);
-                    showPlayOverlay('Tap to enable sound');
+                    }).catch(err2 => {
+                        console.log('Audio-only muted play error:', err2);
+                        showPlayOverlay('Tap to play');
+                    });
                 });
             }
             setupAudioAnalysis(currentStream, audioLevel, audioLevelInline);

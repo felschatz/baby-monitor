@@ -174,12 +174,15 @@ export function tryPlayVideo() {
  * Handle user interaction
  */
 export function handleUserInteraction() {
-    if (userHasInteracted) return;
-    userHasInteracted = true;
-    console.log('User interaction detected');
-
-    // Call onUserInteraction first to set up noise gate if needed
-    if (onUserInteraction) onUserInteraction();
+    const firstInteraction = !userHasInteracted;
+    if (firstInteraction) {
+        userHasInteracted = true;
+        console.log('User interaction detected');
+        // Initialize one-time interaction-dependent setup (AudioContext, etc.)
+        if (onUserInteraction) onUserInteraction();
+    } else {
+        console.log('User interaction detected (playback recovery)');
+    }
 
     if (remoteVideo.srcObject) {
         safeUnmuteVideo();
