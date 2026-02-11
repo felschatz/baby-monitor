@@ -172,6 +172,17 @@ export async function createOffer(pttAudio, receiverId) {
         }
     });
 
+    // Add dedicated recvonly audio transceiver for PTT (parent -> baby)
+    let pttTransceiver = null;
+    if (typeof peerConnection.addTransceiver === 'function') {
+        try {
+            pttTransceiver = peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+            console.log('Added PTT recvonly transceiver for receiver:', receiverId);
+        } catch (err) {
+            console.warn('Could not add PTT transceiver:', err?.message || err);
+        }
+    }
+
     peerConnection.onicecandidate = (event) => {
         if (event.candidate && sendSignal) {
             console.log('Sending ICE candidate to receiver:', receiverId);
@@ -272,10 +283,12 @@ export async function createOffer(pttAudio, receiverId) {
         console.log('Created and set local offer for receiver', receiverId, '(low-latency optimized)');
 
         if (sendSignal) {
+            const pttMid = pttTransceiver ? pttTransceiver.mid : null;
             sendSignal({
                 type: 'offer',
                 offer: peerConnection.localDescription,
-                receiverId: receiverId
+                receiverId: receiverId,
+                pttMid: pttMid
             });
             console.log('Sent offer to receiver:', receiverId);
         }

@@ -859,7 +859,7 @@ async function handleMessage(message) {
 
         case 'offer':
             console.log('Received offer');
-            await handleOffer(message.offer);
+            await handleOffer(message.offer, message.pttMid);
             break;
 
         case 'ice-candidate':

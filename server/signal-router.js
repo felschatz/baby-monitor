@@ -47,9 +47,9 @@ async function handleSignal(req, res) {
         case 'offer':
             // If receiverId is specified, send only to that receiver; otherwise broadcast
             if (message.receiverId) {
-                sendToReceiver(sessionName, message.receiverId, { type: 'offer', offer: message.offer });
+                sendToReceiver(sessionName, message.receiverId, { type: 'offer', offer: message.offer, pttMid: message.pttMid });
             } else {
-                broadcastToReceivers(sessionName, { type: 'offer', offer: message.offer });
+                broadcastToReceivers(sessionName, { type: 'offer', offer: message.offer, pttMid: message.pttMid });
             }
             break;
 
