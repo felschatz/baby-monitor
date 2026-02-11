@@ -16,6 +16,8 @@ let videoAvailable = true; // Track if video capture is available
 let audioContext = null;
 let analyser = null;
 
+const MAX_AUDIO_BITRATE_BPS = 16000;
+
 // PTT state per receiver
 const pttActiveReceivers = new Set(); // Set of receiverIds with active PTT
 let pttTimeout = null;
@@ -159,6 +161,7 @@ export async function createOffer(pttAudio, receiverId) {
                     // Set priority to high for lower queuing delay
                     params.encodings[0].priority = 'high';
                     params.encodings[0].networkPriority = 'high';
+                    params.encodings[0].maxBitrate = MAX_AUDIO_BITRATE_BPS;
                     sender.setParameters(params).then(() => {
                         console.log('Set audio encoding priority to high for receiver:', receiverId);
                     }).catch(e => console.log('Could not set audio priority:', e.message));
@@ -168,6 +171,17 @@ export async function createOffer(pttAudio, receiverId) {
             }
         }
     });
+
+    // Add dedicated recvonly audio transceiver for PTT (parent -> baby)
+    let pttTransceiver = null;
+    if (typeof peerConnection.addTransceiver === 'function') {
+        try {
+            pttTransceiver = peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+            console.log('Added PTT recvonly transceiver for receiver:', receiverId);
+        } catch (err) {
+            console.warn('Could not add PTT transceiver:', err?.message || err);
+        }
+    }
 
     peerConnection.onicecandidate = (event) => {
         if (event.candidate && sendSignal) {
@@ -269,10 +283,12 @@ export async function createOffer(pttAudio, receiverId) {
         console.log('Created and set local offer for receiver', receiverId, '(low-latency optimized)');
 
         if (sendSignal) {
+            const pttMid = pttTransceiver ? pttTransceiver.mid : null;
             sendSignal({
                 type: 'offer',
                 offer: peerConnection.localDescription,
-                receiverId: receiverId
+                receiverId: receiverId,
+                pttMid: pttMid
             });
             console.log('Sent offer to receiver:', receiverId);
         }

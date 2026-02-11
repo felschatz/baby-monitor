@@ -114,16 +114,17 @@ export function optimizeSdpForLowLatency(sdp) {
     // stereo=0 forces mono (faster)
     // maxplaybackrate=16000 reduces bandwidth/processing for voice
     // sprop-maxcapturerate=16000 hints at capture rate
+    // maxaveragebitrate=16000 caps bitrate (in bps)
     // minptime=10 allows smaller audio packets
     let optimized = sdp.replace(
         /a=fmtp:111 minptime=10;useinbandfec=1/g,
-        'a=fmtp:111 minptime=10;useinbandfec=0;stereo=0;maxplaybackrate=24000;sprop-maxcapturerate=24000'
+        'a=fmtp:111 minptime=10;useinbandfec=0;stereo=0;maxplaybackrate=16000;sprop-maxcapturerate=16000;maxaveragebitrate=16000'
     );
 
     // Also try the simpler format some browsers use
     optimized = optimized.replace(
         /a=fmtp:111 minptime=10/g,
-        'a=fmtp:111 minptime=10;useinbandfec=0;stereo=0;maxplaybackrate=24000'
+        'a=fmtp:111 minptime=10;useinbandfec=0;stereo=0;maxplaybackrate=16000;sprop-maxcapturerate=16000;maxaveragebitrate=16000'
     );
 
     return optimized;

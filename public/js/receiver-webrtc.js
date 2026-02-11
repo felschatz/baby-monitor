@@ -37,7 +37,7 @@ export function initReceiverWebRTC(callbacks) {
  * Handle incoming offer from sender
  * @param {RTCSessionDescriptionInit} offer
  */
-export async function handleOffer(offer) {
+export async function handleOffer(offer, pttMid = null) {
     console.log('Handling offer...');
     closePeerConnection();
 
@@ -112,18 +112,33 @@ export async function handleOffer(offer) {
         const transceivers = peerConnection.getTransceivers();
         console.log('Transceivers after setRemoteDescription:', transceivers.length);
 
-        // Find audio transceiver by checking receiver.track.kind
-        let audioTransceiver = transceivers.find(t => t.receiver?.track?.kind === 'audio');
+        let pttTransceiver = null;
+        if (pttMid) {
+            pttTransceiver = transceivers.find(t => t.mid === pttMid);
+            if (pttTransceiver) {
+                console.log('Using PTT transceiver from mid:', pttMid);
+            } else {
+                console.log('PTT mid not found in transceivers:', pttMid);
+            }
+        }
 
-        if (audioTransceiver) {
-            audioTransceiver.direction = 'sendrecv';
-            pttAudioSender = audioTransceiver.sender;
-            console.log('Set audio transceiver to sendrecv for PTT');
+        if (pttTransceiver) {
+            pttTransceiver.direction = 'sendonly';
+            pttAudioSender = pttTransceiver.sender;
+            console.log('Set PTT transceiver to sendonly');
         } else {
-            // Fallback: create a new audio transceiver for PTT
-            console.log('No audio transceiver found, creating one for PTT');
-            const transceiver = peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
-            pttAudioSender = transceiver.sender;
+            // Fallback: use any audio transceiver (legacy behavior)
+            let audioTransceiver = transceivers.find(t => t.receiver?.track?.kind === 'audio');
+            if (audioTransceiver) {
+                audioTransceiver.direction = 'sendrecv';
+                pttAudioSender = audioTransceiver.sender;
+                console.log('Set audio transceiver to sendrecv for PTT (fallback)');
+            } else {
+                // Last resort: create a new audio transceiver (may be ignored by offer)
+                console.log('No audio transceiver found, creating one for PTT');
+                const transceiver = peerConnection.addTransceiver('audio', { direction: 'sendrecv' });
+                pttAudioSender = transceiver.sender;
+            }
         }
 
         console.log('Processing', pendingCandidates.length, 'queued ICE candidates');

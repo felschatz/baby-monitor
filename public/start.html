@@ -260,6 +260,60 @@
             text-align: right;
         }
 
+        /* Stream Mode Toggle */
+        .stream-section {
+            margin-top: 1.25rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .stream-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .stream-header .input-label {
+            margin-bottom: 0;
+        }
+
+        .stream-toggle {
+            display: flex;
+            background: var(--night);
+            border-radius: 10px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .stream-option {
+            padding: 0.5rem 0.85rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .stream-option.active {
+            background: var(--mint);
+            color: var(--night);
+        }
+
+        .stream-option:not(.active):hover {
+            color: var(--text);
+        }
+
+        .stream-hint {
+            font-size: 0.8rem;
+            color: var(--text-subtle);
+            text-align: right;
+        }
+
         /* Role Buttons */
         .role-buttons {
             display: grid;
@@ -554,6 +608,17 @@
                 </div>
                 <p class="quality-hint">SD (480p) uses less data on slow connections</p>
             </div>
+
+            <div class="stream-section">
+                <div class="stream-header">
+                    <span class="input-label">Stream Mode</span>
+                    <div class="stream-toggle">
+                        <button type="button" class="stream-option active" data-mode="av">Audio + Video</button>
+                        <button type="button" class="stream-option" data-mode="audio">Audio Only</button>
+                    </div>
+                </div>
+                <p class="stream-hint">Audio-only saves data and battery</p>
+            </div>
         </div>
 
         <div class="role-buttons">
@@ -630,6 +695,7 @@
         const senderBtn = document.getElementById('senderBtn');
         const receiverBtn = document.getElementById('receiverBtn');
         const qualityOptions = document.querySelectorAll('.quality-option');
+        const streamOptions = document.querySelectorAll('.stream-option');
 
         // Quality toggle
         let selectedQuality = 'hd';
@@ -642,6 +708,23 @@
             });
         });
 
+        // Stream mode toggle
+        let selectedMode = localStorage.getItem('babymonitor-stream-mode') || 'av';
+
+        function setStreamMode(mode) {
+            selectedMode = mode === 'audio' ? 'audio' : 'av';
+            streamOptions.forEach(option => {
+                option.classList.toggle('active', option.dataset.mode === selectedMode);
+            });
+            localStorage.setItem('babymonitor-stream-mode', selectedMode);
+        }
+
+        streamOptions.forEach(option => {
+            option.addEventListener('click', () => setStreamMode(option.dataset.mode));
+        });
+
+        setStreamMode(selectedMode);
+
         // Pre-fill from localStorage if available
         const savedSession = localStorage.getItem('babymonitor-session');
         if (savedSession) {
@@ -652,17 +735,18 @@
             const session = sessionInput.value.trim();
             const pathMap = { sender: 's', receiver: 'r' };
             const shortPath = pathMap[role] || role;
+            const modeParam = selectedMode === 'audio' ? '&mode=audio' : '';
 
             if (!session) {
                 if (role === 'sender') {
-                    window.location.href = `/${role}?q=${selectedQuality}`;
+                    window.location.href = `/${role}?q=${selectedQuality}${modeParam}`;
                 } else {
                     window.location.href = `/${role}`;
                 }
             } else {
                 localStorage.setItem('babymonitor-session', session);
                 if (role === 'sender') {
-                    window.location.href = `/${shortPath}/${encodeURIComponent(session)}?q=${selectedQuality}`;
+                    window.location.href = `/${shortPath}/${encodeURIComponent(session)}?q=${selectedQuality}${modeParam}`;
                 } else {
                     window.location.href = `/${shortPath}/${encodeURIComponent(session)}`;
                 }

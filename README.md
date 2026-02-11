@@ -276,7 +276,7 @@ baby-monitor/
 |---------|----------|
 | 🎤 Button | Hold to talk to baby (Push-to-Talk) |
 | 🎵 Button | Toggle lullaby playback on baby's phone |
-| Timer dropdown | Select sleep timer duration (45 min, 1 hour) |
+| Timer dropdown | Select sleep timer duration (45 min, 1 hour, 1:45, 2 hours; default 2 hours) |
 | Volume slider | Adjust playback volume (saved to localStorage) |
 | Sensitivity slider | Adjust loud sound threshold (saved to localStorage) |
 | Audio only checkbox | Disable video to save bandwidth |

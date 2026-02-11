@@ -11,6 +11,7 @@ import {
     setupAudioAnalysis,
     ensureAudioContext,
     resetAudioAnalysis,
+    getAudioContext,
     setNoiseGateThreshold,
     setPlaybackVolume,
     resetNoiseGate,
@@ -84,6 +85,7 @@ const noiseGateInfoItem = document.getElementById('noiseGateInfoItem');
 const noiseGateDisplay = document.getElementById('noiseGateDisplay');
 const noiseGateMarker = document.getElementById('noiseGateMarker');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
+const reloadBtn = document.getElementById('reloadBtn');
 const info = document.getElementById('info');
 const thresholdMarker = document.getElementById('thresholdMarker');
 const audioOnlyToggle = document.getElementById('audioOnlyToggle');
@@ -95,6 +97,9 @@ const shutdownStatus = document.getElementById('shutdownStatus');
 const shutdownInfoItem = document.getElementById('shutdownInfoItem');
 const shutdownStatusDisplay = document.getElementById('shutdownStatusDisplay');
 const testSoundBtn = document.getElementById('testSoundBtn');
+let debugBanner = document.getElementById('debugBanner');
+let debugText = document.getElementById('debugText');
+let debugToggleBtn = document.getElementById('debugToggleBtn');
 
 // Music elements
 const musicContainer = document.getElementById('musicContainer');
@@ -144,15 +149,90 @@ let loudSoundTimeout = null;
 let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
 let debugTimerMode = false; // Will be set from /api/music response
-let shutdownTimerValue = parseInt(localStorage.getItem('receiver-shutdown-timer') || '6');
+const DEFAULT_SHUTDOWN_SELECTION = '6h';
+let shutdownTimerValue = localStorage.getItem('receiver-shutdown-timer') || DEFAULT_SHUTDOWN_SELECTION;
 let testSoundResetTimer = null;
 const testSoundButtonLabel = testSoundBtn ? testSoundBtn.textContent : 'Send test ping';
 let shutdownActive = false;
 let shutdownEndTime = null;  // Local end time for smooth countdown
 let shutdownCountdownInterval = null;
+let debugInterval = null;
+const DEBUG_MINIMIZED_STORAGE_KEY = 'receiver-debug-minimized';
+let debugMinimized = localStorage.getItem(DEBUG_MINIMIZED_STORAGE_KEY) === 'true';
 
 // Initialize keep-awake
 initKeepAwake();
+
+function ensureDebugBanner() {
+    if (!debugBanner) {
+        const banner = document.createElement('div');
+        banner.className = 'debug-banner';
+        banner.id = 'debugBanner';
+        banner.style.display = 'none';
+        banner.innerHTML = `
+            <div class="debug-header">
+                <div class="debug-title">Debug</div>
+                <button type="button" class="debug-toggle-btn" id="debugToggleBtn" aria-controls="debugText" aria-expanded="true">Minimize</button>
+            </div>
+            <div class="debug-text" id="debugText"></div>
+        `;
+
+        const headerEl = document.querySelector('.header');
+        if (headerEl && headerEl.parentNode) {
+            headerEl.parentNode.insertBefore(banner, headerEl);
+        } else {
+            document.body.insertBefore(banner, document.body.firstChild);
+        }
+
+        debugBanner = banner;
+    }
+
+    // Upgrade old markup so the panel can be collapsed and reopened.
+    if (debugBanner && !debugBanner.querySelector('#debugToggleBtn')) {
+        debugBanner.innerHTML = `
+            <div class="debug-header">
+                <div class="debug-title">Debug</div>
+                <button type="button" class="debug-toggle-btn" id="debugToggleBtn" aria-controls="debugText" aria-expanded="true">Minimize</button>
+            </div>
+            <div class="debug-text" id="debugText"></div>
+        `;
+    }
+
+    debugText = debugBanner ? debugBanner.querySelector('#debugText') : null;
+    debugToggleBtn = debugBanner ? debugBanner.querySelector('#debugToggleBtn') : null;
+}
+
+function setDebugMinimized(minimized) {
+    debugMinimized = !!minimized;
+
+    if (debugBanner) {
+        debugBanner.classList.toggle('minimized', debugMinimized);
+    }
+
+    if (debugToggleBtn) {
+        debugToggleBtn.textContent = debugMinimized ? 'Open' : 'Minimize';
+        debugToggleBtn.setAttribute('aria-expanded', debugMinimized ? 'false' : 'true');
+        debugToggleBtn.setAttribute('aria-label', debugMinimized ? 'Open debug panel' : 'Minimize debug panel');
+    }
+
+    localStorage.setItem(DEBUG_MINIMIZED_STORAGE_KEY, String(debugMinimized));
+}
+
+function setupDebugControls() {
+    if (!debugToggleBtn) return;
+
+    debugToggleBtn.addEventListener('click', () => {
+        setDebugMinimized(!debugMinimized);
+    });
+
+    setDebugMinimized(debugMinimized);
+}
+
+ensureDebugBanner();
+setupDebugControls();
+
+const debugParams = new URLSearchParams(window.location.search);
+let debugEnabled = debugParams.get('debug') === '1' || debugParams.get('debug') === 'true';
 
 // Load saved settings
 const savedVolume = localStorage.getItem('receiver-volume');
@@ -181,8 +261,82 @@ echoCancelToggle.checked = echoCancelEnabled;
 // Set video element reference for noise gate
 setVideoElement(remoteVideo);
 
+const shutdownTimerOptions = {
+    standard: [
+        { value: 'off', label: 'Disabled' },
+        { value: '20m', label: '20 min' },
+        { value: '4h', label: '4 hours' },
+        { value: '6h', label: '6 hours' },
+        { value: '8h', label: '8 hours' },
+        { value: '10h', label: '10 hours' },
+        { value: 'now', label: 'Shutdown now' }
+    ],
+    debug: [
+        { value: 'off', label: 'Disabled' },
+        { value: '10s', label: '10 sec' },
+        { value: '30s', label: '30 sec' },
+        { value: '5m', label: '5 min' },
+        { value: '20m', label: '20 min' },
+        { value: '1h', label: '1 hour' },
+        { value: 'now', label: 'Shutdown now' }
+    ]
+};
+
+function renderShutdownOptions(options) {
+    shutdownTimerSelect.innerHTML = options
+        .map(option => `<option value="${option.value}">${option.label}</option>`)
+        .join('');
+}
+
+function normalizeShutdownTimerValue(value) {
+    if (!value) return DEFAULT_SHUTDOWN_SELECTION;
+    if (value === 'off' || value === 'now') return value;
+    if (/^\d+(?:\.\d+)?[hms]$/.test(value)) return value;
+    if (/^\d+(?:\.\d+)?$/.test(value)) {
+        return `${value}${debugTimerMode ? 's' : 'h'}`;
+    }
+    return DEFAULT_SHUTDOWN_SELECTION;
+}
+
+function applyShutdownSelection() {
+    shutdownTimerValue = normalizeShutdownTimerValue(shutdownTimerValue);
+    if (!shutdownTimerSelect.querySelector(`option[value="${shutdownTimerValue}"]`)) {
+        const fallback = shutdownTimerSelect.querySelector(`option[value="${DEFAULT_SHUTDOWN_SELECTION}"]`)
+            ? DEFAULT_SHUTDOWN_SELECTION
+            : shutdownTimerSelect.options[0]?.value || DEFAULT_SHUTDOWN_SELECTION;
+        shutdownTimerValue = fallback;
+    }
+    shutdownTimerSelect.value = shutdownTimerValue;
+    localStorage.setItem('receiver-shutdown-timer', shutdownTimerValue);
+}
+
+function parseShutdownSelection(value) {
+    if (value === 'now') return { mode: 'now' };
+    if (value === 'off' || value === '0') {
+        return { mode: 'disabled', value: 0, unit: debugTimerMode ? 'seconds' : 'hours' };
+    }
+    const match = value.match(/^(\d+(?:\.\d+)?)([hms])$/);
+    if (match) {
+        const unitMap = { h: 'hours', m: 'minutes', s: 'seconds' };
+        return {
+            mode: 'timeout',
+            value: parseFloat(match[1]),
+            unit: unitMap[match[2]]
+        };
+    }
+    if (/^\d+(?:\.\d+)?$/.test(value)) {
+        return {
+            mode: 'timeout',
+            value: parseFloat(value),
+            unit: debugTimerMode ? 'seconds' : 'hours'
+        };
+    }
+    return { mode: 'disabled', value: 0, unit: debugTimerMode ? 'seconds' : 'hours' };
+}
+
 // Initialize shutdown timer select
-shutdownTimerSelect.value = shutdownTimerValue.toString();
+renderShutdownOptions(shutdownTimerOptions.standard);
+applyShutdownSelection();
 updateShutdownButtonState();
 
 // Helper functions
@@ -423,18 +577,10 @@ async function checkMusicAvailability() {
         }
 
         // Setup shutdown timer based on debug mode
-        if (data.debugTimer) {
-            debugTimerMode = true;
-            // Replace hours with seconds in shutdown timer for debug mode
-            shutdownTimerSelect.innerHTML = `
-                <option value="0">Disabled</option>
-                <option value="10">10 sec</option>
-                <option value="30">30 sec</option>
-                <option value="60">60 sec</option>
-                <option value="120">2 min</option>
-            `;
-            shutdownTimerSelect.value = shutdownTimerValue.toString();
-        }
+        debugTimerMode = !!data.debugTimer;
+        renderShutdownOptions(debugTimerMode ? shutdownTimerOptions.debug : shutdownTimerOptions.standard);
+        applyShutdownSelection();
+        setDebugEnabled(debugEnabled || debugTimerMode);
 
         if ((data.files && data.files.length > 0) || musicPlaylists.length > 0) {
             musicAvailable = true;
@@ -480,6 +626,22 @@ function updateMusicUI() {
         musicStatus.textContent = '';
         musicInfoItem.style.display = 'none';
         musicStatusDisplay.textContent = '—';
+    }
+}
+
+function setDebugEnabled(enabled) {
+    debugEnabled = !!enabled;
+    if (debugBanner) {
+        debugBanner.style.display = debugEnabled ? 'block' : 'none';
+    }
+    if (debugEnabled) {
+        updateDebugBanner();
+        if (!debugInterval) {
+            debugInterval = setInterval(updateDebugBanner, 1000);
+        }
+    } else if (debugInterval) {
+        clearInterval(debugInterval);
+        debugInterval = null;
     }
 }
 
@@ -662,12 +824,24 @@ initReceiverWebRTC({
                 setConnectedState(true);
                 info.textContent = 'Streaming (audio only)';
                 updateAudioOnlyIndicator();
-                // For audio-only streams, we need to explicitly play the video element
-                // (which acts as the audio player) since handleVideoTrack isn't called
+                // For audio-only streams, explicitly start the <video> element as audio player.
+                // First attempt unmuted playback; if autoplay blocks it, keep stream alive muted
+                // and prompt the user to tap for sound.
+                remoteVideo.muted = false;
                 remoteVideo.play().then(() => {
                     console.log('Audio-only stream playing');
                     overlay.classList.add('hidden');
-                }).catch(e => console.log('Audio-only play error:', e));
+                }).catch(err => {
+                    console.log('Audio-only play with sound failed, retrying muted:', err);
+                    remoteVideo.muted = true;
+                    remoteVideo.play().then(() => {
+                        console.log('Audio-only stream playing muted; waiting for user tap to enable sound');
+                        showPlayOverlay('Tap to enable sound');
+                    }).catch(err2 => {
+                        console.log('Audio-only muted play error:', err2);
+                        showPlayOverlay('Tap to play');
+                    });
+                });
             }
             setupAudioAnalysis(currentStream, audioLevel, audioLevelInline);
             setupAudioTrackMuteDetection(event.track);
@@ -689,12 +863,6 @@ async function handleMessage(message) {
                 if (echoCancelEnabled) {
                     signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
                 }
-                // Send shutdown timer setting to sender
-                signaling.sendSignal({
-                    type: 'shutdown-timeout',
-                    value: shutdownTimerValue,
-                    unit: debugTimerMode ? 'seconds' : 'hours'
-                });
             } else {
                 overlayText.textContent = 'Waiting for sender to start streaming...';
             }
@@ -715,12 +883,6 @@ async function handleMessage(message) {
             if (echoCancelEnabled) {
                 signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
             }
-            // Send shutdown timer setting to sender
-            signaling.sendSignal({
-                type: 'shutdown-timeout',
-                value: shutdownTimerValue,
-                unit: debugTimerMode ? 'seconds' : 'hours'
-            });
             break;
 
         case 'sender-disconnected':
@@ -741,7 +903,7 @@ async function handleMessage(message) {
 
         case 'offer':
             console.log('Received offer');
-            await handleOffer(message.offer);
+            await handleOffer(message.offer, message.pttMid);
             break;
 
         case 'ice-candidate':
@@ -814,18 +976,31 @@ echoCancelToggle.addEventListener('change', () => {
 });
 
 shutdownTimerSelect.addEventListener('change', () => {
-    shutdownTimerValue = parseInt(shutdownTimerSelect.value);
+    shutdownTimerValue = shutdownTimerSelect.value;
     localStorage.setItem('receiver-shutdown-timer', shutdownTimerValue);
-    console.log('Shutdown timer changed:', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
+    const selection = parseShutdownSelection(shutdownTimerValue);
+    if (selection.mode === 'now') {
+        console.log('Shutdown timer changed: now');
+    } else if (selection.mode === 'disabled') {
+        console.log('Shutdown timer changed: disabled');
+    } else {
+        console.log('Shutdown timer changed:', selection.value, selection.unit);
+    }
     updateShutdownButtonState();
 });
 
 shutdownBtn.addEventListener('click', () => {
-    console.log('Setting shutdown timer to', shutdownTimerValue, debugTimerMode ? 'seconds' : 'hours');
+    const selection = parseShutdownSelection(shutdownTimerSelect.value);
+    if (selection.mode === 'now') {
+        console.log('Shutdown now requested');
+        signaling.sendSignal({ type: 'shutdown-now' });
+        return;
+    }
+    console.log('Setting shutdown timer to', selection.value, selection.unit);
     signaling.sendSignal({
         type: 'shutdown-timeout',
-        value: shutdownTimerValue,
-        unit: debugTimerMode ? 'seconds' : 'hours'
+        value: selection.value,
+        unit: selection.unit
     });
 });
 
@@ -874,6 +1049,12 @@ noiseGateSlider.addEventListener('input', () => {
     setNoiseGateThreshold(value);
     localStorage.setItem('receiver-noise-gate', value);
 });
+
+if (reloadBtn) {
+    reloadBtn.addEventListener('click', () => {
+        window.location.reload();
+    });
+}
 
 fullscreenBtn.addEventListener('click', () => {
     if (document.fullscreenElement) {
@@ -990,6 +1171,9 @@ window.addEventListener('beforeunload', () => {
     if (shutdownCountdownInterval) {
         clearInterval(shutdownCountdownInterval);
     }
+    if (debugInterval) {
+        clearInterval(debugInterval);
+    }
     cleanupPTT();
     destroyKeepAwake();
     destroyAudioAnalysis();
@@ -998,7 +1182,43 @@ window.addEventListener('beforeunload', () => {
     signaling.disconnect();
 });
 
+function formatTrackState(track) {
+    if (!track) return 'none';
+    const muted = track.muted ? 'muted' : 'unmuted';
+    return `${track.readyState}, ${muted}`;
+}
+
+function updateDebugBanner() {
+    if (!debugEnabled || !debugText) return;
+
+    const stream = remoteVideo?.srcObject || null;
+    const audioTracks = stream ? stream.getAudioTracks() : [];
+    const videoTracks = stream ? stream.getVideoTracks() : [];
+    const audioTrack = audioTracks[0] || null;
+    const videoTrack = videoTracks[0] || null;
+    const ctx = getAudioContext();
+    const volume = typeof remoteVideo?.volume === 'number' ? remoteVideo.volume.toFixed(2) : 'n/a';
+    const muted = remoteVideo ? remoteVideo.muted : 'n/a';
+    const paused = remoteVideo ? remoteVideo.paused : 'n/a';
+    const overlayState = overlay?.classList.contains('hidden') ? 'hidden' : 'shown';
+
+    const lines = [
+        `connected: ${isConnected}`,
+        `stream: ${stream ? 'yes' : 'no'} active=${stream ? stream.active : 'n/a'}`,
+        `audioTrack: ${audioTracks.length} (${formatTrackState(audioTrack)})`,
+        `videoTrack: ${videoTracks.length} (${formatTrackState(videoTrack)})`,
+        `video: muted=${muted} vol=${volume} paused=${paused}`,
+        `audioOnlyMode: ${getAudioOnlyMode()} hasVideoTrack: ${getHasVideoTrack()}`,
+        `overlay: ${overlayState}`,
+        `audioCtx: ${ctx ? ctx.state : 'none'}`
+    ];
+
+    debugText.innerHTML = lines.map(line => `<div>${line}</div>`).join('');
+}
+
 // Initialize
 updateThresholdMarker();
 checkMusicAvailability();
 signaling.connect();
+
+setDebugEnabled(debugEnabled);

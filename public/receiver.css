@@ -146,6 +146,77 @@ body.connected {
     display: flex;
 }
 
+/* Debug banner (enabled via ?debug=1) */
+.debug-banner {
+    position: fixed;
+    top: 62px;
+    left: 12px;
+    right: 12px;
+    background: rgba(15, 15, 20, 0.88);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 8px 12px;
+    z-index: 10002;
+    font-size: 0.72rem;
+    pointer-events: none;
+    backdrop-filter: blur(6px);
+}
+
+.debug-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+    pointer-events: auto;
+}
+
+.debug-title {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent-orange);
+    margin-bottom: 0;
+}
+
+.debug-toggle-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    padding: 4px 8px;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.debug-banner.minimized {
+    padding: 8px 12px;
+}
+
+.debug-banner.minimized .debug-title {
+    margin-bottom: 0;
+}
+
+.debug-banner.minimized .debug-header {
+    margin-bottom: 0;
+}
+
+.debug-banner.minimized .debug-text {
+    display: none;
+}
+
+.debug-text {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    color: var(--text-secondary);
+    display: grid;
+    gap: 2px;
+}
+
 .disconnect-alert {
     background: rgba(180, 0, 0, 0.95);
     color: white;
@@ -169,7 +240,8 @@ body.connected {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    z-index: 10;
+    position: relative;
+    z-index: 30;
     border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -199,6 +271,27 @@ body.connected {
 #statusText {
     font-size: 0.85rem;
     color: var(--text-secondary);
+}
+
+.reload-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+
+.reload-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--text-primary);
+}
+
+.reload-btn:active {
+    transform: scale(0.98);
 }
 
 @keyframes pulse {
@@ -261,6 +354,7 @@ body.loud-alert-active .info-strip {
     justify-content: center;
     background: rgba(0, 0, 0, 0.7);
     cursor: pointer;
+    z-index: 20;
 }
 
 .overlay-content {
@@ -289,6 +383,7 @@ body.loud-alert-active .info-strip {
     display: none;
     z-index: 10;
     border: 1px solid var(--border-subtle);
+    pointer-events: none;
 }
 
 .audio-only-indicator.active {

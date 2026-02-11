@@ -81,7 +81,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Audio ducking reduces baby audio to 15% during PTT
 - STUN servers: stunprotocol.org, nextcloud.com, sipgate.net
 - FFT-based spectral subtraction for music echo reduction
-- Auto-shutdown: Sender stops after timeout set by receiver (default 6 hours)
+- Auto-shutdown: Sender stops after timeout set by receiver (manual, no auto default)
 
 ## Visual States
 
@@ -98,7 +98,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 ## Implementation Details
 
 - Wake Lock API keeps screens on (with auto-shutdown timer)
-- Auto-shutdown configured by receiver (default 6 hours, uses seconds instead of hours when ENABLE_DEBUG_TIMER=true)
+- Auto-shutdown configured by receiver (manual; supports minutes/hours/seconds, uses short options when ENABLE_DEBUG_TIMER=true)
 - AudioContext analyzes volume for loud sound detection
 - Sensitivity slider controls threshold (saved to localStorage)
 - Volume control persisted to localStorage
@@ -177,6 +177,7 @@ mp3/
 
 ## When Making Changes
 
+0. Ask if you want to make any changes, which could affect the receivers sound. The whole routing/context-switch/bluetooth stuff is pretty delicate and breaks easily
 1. Keep it dependency-free (no frameworks, pure Node.js)
 2. No WebSockets - use SSE + HTTP POST
 3. No data storage - everything is peer-to-peer
