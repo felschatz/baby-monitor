@@ -186,7 +186,10 @@ export function handleUserInteraction() {
         remoteVideo.play().then(() => {
             console.log('Video playing after interaction');
             overlay.classList.add('hidden');
-        }).catch(e => console.log('Play after interaction failed:', e));
+        }).catch(e => {
+            console.log('Play after interaction failed:', e);
+            showPlayOverlay('Tap to enable sound');
+        });
     }
 }
 
@@ -264,7 +267,12 @@ export function handleVideoTrack(track, savedVolume) {
         console.log('Video playing (muted), dimensions:', remoteVideo.videoWidth, 'x', remoteVideo.videoHeight);
         if (userHasInteracted) {
             safeUnmuteVideo();
-            overlay.classList.add('hidden');
+            remoteVideo.play().then(() => {
+                overlay.classList.add('hidden');
+            }).catch(err => {
+                console.log('Unmuted play failed:', err);
+                showPlayOverlay('Tap to enable sound');
+            });
         } else {
             showPlayOverlay();
         }

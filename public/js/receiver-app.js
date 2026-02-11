@@ -735,7 +735,12 @@ initReceiverWebRTC({
                     console.log('Audio-only stream playing');
                     if (hasUserInteracted()) {
                         remoteVideo.muted = false;
-                        overlay.classList.add('hidden');
+                        remoteVideo.play().then(() => {
+                            overlay.classList.add('hidden');
+                        }).catch(err => {
+                            console.log('Audio-only unmute play failed:', err);
+                            showPlayOverlay('Tap to enable sound');
+                        });
                     } else {
                         showPlayOverlay('Tap to enable sound');
                     }
