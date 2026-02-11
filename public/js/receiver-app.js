@@ -99,6 +99,7 @@ const shutdownStatusDisplay = document.getElementById('shutdownStatusDisplay');
 const testSoundBtn = document.getElementById('testSoundBtn');
 let debugBanner = document.getElementById('debugBanner');
 let debugText = document.getElementById('debugText');
+let debugToggleBtn = document.getElementById('debugToggleBtn');
 
 // Music elements
 const musicContainer = document.getElementById('musicContainer');
@@ -156,34 +157,79 @@ let shutdownActive = false;
 let shutdownEndTime = null;  // Local end time for smooth countdown
 let shutdownCountdownInterval = null;
 let debugInterval = null;
+const DEBUG_MINIMIZED_STORAGE_KEY = 'receiver-debug-minimized';
+let debugMinimized = localStorage.getItem(DEBUG_MINIMIZED_STORAGE_KEY) === 'true';
 
 // Initialize keep-awake
 initKeepAwake();
 
 function ensureDebugBanner() {
-    if (debugBanner && debugText) return;
+    if (!debugBanner) {
+        const banner = document.createElement('div');
+        banner.className = 'debug-banner';
+        banner.id = 'debugBanner';
+        banner.style.display = 'none';
+        banner.innerHTML = `
+            <div class="debug-header">
+                <div class="debug-title">Debug</div>
+                <button type="button" class="debug-toggle-btn" id="debugToggleBtn" aria-controls="debugText" aria-expanded="true">Minimize</button>
+            </div>
+            <div class="debug-text" id="debugText"></div>
+        `;
 
-    const banner = document.createElement('div');
-    banner.className = 'debug-banner';
-    banner.id = 'debugBanner';
-    banner.style.display = 'none';
-    banner.innerHTML = `
-        <div class="debug-title">Debug</div>
-        <div class="debug-text" id="debugText"></div>
-    `;
+        const headerEl = document.querySelector('.header');
+        if (headerEl && headerEl.parentNode) {
+            headerEl.parentNode.insertBefore(banner, headerEl);
+        } else {
+            document.body.insertBefore(banner, document.body.firstChild);
+        }
 
-    const headerEl = document.querySelector('.header');
-    if (headerEl && headerEl.parentNode) {
-        headerEl.parentNode.insertBefore(banner, headerEl);
-    } else {
-        document.body.insertBefore(banner, document.body.firstChild);
+        debugBanner = banner;
     }
 
-    debugBanner = banner;
-    debugText = banner.querySelector('#debugText');
+    // Upgrade old markup so the panel can be collapsed and reopened.
+    if (debugBanner && !debugBanner.querySelector('#debugToggleBtn')) {
+        debugBanner.innerHTML = `
+            <div class="debug-header">
+                <div class="debug-title">Debug</div>
+                <button type="button" class="debug-toggle-btn" id="debugToggleBtn" aria-controls="debugText" aria-expanded="true">Minimize</button>
+            </div>
+            <div class="debug-text" id="debugText"></div>
+        `;
+    }
+
+    debugText = debugBanner ? debugBanner.querySelector('#debugText') : null;
+    debugToggleBtn = debugBanner ? debugBanner.querySelector('#debugToggleBtn') : null;
+}
+
+function setDebugMinimized(minimized) {
+    debugMinimized = !!minimized;
+
+    if (debugBanner) {
+        debugBanner.classList.toggle('minimized', debugMinimized);
+    }
+
+    if (debugToggleBtn) {
+        debugToggleBtn.textContent = debugMinimized ? 'Open' : 'Minimize';
+        debugToggleBtn.setAttribute('aria-expanded', debugMinimized ? 'false' : 'true');
+        debugToggleBtn.setAttribute('aria-label', debugMinimized ? 'Open debug panel' : 'Minimize debug panel');
+    }
+
+    localStorage.setItem(DEBUG_MINIMIZED_STORAGE_KEY, String(debugMinimized));
+}
+
+function setupDebugControls() {
+    if (!debugToggleBtn) return;
+
+    debugToggleBtn.addEventListener('click', () => {
+        setDebugMinimized(!debugMinimized);
+    });
+
+    setDebugMinimized(debugMinimized);
 }
 
 ensureDebugBanner();
+setupDebugControls();
 
 const debugParams = new URLSearchParams(window.location.search);
 let debugEnabled = debugParams.get('debug') === '1' || debugParams.get('debug') === 'true';

@@ -162,13 +162,52 @@ body.connected {
     backdrop-filter: blur(6px);
 }
 
+.debug-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+    pointer-events: auto;
+}
+
 .debug-title {
     font-size: 0.6rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.12em;
     color: var(--accent-orange);
-    margin-bottom: 4px;
+    margin-bottom: 0;
+}
+
+.debug-toggle-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    padding: 4px 8px;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.debug-banner.minimized {
+    padding: 8px 12px;
+}
+
+.debug-banner.minimized .debug-title {
+    margin-bottom: 0;
+}
+
+.debug-banner.minimized .debug-header {
+    margin-bottom: 0;
+}
+
+.debug-banner.minimized .debug-text {
+    display: none;
 }
 
 .debug-text {
