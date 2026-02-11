@@ -233,6 +233,27 @@ body.connected {
     color: var(--text-secondary);
 }
 
+.reload-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+
+.reload-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--text-primary);
+}
+
+.reload-btn:active {
+    transform: scale(0.98);
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }

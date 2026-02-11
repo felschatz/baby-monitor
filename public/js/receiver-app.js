@@ -85,6 +85,7 @@ const noiseGateInfoItem = document.getElementById('noiseGateInfoItem');
 const noiseGateDisplay = document.getElementById('noiseGateDisplay');
 const noiseGateMarker = document.getElementById('noiseGateMarker');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
+const reloadBtn = document.getElementById('reloadBtn');
 const info = document.getElementById('info');
 const thresholdMarker = document.getElementById('thresholdMarker');
 const audioOnlyToggle = document.getElementById('audioOnlyToggle');
@@ -979,6 +980,12 @@ noiseGateSlider.addEventListener('input', () => {
     setNoiseGateThreshold(value);
     localStorage.setItem('receiver-noise-gate', value);
 });
+
+if (reloadBtn) {
+    reloadBtn.addEventListener('click', () => {
+        window.location.reload();
+    });
+}
 
 fullscreenBtn.addEventListener('click', () => {
     if (document.fullscreenElement) {
