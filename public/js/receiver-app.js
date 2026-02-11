@@ -97,8 +97,8 @@ const shutdownStatus = document.getElementById('shutdownStatus');
 const shutdownInfoItem = document.getElementById('shutdownInfoItem');
 const shutdownStatusDisplay = document.getElementById('shutdownStatusDisplay');
 const testSoundBtn = document.getElementById('testSoundBtn');
-const debugBanner = document.getElementById('debugBanner');
-const debugText = document.getElementById('debugText');
+let debugBanner = document.getElementById('debugBanner');
+let debugText = document.getElementById('debugText');
 
 // Music elements
 const musicContainer = document.getElementById('musicContainer');
@@ -159,6 +159,31 @@ let debugInterval = null;
 
 // Initialize keep-awake
 initKeepAwake();
+
+function ensureDebugBanner() {
+    if (debugBanner && debugText) return;
+
+    const banner = document.createElement('div');
+    banner.className = 'debug-banner';
+    banner.id = 'debugBanner';
+    banner.style.display = 'none';
+    banner.innerHTML = `
+        <div class="debug-title">Debug</div>
+        <div class="debug-text" id="debugText"></div>
+    `;
+
+    const headerEl = document.querySelector('.header');
+    if (headerEl && headerEl.parentNode) {
+        headerEl.parentNode.insertBefore(banner, headerEl);
+    } else {
+        document.body.insertBefore(banner, document.body.firstChild);
+    }
+
+    debugBanner = banner;
+    debugText = banner.querySelector('#debugText');
+}
+
+ensureDebugBanner();
 
 const debugParams = new URLSearchParams(window.location.search);
 let debugEnabled = debugParams.get('debug') === '1' || debugParams.get('debug') === 'true';

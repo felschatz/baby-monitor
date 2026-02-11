@@ -201,7 +201,8 @@ body.connected {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    z-index: 10;
+    position: relative;
+    z-index: 30;
     border-bottom: 1px solid var(--border-subtle);
 }
 
