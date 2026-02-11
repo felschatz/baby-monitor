@@ -97,9 +97,10 @@ const volumeTooltip = document.getElementById('volumeTooltip');
 const volumeMinusBtn = document.getElementById('volumeMinus');
 const volumePlusBtn = document.getElementById('volumePlus');
 
-// Extract quality setting from URL
+// Extract quality and stream mode from URL
 const urlParams = new URLSearchParams(window.location.search);
 const videoQuality = urlParams.get('q') === 'sd' ? 'sd' : 'hd';
+const streamMode = (urlParams.get('mode') || '').toLowerCase();
 
 // Initialize session
 const sessionName = initSession({
@@ -119,6 +120,11 @@ if (!sessionName) {
 // Display quality badge
 qualityBadge.textContent = videoQuality.toUpperCase();
 qualityBadge.classList.add(videoQuality);
+
+// Apply stream mode default from URL (audio-only vs audio+video)
+if (streamMode === 'audio' || streamMode === 'audio-only') {
+    enableVideo.checked = false;
+}
 
 // State
 let isStreaming = false;
