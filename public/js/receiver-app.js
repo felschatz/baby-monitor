@@ -730,9 +730,15 @@ initReceiverWebRTC({
                 updateAudioOnlyIndicator();
                 // For audio-only streams, we need to explicitly play the video element
                 // (which acts as the audio player) since handleVideoTrack isn't called
+                remoteVideo.muted = true;
                 remoteVideo.play().then(() => {
                     console.log('Audio-only stream playing');
-                    overlay.classList.add('hidden');
+                    if (hasUserInteracted()) {
+                        remoteVideo.muted = false;
+                        overlay.classList.add('hidden');
+                    } else {
+                        showPlayOverlay('Tap to enable sound');
+                    }
                 }).catch(e => console.log('Audio-only play error:', e));
             }
             setupAudioAnalysis(currentStream, audioLevel, audioLevelInline);
