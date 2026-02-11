@@ -160,10 +160,7 @@ let debugInterval = null;
 initKeepAwake();
 
 const debugParams = new URLSearchParams(window.location.search);
-const debugEnabled = debugParams.get('debug') === '1' || debugParams.get('debug') === 'true';
-if (debugBanner) {
-    debugBanner.style.display = debugEnabled ? 'block' : 'none';
-}
+let debugEnabled = debugParams.get('debug') === '1' || debugParams.get('debug') === 'true';
 
 // Load saved settings
 const savedVolume = localStorage.getItem('receiver-volume');
@@ -511,6 +508,7 @@ async function checkMusicAvailability() {
         debugTimerMode = !!data.debugTimer;
         renderShutdownOptions(debugTimerMode ? shutdownTimerOptions.debug : shutdownTimerOptions.standard);
         applyShutdownSelection();
+        setDebugEnabled(debugEnabled || debugTimerMode);
 
         if ((data.files && data.files.length > 0) || musicPlaylists.length > 0) {
             musicAvailable = true;
@@ -556,6 +554,22 @@ function updateMusicUI() {
         musicStatus.textContent = '';
         musicInfoItem.style.display = 'none';
         musicStatusDisplay.textContent = '—';
+    }
+}
+
+function setDebugEnabled(enabled) {
+    debugEnabled = !!enabled;
+    if (debugBanner) {
+        debugBanner.style.display = debugEnabled ? 'block' : 'none';
+    }
+    if (debugEnabled) {
+        updateDebugBanner();
+        if (!debugInterval) {
+            debugInterval = setInterval(updateDebugBanner, 1000);
+        }
+    } else if (debugInterval) {
+        clearInterval(debugInterval);
+        debugInterval = null;
     }
 }
 
@@ -1131,7 +1145,4 @@ updateThresholdMarker();
 checkMusicAvailability();
 signaling.connect();
 
-if (debugEnabled) {
-    updateDebugBanner();
-    debugInterval = setInterval(updateDebugBanner, 1000);
-}
+setDebugEnabled(debugEnabled);
