@@ -16,6 +16,8 @@ let videoAvailable = true; // Track if video capture is available
 let audioContext = null;
 let analyser = null;
 
+const MAX_AUDIO_BITRATE_BPS = 16000;
+
 // PTT state per receiver
 const pttActiveReceivers = new Set(); // Set of receiverIds with active PTT
 let pttTimeout = null;
@@ -159,6 +161,7 @@ export async function createOffer(pttAudio, receiverId) {
                     // Set priority to high for lower queuing delay
                     params.encodings[0].priority = 'high';
                     params.encodings[0].networkPriority = 'high';
+                    params.encodings[0].maxBitrate = MAX_AUDIO_BITRATE_BPS;
                     sender.setParameters(params).then(() => {
                         console.log('Set audio encoding priority to high for receiver:', receiverId);
                     }).catch(e => console.log('Could not set audio priority:', e.message));
