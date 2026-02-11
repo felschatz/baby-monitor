@@ -739,7 +739,10 @@ initReceiverWebRTC({
                     } else {
                         showPlayOverlay('Tap to enable sound');
                     }
-                }).catch(e => console.log('Audio-only play error:', e));
+                }).catch(e => {
+                    console.log('Audio-only play error:', e);
+                    showPlayOverlay('Tap to enable sound');
+                });
             }
             setupAudioAnalysis(currentStream, audioLevel, audioLevelInline);
             setupAudioTrackMuteDetection(event.track);
