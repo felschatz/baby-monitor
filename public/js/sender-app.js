@@ -39,6 +39,7 @@ import {
     handlePTTOffer,
     stopStreaming as stopWebRTCStreaming,
     replaceAudioTrack,
+    applyMicGainIfReady,
     showPTTIndicator,
     hidePTTIndicator,
     getLocalStream,
@@ -254,7 +255,13 @@ function enableAudioPlayback(fromUserGesture = false) {
 
     const ctx = getAudioContext();
     if (ctx && ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
+        ctx.resume().then(() => {
+            if (!isEchoCancelActive()) {
+                applyMicGainIfReady();
+            }
+        }).catch(() => {});
+    } else if (!isEchoCancelActive()) {
+        applyMicGainIfReady();
     }
 
     if (fromUserGesture) {
@@ -498,6 +505,7 @@ initMusicPlayer(
                 if (getOriginalAudioTrack()) {
                     await replaceAudioTrack(getOriginalAudioTrack());
                 }
+                await applyMicGainIfReady();
                 broadcastEchoCancelStatus();
             }
         }
@@ -527,6 +535,7 @@ async function handleEchoCancelToggle(enabled) {
         if (getOriginalAudioTrack()) {
             await replaceAudioTrack(getOriginalAudioTrack());
         }
+        await applyMicGainIfReady();
     }
 
     broadcastEchoCancelStatus();

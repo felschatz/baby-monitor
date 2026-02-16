@@ -3,6 +3,8 @@
  * Reduces music echo from the baby's microphone
  */
 
+import { getMicGain } from './mic-gain.js';
+
 // FFT-based spectral subtraction parameters
 const FFT_SIZE = 2048;              // Frequency resolution (1024 bins)
 const HOP_SIZE = 1024;              // 50% overlap
@@ -24,6 +26,7 @@ let musicMediaSource = null;
 let musicMediaSourceInitialized = false;
 let echoProcessorNode = null;
 let echoStreamDestination = null;
+let echoGainNode = null;
 let echoMicSource = null;
 let echoMusicAnalyser = null;
 let originalAudioTrack = null;
@@ -383,9 +386,12 @@ export function setupEchoCancellation() {
 
         echoProcessorNode = ctx.createScriptProcessor(PROCESSOR_BUFFER_SIZE, 1, 1);
         echoStreamDestination = ctx.createMediaStreamDestination();
+        echoGainNode = ctx.createGain();
+        echoGainNode.gain.value = getMicGain();
 
         echoMicSource.connect(echoProcessorNode);
-        echoProcessorNode.connect(echoStreamDestination);
+        echoProcessorNode.connect(echoGainNode);
+        echoGainNode.connect(echoStreamDestination);
 
         let debugCounter = 0;
 
@@ -553,6 +559,10 @@ export function teardownEchoCancellation() {
         echoProcessorNode.disconnect();
         echoProcessorNode.onaudioprocess = null;
         echoProcessorNode = null;
+    }
+    if (echoGainNode) {
+        echoGainNode.disconnect();
+        echoGainNode = null;
     }
 
     if (echoMicSource) {
