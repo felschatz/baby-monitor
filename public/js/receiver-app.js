@@ -164,13 +164,92 @@ let debugMinimized = localStorage.getItem(DEBUG_MINIMIZED_STORAGE_KEY) === 'true
 const sensitivityAlertAudio = new Audio('/sensitivity.mp3');
 sensitivityAlertAudio.preload = 'auto';
 sensitivityAlertAudio.playsInline = true;
+let sensitivityAlertAudioUnlocked = false;
+let sensitivityAlertContext = null;
+let sensitivityAlertBuffer = null;
+let sensitivityAlertBufferPromise = null;
 
-function playSensitivityAlertSound() {
+async function unlockSensitivityAlertAudio() {
+    if (sensitivityAlertAudioUnlocked) return;
+    try {
+        sensitivityAlertAudio.muted = true;
+        sensitivityAlertAudio.currentTime = 0;
+        await sensitivityAlertAudio.play();
+        sensitivityAlertAudio.pause();
+        sensitivityAlertAudio.currentTime = 0;
+        sensitivityAlertAudio.muted = false;
+        sensitivityAlertAudioUnlocked = true;
+        console.log('Sensitivity alert sound unlocked');
+    } catch (err) {
+        sensitivityAlertAudio.muted = false;
+        console.log('Sensitivity alert unlock pending user gesture:', err?.message || err);
+    }
+}
+
+function getSensitivityAlertContext() {
+    const analysisCtx = getAudioContext();
+    if (analysisCtx && analysisCtx.state !== 'closed') {
+        return analysisCtx;
+    }
+    if (!sensitivityAlertContext || sensitivityAlertContext.state === 'closed') {
+        sensitivityAlertContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return sensitivityAlertContext;
+}
+
+async function ensureSensitivityAlertBuffer(ctx) {
+    if (sensitivityAlertBuffer) return sensitivityAlertBuffer;
+    if (!sensitivityAlertBufferPromise) {
+        sensitivityAlertBufferPromise = fetch('/sensitivity.mp3')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load sensitivity.mp3: ${response.status}`);
+                }
+                return response.arrayBuffer();
+            })
+            .then(arrayBuffer => ctx.decodeAudioData(arrayBuffer.slice(0)))
+            .then(decoded => {
+                sensitivityAlertBuffer = decoded;
+                return decoded;
+            })
+            .catch(err => {
+                sensitivityAlertBufferPromise = null;
+                throw err;
+            });
+    }
+    return sensitivityAlertBufferPromise;
+}
+
+async function playSensitivityAlertSound() {
     if (!sensitivityAlertEnabled || !hasUserInteracted()) return;
-    sensitivityAlertAudio.currentTime = 0;
-    sensitivityAlertAudio.play().catch(err => {
-        console.log('Sensitivity alert sound blocked:', err?.message || err);
-    });
+
+    try {
+        const ctx = getSensitivityAlertContext();
+        if (ctx.state === 'suspended') {
+            await ctx.resume();
+        }
+
+        const buffer = await ensureSensitivityAlertBuffer(ctx);
+        const source = ctx.createBufferSource();
+        const gain = ctx.createGain();
+        gain.gain.value = 1.2;
+        source.buffer = buffer;
+        source.connect(gain);
+        gain.connect(ctx.destination);
+        source.start(0);
+        return;
+    } catch (err) {
+        console.log('Sensitivity alert via AudioContext failed, falling back:', err?.message || err);
+    }
+
+    try {
+        sensitivityAlertAudio.currentTime = 0;
+        sensitivityAlertAudio.play().catch(err => {
+            console.log('Sensitivity alert sound blocked:', err?.message || err);
+        });
+    } catch (err) {
+        console.log('Sensitivity alert fallback failed:', err?.message || err);
+    }
 }
 
 // Initialize keep-awake
@@ -1132,6 +1211,7 @@ musicPlaylistSelect.addEventListener('touchcancel', cancelLongPress);
 
 // User interaction handlers for audio context and noise gate
 function onUserInteractionGlobal() {
+    unlockSensitivityAlertAudio();
     handleUserInteraction();
     ensureAudioContext(audioLevel);
     // Set noise gate threshold from saved settings
