@@ -91,6 +91,7 @@ const thresholdMarker = document.getElementById('thresholdMarker');
 const audioOnlyToggle = document.getElementById('audioOnlyToggle');
 const echoCancelToggle = document.getElementById('echoCancelToggle');
 const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
+const sensitivityAlertToggle = document.getElementById('sensitivityAlertToggle');
 const shutdownTimerSelect = document.getElementById('shutdownTimerSelect');
 const shutdownBtn = document.getElementById('shutdownBtn');
 const shutdownStatus = document.getElementById('shutdownStatus');
@@ -148,6 +149,7 @@ let playlistsUnlocked = localStorage.getItem('receiver-playlists-unlocked') === 
 let loudSoundTimeout = null;
 let loudSoundCooldown = false;
 let echoCancelEnabled = localStorage.getItem('receiver-echo-cancel') === 'true';
+let sensitivityAlertEnabled = localStorage.getItem('receiver-sensitivity-alert-sound') !== 'false';
 let debugTimerMode = false; // Will be set from /api/music response
 const DEFAULT_SHUTDOWN_SELECTION = '6h';
 let shutdownTimerValue = localStorage.getItem('receiver-shutdown-timer') || DEFAULT_SHUTDOWN_SELECTION;
@@ -159,6 +161,17 @@ let shutdownCountdownInterval = null;
 let debugInterval = null;
 const DEBUG_MINIMIZED_STORAGE_KEY = 'receiver-debug-minimized';
 let debugMinimized = localStorage.getItem(DEBUG_MINIMIZED_STORAGE_KEY) === 'true';
+const sensitivityAlertAudio = new Audio('/sensitivity.mp3');
+sensitivityAlertAudio.preload = 'auto';
+sensitivityAlertAudio.playsInline = true;
+
+function playSensitivityAlertSound() {
+    if (!sensitivityAlertEnabled || !hasUserInteracted()) return;
+    sensitivityAlertAudio.currentTime = 0;
+    sensitivityAlertAudio.play().catch(err => {
+        console.log('Sensitivity alert sound blocked:', err?.message || err);
+    });
+}
 
 // Initialize keep-awake
 initKeepAwake();
@@ -257,6 +270,9 @@ if (savedNoiseGate !== null) {
 // Initialize audio-only toggle
 audioOnlyToggle.checked = getAudioOnlyMode();
 echoCancelToggle.checked = echoCancelEnabled;
+if (sensitivityAlertToggle) {
+    sensitivityAlertToggle.checked = sensitivityAlertEnabled;
+}
 
 // Set video element reference for noise gate
 setVideoElement(remoteVideo);
@@ -469,6 +485,8 @@ function setMediaMutedState(muted) {
 
 function triggerLoudSoundAlert(isSoft = false) {
     if (!isConnected || loudSoundCooldown) return;
+
+    playSensitivityAlertSound();
 
     if (isSoft) {
         document.body.classList.add('soft-alert-active');
@@ -974,6 +992,14 @@ echoCancelToggle.addEventListener('change', () => {
     console.log('Echo cancel mode:', echoCancelEnabled);
     signaling.sendSignal({ type: 'echo-cancel-enable', enabled: echoCancelEnabled });
 });
+
+if (sensitivityAlertToggle) {
+    sensitivityAlertToggle.addEventListener('change', () => {
+        sensitivityAlertEnabled = sensitivityAlertToggle.checked;
+        localStorage.setItem('receiver-sensitivity-alert-sound', sensitivityAlertEnabled);
+        console.log('Sensitivity alert sound:', sensitivityAlertEnabled ? 'enabled' : 'disabled');
+    });
+}
 
 shutdownTimerSelect.addEventListener('change', () => {
     shutdownTimerValue = shutdownTimerSelect.value;
