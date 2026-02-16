@@ -162,8 +162,13 @@ const DEBUG_MINIMIZED_STORAGE_KEY = 'receiver-debug-minimized';
 let debugMinimized = localStorage.getItem(DEBUG_MINIMIZED_STORAGE_KEY) === 'true';
 function playSensitivityAlertSound() {
     if (!sensitivityAlertEnabled || !isConnected) return;
-    if (!signaling.isConnected()) return;
     signaling.sendSignal({ type: 'sensitivity-sound' });
+    // Mobile networks can briefly flap SSE while POST still works; send one delayed retry.
+    setTimeout(() => {
+        if (sensitivityAlertEnabled && isConnected) {
+            signaling.sendSignal({ type: 'sensitivity-sound' });
+        }
+    }, 180);
 }
 
 // Initialize keep-awake
