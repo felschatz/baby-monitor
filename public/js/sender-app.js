@@ -134,6 +134,7 @@ let shutdownUnit = 'hours'; // Will be updated by receiver
 let shutdownConfigured = false;
 let testSoundInProgress = false;
 let testSoundBuffer = null;
+let sensitivitySoundBuffer = null;
 let testSoundContext = null;
 let reclaimTimer = null;
 let reclaimPending = false;
@@ -340,6 +341,17 @@ async function ensureTestSoundBuffer(ctx) {
     return testSoundBuffer;
 }
 
+async function ensureSensitivitySoundBuffer(ctx) {
+    if (sensitivitySoundBuffer) return sensitivitySoundBuffer;
+    const response = await fetch('/sensitivity.mp3');
+    if (!response.ok) {
+        throw new Error(`Failed to load sensitivity.mp3: ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    sensitivitySoundBuffer = await ctx.decodeAudioData(arrayBuffer);
+    return sensitivitySoundBuffer;
+}
+
 async function playTestSound(receiverId) {
     const sendTestSoundStatus = (status, detail) => {
         if (!signaling.isConnected()) return;
@@ -420,6 +432,80 @@ async function playTestSound(receiverId) {
             }
         } catch (restoreErr) {
             console.error('Failed to restore audio track after test sound:', restoreErr);
+        }
+    } finally {
+        if (source) {
+            try {
+                source.disconnect();
+            } catch (e) {}
+        }
+        testSoundInProgress = false;
+    }
+}
+
+async function playSensitivitySound(receiverId) {
+    if (testSoundInProgress) {
+        console.log('Sensitivity sound ignored: audio injection busy');
+        return;
+    }
+    if (!isStreaming || !getLocalStream()) {
+        console.log('Sensitivity sound ignored: no active stream');
+        return;
+    }
+
+    const restoreTrack = getOutboundAudioTrackForRestore();
+    if (!restoreTrack) {
+        console.log('Sensitivity sound ignored: no outbound audio track');
+        return;
+    }
+
+    testSoundInProgress = true;
+    let source = null;
+    let testTrack = null;
+
+    try {
+        let ctx = testSoundContext;
+        if (!ctx || ctx.state === 'closed') {
+            ctx = getAudioContext();
+        }
+        if (!ctx || ctx.state === 'closed') {
+            testSoundContext = new (window.AudioContext || window.webkitAudioContext)();
+            ctx = testSoundContext;
+        }
+
+        if (ctx.state === 'suspended') {
+            try {
+                await ctx.resume();
+            } catch (err) {
+                console.log('Sensitivity sound: audio context resume blocked');
+            }
+        }
+
+        const buffer = await ensureSensitivitySoundBuffer(ctx);
+        const destination = ctx.createMediaStreamDestination();
+        source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(destination);
+
+        testTrack = destination.stream.getAudioTracks()[0];
+        await replaceAudioTrack(testTrack);
+
+        await new Promise(resolve => {
+            source.onended = resolve;
+            source.start(0);
+        });
+
+        testTrack.stop();
+        await replaceAudioTrack(restoreTrack);
+        console.log('Sensitivity sound complete (receiverId:', receiverId || 'unknown', ')');
+    } catch (err) {
+        console.error('Sensitivity sound failed:', err);
+        try {
+            if (restoreTrack) {
+                await replaceAudioTrack(restoreTrack);
+            }
+        } catch (restoreErr) {
+            console.error('Failed to restore audio track after sensitivity sound:', restoreErr);
         }
     } finally {
         if (source) {
@@ -728,6 +814,11 @@ async function handleMessage(message) {
         case 'test-sound':
             console.log('Received test sound request');
             await playTestSound(message.receiverId);
+            break;
+
+        case 'sensitivity-sound':
+            console.log('Received sensitivity sound request');
+            await playSensitivitySound(message.receiverId);
             break;
 
         case 'shutdown-timeout':

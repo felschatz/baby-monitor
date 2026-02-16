@@ -128,6 +128,15 @@ async function handleSignal(req, res) {
                 return sendJson(res, { error: 'Sender not connected' }, 409);
             }
             break;
+        case 'sensitivity-sound':
+            // Receiver -> Sender: trigger sensitivity alert sound through outgoing audio stream
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, { type: 'sensitivity-sound', receiverId: message.receiverId });
+            } else {
+                console.log('Sensitivity sound ignored: no sender in session', sessionName);
+                return sendJson(res, { error: 'Sender not connected' }, 409);
+            }
+            break;
         case 'test-sound-status':
             // Sender -> Receiver(s): report test sound status
             if (message.receiverId) {
