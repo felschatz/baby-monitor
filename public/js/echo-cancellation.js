@@ -11,7 +11,10 @@ const HOP_SIZE = 1024;              // 50% overlap
 const ALPHA = 2.0;                  // Over-subtraction factor (reduces musical noise)
 const BETA = 0.02;                  // Spectral floor (prevents artifacts)
 const SMOOTHING = 0.6;              // Temporal smoothing between frames
-const MUSIC_SCALE = 0.7;            // Scale music magnitude for acoustic path
+const ANALYSER_TO_FFT_MAG_SCALE = FFT_SIZE / 2; // Convert analyser linear mags to FFT mag scale
+const DEFAULT_ACOUSTIC_SCALE = 0.12; // Typical speaker->mic leakage ratio before calibration
+const MIN_ACOUSTIC_SCALE = 0.02;
+const MAX_ACOUSTIC_SCALE = 0.6;
 const PROCESSOR_BUFFER_SIZE = 4096; // Processing buffer size
 const MAX_OVERRUNS = 10;            // Fallback to simple mode after this many
 const DEFAULT_DELAY_MS = 250;       // Initial delay estimate for speaker→mic path
@@ -202,7 +205,8 @@ function initFFTState(sampleRate) {
         calibrationPos: 0,
         calibrationSamples,
         maxDelaySamples,
-        detectedDelayMs: DEFAULT_DELAY_MS
+        detectedDelayMs: DEFAULT_DELAY_MS,
+        acousticScale: DEFAULT_ACOUSTIC_SCALE
     };
 }
 
@@ -266,6 +270,35 @@ function detectDelay(musicBuffer, micBuffer, maxDelaySamples, sampleRate) {
     return { delaySamples: bestDelay, correlation: bestCorrelation };
 }
 
+function estimateAcousticScale(musicBuffer, micBuffer, delaySamples) {
+    if (!musicBuffer || !micBuffer) return DEFAULT_ACOUSTIC_SCALE;
+
+    const len = Math.min(musicBuffer.length, micBuffer.length - delaySamples);
+    if (len <= 0) return DEFAULT_ACOUSTIC_SCALE;
+
+    let dot = 0;
+    let energy = 0;
+    const step = 4;
+
+    for (let i = 0; i < len; i += step) {
+        const musicSample = musicBuffer[i];
+        const micSample = micBuffer[i + delaySamples];
+        dot += micSample * musicSample;
+        energy += musicSample * musicSample;
+    }
+
+    if (!Number.isFinite(dot) || !Number.isFinite(energy) || energy < 1e-8) {
+        return DEFAULT_ACOUSTIC_SCALE;
+    }
+
+    const gain = dot / energy;
+    if (!Number.isFinite(gain) || gain <= 0) {
+        return DEFAULT_ACOUSTIC_SCALE;
+    }
+
+    return Math.min(MAX_ACOUSTIC_SCALE, Math.max(MIN_ACOUSTIC_SCALE, gain));
+}
+
 // === Processing Functions ===
 
 function processFFTFrame() {
@@ -291,7 +324,7 @@ function processFFTFrame() {
 
         const musicIdx = Math.min(k, musicBins - 1);
         const musicDb = state.musicFreqData[musicIdx];
-        const musicMag = Math.pow(10, musicDb / 20) * MUSIC_SCALE;
+        const musicMag = Math.pow(10, musicDb / 20) * ANALYSER_TO_FFT_MAG_SCALE * state.acousticScale;
 
         let outputMag = micMag - ALPHA * musicMag;
         outputMag = Math.max(outputMag, BETA * micMag);
@@ -330,10 +363,10 @@ function processSimpleMode(inputData, outputData) {
     }
     musicEnergy = musicEnergy / fftState.musicFreqData.length;
 
-    const suppressionFactor = Math.min(1, musicEnergy * 7);
+    const suppressionFactor = Math.min(1, musicEnergy * ANALYSER_TO_FFT_MAG_SCALE * fftState.acousticScale * 0.08);
 
     for (let i = 0; i < inputData.length; i++) {
-        outputData[i] = inputData[i] * (1 - suppressionFactor * 0.7);
+        outputData[i] = inputData[i] * (1 - suppressionFactor * 0.85);
     }
 }
 
@@ -464,11 +497,17 @@ export function setupEchoCancellation() {
                     );
 
                     const detectedMs = (result.delaySamples / fftState.sampleRate) * 1000;
+                    const acousticScale = estimateAcousticScale(
+                        fftState.calibrationMusicBuffer,
+                        fftState.calibrationMicBuffer,
+                        result.delaySamples
+                    );
                     fftState.detectedDelayMs = detectedMs;
                     fftState.delayFrames = Math.ceil((detectedMs / 1000) * fftState.framesPerSecond);
+                    fftState.acousticScale = acousticScale;
                     fftState.calibrating = false;
 
-                    console.log(`Echo cancel: auto-detected delay = ${detectedMs.toFixed(0)}ms (${fftState.delayFrames} frames), correlation = ${result.correlation.toFixed(6)}`);
+                    console.log(`Echo cancel: auto-detected delay = ${detectedMs.toFixed(0)}ms (${fftState.delayFrames} frames), correlation = ${result.correlation.toFixed(6)}, scale = ${acousticScale.toFixed(3)}`);
 
                     // Clear calibration buffers to free memory
                     fftState.calibrationMusicBuffer = null;
