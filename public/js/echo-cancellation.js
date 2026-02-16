@@ -392,6 +392,17 @@ export function setupEchoCancellation() {
         return false;
     }
 
+    // Avoid stacking multiple processing graphs for the same source track.
+    // Repeated enable signals can otherwise create duplicate ScriptProcessor chains.
+    if (echoCancelActive) {
+        if (processedAudioTrack && originalAudioTrack && originalAudioTrack.id === audioTrack.id) {
+            console.log('Echo cancel already active for current audio track');
+            return true;
+        }
+        console.log('Echo cancel active with different source, rebuilding pipeline');
+        teardownEchoCancellation();
+    }
+
     try {
         console.log('Setting up FFT-based echo cancellation...');
 

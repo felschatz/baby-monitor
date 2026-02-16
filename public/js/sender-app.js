@@ -493,6 +493,10 @@ initMusicPlayer(
         },
         onEchoCancelSetup: async () => {
             if (isEchoCancelEnabled() && getAudioContext() && getLocalStream()) {
+                if (isEchoCancelActive()) {
+                    broadcastEchoCancelStatus();
+                    return;
+                }
                 if (setupEchoCancellation()) {
                     await replaceAudioTrack(getProcessedAudioTrack());
                     broadcastEchoCancelStatus();
@@ -527,6 +531,10 @@ async function handleEchoCancelToggle(enabled) {
     setEchoCancelEnabled(enabled);
 
     if (enabled && isMusicPlaying()) {
+        if (isEchoCancelActive()) {
+            broadcastEchoCancelStatus();
+            return;
+        }
         if (setupEchoCancellation()) {
             await replaceAudioTrack(getProcessedAudioTrack());
         }
