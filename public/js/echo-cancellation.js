@@ -1,12 +1,12 @@
 /**
  * Adaptive echo cancellation for sender music bleed-through.
- * Uses delayed-reference NLMS instead of analyser-based spectral subtraction.
+ * Uses delayed-reference NLMS with continuous delay tracking.
  */
 
 import { getMicGain } from './mic-gain.js';
 
 const PROCESSOR_BUFFER_SIZE = 2048;
-const FILTER_LENGTH = 192;
+const FILTER_LENGTH = 1024;
 const DEFAULT_DELAY_MS = 180;
 const MIN_DELAY_MS = 20;
 const MAX_DELAY_MS = 420;
@@ -14,10 +14,10 @@ const DELAY_ESTIMATE_INTERVAL_MS = 1200;
 const DELAY_ESTIMATE_WINDOW_SAMPLES = 16384;
 const DELAY_SEARCH_STEP = 4;
 const DELAY_SEARCH_DECIMATION = 2;
-const ADAPT_MU = 0.06;
+const ADAPT_MU = 0.12;
 const ADAPT_EPS = 1e-6;
 const WEIGHT_LEAK = 0.9998;
-const REFERENCE_ENERGY_FLOOR = 5e-7;
+const REFERENCE_ENERGY_FLOOR = 1e-8;
 const CORRELATION_FLOOR = 0.02;
 
 let echoCancelEnabled = false;
@@ -29,6 +29,10 @@ let echoStreamDestination = null;
 let echoGainNode = null;
 let echoMicSource = null;
 let echoMergeNode = null;
+let musicReferenceSplitter = null;
+let musicReferenceLeftGain = null;
+let musicReferenceRightGain = null;
+let musicReferenceMono = null;
 let originalAudioTrack = null;
 let processedAudioTrack = null;
 let adaptiveState = null;
@@ -211,17 +215,38 @@ function processAdaptiveSample(state, micSample, refSample, musicPlaying) {
     return clampSample(error);
 }
 
+function resetMusicOutputRouting(ctx) {
+    if (!musicMediaSource || !ctx) return;
+    try {
+        musicMediaSource.disconnect();
+    } catch (e) {}
+    musicMediaSource.connect(ctx.destination);
+}
+
 function ensureMusicSource(ctx, musicAudio) {
     if (!musicMediaSource) {
         musicMediaSource = ctx.createMediaElementSource(musicAudio);
         musicMediaSourceInitialized = true;
     }
 
-    try {
-        musicMediaSource.disconnect();
-    } catch (e) {}
+    resetMusicOutputRouting(ctx);
+}
 
-    musicMediaSource.connect(ctx.destination);
+function setupMusicReferenceGraph(ctx) {
+    musicReferenceSplitter = ctx.createChannelSplitter(2);
+    musicReferenceLeftGain = ctx.createGain();
+    musicReferenceRightGain = ctx.createGain();
+    musicReferenceMono = ctx.createGain();
+
+    musicReferenceLeftGain.gain.value = 0.5;
+    musicReferenceRightGain.gain.value = 0.5;
+    musicReferenceMono.gain.value = 1;
+
+    musicMediaSource.connect(musicReferenceSplitter);
+    musicReferenceSplitter.connect(musicReferenceLeftGain, 0, 0);
+    musicReferenceSplitter.connect(musicReferenceRightGain, 1, 0);
+    musicReferenceLeftGain.connect(musicReferenceMono);
+    musicReferenceRightGain.connect(musicReferenceMono);
 }
 
 export function setupEchoCancellation() {
@@ -262,8 +287,10 @@ export function setupEchoCancellation() {
         echoGainNode.gain.value = getMicGain();
         echoStreamDestination = ctx.createMediaStreamDestination();
 
+        setupMusicReferenceGraph(ctx);
+
         echoMicSource.connect(echoMergeNode, 0, 0);
-        musicMediaSource.connect(echoMergeNode, 0, 1);
+        musicReferenceMono.connect(echoMergeNode, 0, 1);
         echoMergeNode.connect(echoProcessorNode);
         echoProcessorNode.connect(echoGainNode);
         echoGainNode.connect(echoStreamDestination);
@@ -278,9 +305,15 @@ export function setupEchoCancellation() {
             const outData = event.outputBuffer.getChannelData(0);
             const musicPlaying = !!getMusicPlaying?.();
 
+            let refRms = 0;
+            let micRms = 0;
+
             for (let i = 0; i < micData.length; i++) {
                 const ref = refData ? refData[i] : 0;
-                outData[i] = processAdaptiveSample(adaptiveState, micData[i], ref, musicPlaying);
+                const mic = micData[i];
+                outData[i] = processAdaptiveSample(adaptiveState, mic, ref, musicPlaying);
+                refRms += ref * ref;
+                micRms += mic * mic;
             }
 
             if (musicPlaying && adaptiveState.samplesSinceDelayEstimate >= adaptiveState.delayEstimateIntervalSamples) {
@@ -290,10 +323,14 @@ export function setupEchoCancellation() {
 
             adaptiveState.debugFrames += 1;
             if (adaptiveState.debugFrames % 50 === 1) {
+                refRms = Math.sqrt(refRms / micData.length);
+                micRms = Math.sqrt(micRms / micData.length);
                 console.log(
                     'Echo cancel active:',
                     `delay=${Math.round((adaptiveState.delaySamples / adaptiveState.sampleRate) * 1000)}ms`,
-                    `corr=${adaptiveState.correlationScore.toFixed(3)}`
+                    `corr=${adaptiveState.correlationScore.toFixed(3)}`,
+                    `refRms=${refRms.toFixed(5)}`,
+                    `micRms=${micRms.toFixed(5)}`
                 );
             }
         };
@@ -337,14 +374,29 @@ export function teardownEchoCancellation() {
         echoMicSource = null;
     }
 
-    if (musicMediaSource) {
-        const ctx = audioContext?.();
-        if (ctx) {
-            try {
-                musicMediaSource.disconnect();
-            } catch (e) {}
-            musicMediaSource.connect(ctx.destination);
-        }
+    if (musicReferenceSplitter) {
+        try { musicReferenceSplitter.disconnect(); } catch (e) {}
+        musicReferenceSplitter = null;
+    }
+
+    if (musicReferenceLeftGain) {
+        try { musicReferenceLeftGain.disconnect(); } catch (e) {}
+        musicReferenceLeftGain = null;
+    }
+
+    if (musicReferenceRightGain) {
+        try { musicReferenceRightGain.disconnect(); } catch (e) {}
+        musicReferenceRightGain = null;
+    }
+
+    if (musicReferenceMono) {
+        try { musicReferenceMono.disconnect(); } catch (e) {}
+        musicReferenceMono = null;
+    }
+
+    const ctx = audioContext?.();
+    if (ctx) {
+        resetMusicOutputRouting(ctx);
     }
 
     echoStreamDestination = null;
