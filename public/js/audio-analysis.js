@@ -283,7 +283,7 @@ export function getAudioContext() {
 /**
  * Set noise gate threshold
  * Noise gate now works by muting/unmuting the video element based on audio level
- * @param {number} threshold - Percentage threshold (0-50), 0 = off
+ * @param {number} threshold - Percentage threshold (0-90), 0 = off
  */
 export function setNoiseGateThreshold(threshold) {
     noiseGateThreshold = threshold;

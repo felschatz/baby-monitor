@@ -5,6 +5,7 @@
  */
 
 import { rtcConfig, waitForStableState, addIceCandidates, getMediaConstraints, optimizeSdpForLowLatency } from './webrtc.js';
+import { getMicGain } from './mic-gain.js';
 
 // State - now using Maps to support multiple receivers
 const peerConnections = new Map(); // receiverId -> RTCPeerConnection
@@ -15,6 +16,14 @@ let localStream = null;
 let videoAvailable = true; // Track if video capture is available
 let audioContext = null;
 let analyser = null;
+let rawAudioTrack = null;
+let currentAudioTrack = null;
+
+// Mic gain processing (sender-side)
+let micGainSource = null;
+let micGainNode = null;
+let micGainDestination = null;
+let micGainTrack = null;
 
 const MAX_AUDIO_BITRATE_BPS = 16000;
 
@@ -73,6 +82,14 @@ export async function startStreaming(options) {
         videoAvailable = true; // Don't mark as unavailable if user chose audio-only
     }
 
+    if (audio) {
+        initMicGainPipeline(localStream);
+    } else {
+        rawAudioTrack = null;
+        currentAudioTrack = null;
+        resetMicGainPipeline();
+    }
+
     videoElement.srcObject = localStream;
 
     console.log('Got local stream');
@@ -118,6 +135,63 @@ export function setupAudioAnalysis(stream, audioLevelElement) {
     updateAudioLevel();
 }
 
+function resetMicGainPipeline() {
+    if (micGainSource) {
+        try { micGainSource.disconnect(); } catch (e) {}
+    }
+    if (micGainNode) {
+        try { micGainNode.disconnect(); } catch (e) {}
+    }
+    micGainSource = null;
+    micGainNode = null;
+    micGainDestination = null;
+    micGainTrack = null;
+}
+
+export function initMicGainPipeline(stream) {
+    if (!stream) return;
+
+    const audioTracks = stream.getAudioTracks();
+    rawAudioTrack = audioTracks.length > 0 ? audioTracks[0] : null;
+    currentAudioTrack = rawAudioTrack;
+
+    if (!rawAudioTrack) {
+        resetMicGainPipeline();
+        return;
+    }
+
+    if (!audioContext || audioContext.state === 'closed') {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    resetMicGainPipeline();
+
+    micGainSource = audioContext.createMediaStreamSource(stream);
+    micGainNode = audioContext.createGain();
+    micGainNode.gain.value = getMicGain();
+    micGainDestination = audioContext.createMediaStreamDestination();
+
+    micGainSource.connect(micGainNode);
+    micGainNode.connect(micGainDestination);
+
+    micGainTrack = micGainDestination.stream.getAudioTracks()[0] || null;
+}
+
+export function getCurrentAudioTrack() {
+    return currentAudioTrack || rawAudioTrack;
+}
+
+export async function applyMicGainIfReady() {
+    if (!micGainTrack || !audioContext || audioContext.state !== 'running') {
+        return;
+    }
+    if (currentAudioTrack === micGainTrack) {
+        return;
+    }
+    currentAudioTrack = micGainTrack;
+    await replaceAudioTrack(micGainTrack);
+}
+
 /**
  * Create and send WebRTC offer for a specific receiver
  * @param {HTMLAudioElement} pttAudio - PTT audio element
@@ -145,12 +219,23 @@ export async function createOffer(pttAudio, receiverId) {
     // Get video preference for this receiver (default to true)
     const receiverWantsVideo = receiverVideoPrefs.get(receiverId) !== false;
 
-    localStream.getTracks().forEach(track => {
+    const outboundStream = new MediaStream();
+    const audioTrack = getCurrentAudioTrack();
+    const videoTracks = receiverWantsVideo ? localStream.getVideoTracks() : [];
+
+    if (audioTrack) {
+        outboundStream.addTrack(audioTrack);
+    }
+    if (videoTracks.length > 0) {
+        videoTracks.forEach(track => outboundStream.addTrack(track));
+    }
+
+    outboundStream.getTracks().forEach(track => {
         if (track.kind === 'video' && !receiverWantsVideo) {
             console.log('Skipping video track for receiver', receiverId, '(requested audio-only)');
             return;
         }
-        const sender = peerConnection.addTrack(track, localStream);
+        const sender = peerConnection.addTrack(track, outboundStream);
         console.log('Added track for receiver', receiverId, ':', track.kind);
 
         // Configure audio sender for low latency
@@ -417,6 +502,9 @@ export function stopStreaming(videoElement) {
 
     videoElement.srcObject = null;
     videoAvailable = true; // Reset for next stream attempt
+    rawAudioTrack = null;
+    currentAudioTrack = null;
+    resetMicGainPipeline();
 }
 
 /**
@@ -425,6 +513,7 @@ export function stopStreaming(videoElement) {
  */
 export async function replaceAudioTrack(newTrack) {
     if (!newTrack) return;
+    currentAudioTrack = newTrack;
 
     const promises = [];
     peerConnections.forEach((peerConnection, receiverId) => {
