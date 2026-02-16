@@ -93,7 +93,7 @@ export function getMediaConstraints(options) {
         audio: audio ? {
             echoCancellation: false,
             noiseSuppression: false,
-            autoGainControl: true,
+            autoGainControl: false,
             // Request low-latency audio capture
             latency: 0,
             channelCount: 1  // Mono is faster to encode
@@ -129,3 +129,4 @@ export function optimizeSdpForLowLatency(sdp) {
 
     return optimized;
 }
+
