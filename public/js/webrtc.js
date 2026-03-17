@@ -3,18 +3,99 @@
  * Shared between sender and receiver
  */
 
+const DEFAULT_ICE_SERVERS = [
+    { urls: 'stun:stun.stunprotocol.org:3478' },
+    { urls: 'stun:stun.nextcloud.com:443' },
+    { urls: 'stun:stun.sipgate.net:3478' }
+];
+
+const DEFAULT_ICE_CANDIDATE_POOL_SIZE = 10;
+
+function cloneIceServers(iceServers = DEFAULT_ICE_SERVERS) {
+    return iceServers.map(server => ({ ...server }));
+}
+
+function createDefaultRtcConfig() {
+    return {
+        iceServers: cloneIceServers(DEFAULT_ICE_SERVERS),
+        iceCandidatePoolSize: DEFAULT_ICE_CANDIDATE_POOL_SIZE
+    };
+}
+
+function normalizeRtcConfig(config = {}) {
+    const normalized = {
+        iceServers: Array.isArray(config.iceServers) && config.iceServers.length > 0
+            ? cloneIceServers(config.iceServers)
+            : cloneIceServers(DEFAULT_ICE_SERVERS),
+        iceCandidatePoolSize: Number.isFinite(config.iceCandidatePoolSize)
+            ? config.iceCandidatePoolSize
+            : DEFAULT_ICE_CANDIDATE_POOL_SIZE
+    };
+
+    if (config.iceTransportPolicy) {
+        normalized.iceTransportPolicy = config.iceTransportPolicy;
+    }
+
+    return normalized;
+}
+
 /**
- * Default WebRTC configuration with public STUN servers
- * (only used for IP discovery, no media passes through)
+ * Active WebRTC configuration loaded from the server.
+ * Defaults to direct mode with public STUN servers.
  */
-export const rtcConfig = {
-    iceServers: [
-        { urls: 'stun:stun.stunprotocol.org:3478' },
-        { urls: 'stun:stun.nextcloud.com:443' },
-        { urls: 'stun:stun.sipgate.net:3478' }
-    ],
-    iceCandidatePoolSize: 10
-};
+export let rtcConfig = createDefaultRtcConfig();
+let activeTransportMode = 'direct';
+
+/**
+ * Load the current WebRTC transport configuration from the server.
+ * @param {string} transport - 'direct' or 'relay'
+ * @returns {Promise<object>}
+ */
+export async function loadRtcConfig(transport = 'direct') {
+    const requestedTransport = transport === 'relay' ? 'relay' : 'direct';
+
+    try {
+        const response = await fetch(`/api/webrtc-config?transport=${encodeURIComponent(requestedTransport)}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load WebRTC config (${response.status})`);
+        }
+
+        const data = await response.json();
+
+        if (requestedTransport === 'relay' && !data.relayAvailable) {
+            throw new Error(data.error || 'Server relay mode is not configured.');
+        }
+
+        rtcConfig = normalizeRtcConfig(data);
+        activeTransportMode = requestedTransport;
+        return getRtcConfig();
+    } catch (err) {
+        if (requestedTransport === 'relay') {
+            throw err;
+        }
+
+        console.warn('Falling back to built-in STUN config:', err.message || err);
+        rtcConfig = createDefaultRtcConfig();
+        activeTransportMode = 'direct';
+        return getRtcConfig();
+    }
+}
+
+/**
+ * Get a safe copy of the current WebRTC configuration.
+ * @returns {object}
+ */
+export function getRtcConfig() {
+    return normalizeRtcConfig(rtcConfig);
+}
+
+/**
+ * Get the active transport mode.
+ * @returns {string}
+ */
+export function getTransportMode() {
+    return activeTransportMode;
+}
 
 /**
  * Create a new RTCPeerConnection with default configuration

@@ -13,6 +13,7 @@ const { handleSenderSSE, handleReceiverSSE } = require('./sse-manager');
 const { handleSignal } = require('./signal-router');
 const { handleMusicApi } = require('./music-api');
 const { sendFile, serveMp3, servePublic } = require('./static-server');
+const { buildRtcConfig, isRelayAvailable, getRelayError } = require('./relay-manager');
 
 /**
  * Load .env file if it exists (no external dependencies)
@@ -102,6 +103,12 @@ function createServer(baseDir) {
                 return handleMusicApi(res, query, baseDir, config.ENABLE_DEBUG_TIMER);
             }
 
+            // WebRTC runtime config endpoint
+            if (pathname === '/api/webrtc-config') {
+                const transport = query.transport === 'relay' ? 'relay' : 'direct';
+                return sendJson(res, buildRtcConfig({ transport }));
+            }
+
             // Page routes
             if (pathname === '/' || pathname === '/index.html') {
                 return sendFile(res, path.join(baseDir, 'public', 'index.html'));
@@ -173,7 +180,13 @@ function startServer(baseDir) {
         console.log(`Baby Monitor server running on port ${config.PORT}`);
         console.log(`Open http://localhost:${config.PORT} in your browser`);
         console.log('Using SSE for signaling (no WebSockets required)');
-        console.log('Zero external dependencies - pure Node.js');
+        console.log('Pure Node.js HTTP server with optional server-side WebRTC relay');
+
+        if (isRelayAvailable()) {
+            console.log('Relay mode available via server-side WebRTC');
+        } else {
+            console.log('Relay mode unavailable:', getRelayError() || 'server relay dependency missing');
+        }
     });
 
     return server;

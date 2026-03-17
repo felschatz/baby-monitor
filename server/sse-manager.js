@@ -5,6 +5,7 @@
 
 const { generateId } = require('./utils');
 const { getSession, hasSender, cleanupSession } = require('./session-manager');
+const { closeRelayConnection, closeRelaySession } = require('./relay-manager');
 
 /**
  * Send SSE message to a client
@@ -118,6 +119,7 @@ function handleSenderSSE(req, res, sessionName) {
         } catch (e) {
             // Old connection might already be dead
         }
+        closeRelaySession(sessionName);
         broadcastToReceivers(sessionName, { type: 'sender-disconnected' });
         session.sender = null;
         session.senderRes = null;
@@ -140,6 +142,7 @@ function handleSenderSSE(req, res, sessionName) {
         if (!sendSSE(res, { type: 'heartbeat' })) {
             clearInterval(heartbeat);
             if (session.sender === id) {
+                closeRelaySession(sessionName);
                 session.sender = null;
                 session.senderRes = null;
                 broadcastToReceivers(sessionName, { type: 'sender-disconnected' });
@@ -153,6 +156,7 @@ function handleSenderSSE(req, res, sessionName) {
         console.log('Sender disconnected from session', sessionName, ':', id);
         clearInterval(heartbeat);
         if (session.sender === id) {
+            closeRelaySession(sessionName);
             session.sender = null;
             session.senderRes = null;
             broadcastToReceivers(sessionName, { type: 'sender-disconnected' });
@@ -188,6 +192,7 @@ function handleReceiverSSE(req, res, sessionName) {
     const heartbeat = setInterval(() => {
         if (!sendSSE(res, { type: 'heartbeat' })) {
             clearInterval(heartbeat);
+            closeRelayConnection(sessionName, id);
             session.receivers.delete(id);
         }
     }, 15000);
@@ -196,6 +201,7 @@ function handleReceiverSSE(req, res, sessionName) {
     req.on('close', () => {
         console.log('Receiver disconnected from session', sessionName, ':', id, 'remaining:', session.receivers.size - 1);
         clearInterval(heartbeat);
+        closeRelayConnection(sessionName, id);
         session.receivers.delete(id);
         if (session.receivers.size === 0) {
             sendToSender(sessionName, { type: 'no-receivers' });

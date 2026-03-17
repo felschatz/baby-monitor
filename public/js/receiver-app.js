@@ -6,6 +6,7 @@
 import { initKeepAwake } from './keep-awake.js';
 import { initSession } from './session.js';
 import { createSignalingManager } from './signaling.js';
+import { loadRtcConfig } from './webrtc.js';
 import {
     initAudioAnalysis,
     setupAudioAnalysis,
@@ -123,13 +124,18 @@ const thresholdMarkerInline = document.getElementById('thresholdMarkerInline');
 const noiseGateMarkerInline = document.getElementById('noiseGateMarkerInline');
 const audioMeterRow = document.querySelector('.audio-meter-row');
 
+const transportMode = new URLSearchParams(window.location.search).get('transport') === 'relay'
+    ? 'relay'
+    : 'direct';
+
 // Initialize session
 const sessionName = initSession({
     pathPrefix: '/r/',
     overlay: sessionOverlay,
     input: sessionInput,
     button: sessionJoinBtn,
-    redirectPrefix: '/r/'
+    redirectPrefix: '/r/',
+    queryString: transportMode === 'relay' ? 'transport=relay' : ''
 });
 
 if (!sessionName) {
@@ -750,6 +756,7 @@ const signaling = createSignalingManager({
     sessionName,
     role: 'receiver',
     sseEndpoint: '/api/sse/receiver',
+    transportMode,
     onMessage: handleMessage,
     onError: () => {
         setDisconnectedState();
@@ -819,9 +826,33 @@ initReceiverWebRTC({
         setMediaMutedState(isStale);
     },
     onTrack: (event) => {
-        currentStream = event.streams[0];
+        const incomingStream = event.streams && event.streams[0] ? event.streams[0] : null;
+
+        if (!currentStream) {
+            currentStream = incomingStream || new MediaStream();
+        }
+
+        if (incomingStream && incomingStream !== currentStream) {
+            incomingStream.getTracks().forEach(track => {
+                const hasTrack = currentStream.getTracks().some(existingTrack => existingTrack.id === track.id);
+                if (!hasTrack) {
+                    currentStream.addTrack(track);
+                }
+            });
+        }
+
+        const streamHasTrack = currentStream.getTracks().some(track => track.id === event.track.id);
+        if (!streamHasTrack) {
+            currentStream.addTrack(event.track);
+        }
+
         remoteVideo.srcObject = currentStream;
-        console.log('Set video srcObject, tracks in stream:', currentStream.getTracks().length);
+        console.log(
+            'Set video srcObject, tracks in stream:',
+            currentStream.getTracks().length,
+            'provided streams:',
+            event.streams ? event.streams.length : 0
+        );
 
         const savedVol = localStorage.getItem('receiver-volume');
         if (savedVol !== null) {
@@ -1243,6 +1274,20 @@ function updateDebugBanner() {
 // Initialize
 updateThresholdMarker();
 checkMusicAvailability();
-signaling.connect();
-
 setDebugEnabled(debugEnabled);
+
+async function initializeApp() {
+    try {
+        await loadRtcConfig(transportMode);
+    } catch (err) {
+        console.error('Failed to initialize WebRTC transport:', err);
+        setDisconnectedState();
+        overlayText.textContent = err.message || 'Failed to initialize relay mode.';
+        pttBtn.disabled = true;
+        return;
+    }
+
+    signaling.connect();
+}
+
+initializeApp();

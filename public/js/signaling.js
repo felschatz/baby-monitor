@@ -15,7 +15,15 @@
  * @returns {object} Signaling manager
  */
 export function createSignalingManager(options) {
-    const { sessionName, role, sseEndpoint, onMessage, onConnect, onError } = options;
+    const {
+        sessionName,
+        role,
+        sseEndpoint,
+        onMessage,
+        onConnect,
+        onError,
+        transportMode = 'direct'
+    } = options;
 
     let eventSource = null;
     let connected = false;
@@ -30,6 +38,7 @@ export function createSignalingManager(options) {
     async function sendSignal(message) {
         message.role = role;
         message.session = sessionName;
+        message.transport = transportMode === 'relay' ? 'relay' : 'direct';
         if (receiverId) {
             message.receiverId = receiverId;
         }

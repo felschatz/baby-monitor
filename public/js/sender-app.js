@@ -6,6 +6,7 @@
 import { initKeepAwake, startAutoShutdown, cancelAutoShutdown, destroyKeepAwake, setAutoShutdownTime, setShutdownStatusCallback, getAutoShutdownRemaining } from './keep-awake.js';
 import { initSession } from './session.js';
 import { createSignalingManager } from './signaling.js';
+import { loadRtcConfig } from './webrtc.js';
 import { initScreenDimming } from './screen-dimming.js';
 import {
     initMusicPlayer,
@@ -102,6 +103,15 @@ const volumePlusBtn = document.getElementById('volumePlus');
 const urlParams = new URLSearchParams(window.location.search);
 const videoQuality = urlParams.get('q') === 'sd' ? 'sd' : 'hd';
 const streamMode = (urlParams.get('mode') || '').toLowerCase();
+const transportMode = (urlParams.get('transport') || '').toLowerCase() === 'relay' ? 'relay' : 'direct';
+
+const senderQueryParts = [`q=${videoQuality}`];
+if (streamMode === 'audio' || streamMode === 'audio-only') {
+    senderQueryParts.push('mode=audio');
+}
+if (transportMode === 'relay') {
+    senderQueryParts.push('transport=relay');
+}
 
 // Initialize session
 const sessionName = initSession({
@@ -110,7 +120,7 @@ const sessionName = initSession({
     input: sessionInput,
     button: sessionJoinBtn,
     redirectPrefix: '/s/',
-    queryString: `q=${videoQuality}`
+    queryString: senderQueryParts.join('&')
 });
 
 // Stop execution if no session (user needs to enter session first)
@@ -522,6 +532,7 @@ const signaling = createSignalingManager({
     sessionName,
     role: 'sender',
     sseEndpoint: '/api/sse/sender',
+    transportMode,
     onMessage: handleMessage,
     onError: () => setDisconnectedState()
 });
@@ -970,5 +981,22 @@ document.addEventListener('touchstart', () => enableAudioPlayback(true), { passi
 document.addEventListener('touchend', () => enableAudioPlayback(true), { passive: true });
 
 // Initialize - connect SSE immediately
-signaling.connect();
-enableAudioPlayback();
+async function initializeApp() {
+    try {
+        await loadRtcConfig(transportMode);
+    } catch (err) {
+        console.error('Failed to initialize WebRTC transport:', err);
+        setDisconnectedState();
+        startBtn.disabled = true;
+        stopBtn.disabled = true;
+        enableVideo.disabled = true;
+        enableAudio.disabled = true;
+        info.textContent = err.message || 'Failed to initialize relay mode.';
+        return;
+    }
+
+    signaling.connect();
+    enableAudioPlayback();
+}
+
+initializeApp();

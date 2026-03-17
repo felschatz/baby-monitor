@@ -1,15 +1,16 @@
 # Baby Monitor
 
-A real-time baby monitor web application for streaming audio and video between two phones. Place one phone near your baby and watch/listen from the other. Works on Android and iOS over local network or internet. Talk back to the baby supported. No data storage.
+A real-time baby monitor web application for streaming audio and video between two phones. Place one phone near your baby and watch/listen from the other. Works on Android and iOS over local network or internet. Supports direct WebRTC and optional server-relayed WebRTC for restrictive networks. Talk back to the baby supported. No data storage.
 
 ## Features
 
 - **Session-based isolation** - Multiple monitors on one server, each with unique session name
 - **Bookmarkable URLs** - URLs like `/sender/my-session` work every day without prompts
-- **Real-time streaming** - Low-latency peer-to-peer video and audio
+- **Real-time streaming** - Low-latency direct or server-relayed video and audio
+- **Optional server relay mode** - Start page can force a built-in server relay when direct WebRTC is blocked
 - **Push-to-talk (PTT)** - Talk back to your baby from the parent's phone
 - **Audio ducking** - Automatically lowers baby audio during PTT to prevent echo
-- **No data storage** - All streaming is peer-to-peer, nothing is recorded or stored on the server
+- **No data storage** - Media is never recorded or stored on the server, even in relay mode
 - **Screen wake lock** - Keeps both devices awake while monitoring
 - **Visual alerts**:
   - 🟢 Green background when connected
@@ -60,8 +61,9 @@ npm start
 
 1. Navigate to `http://<server-ip>:3000/`
 2. Enter a session name (e.g., "felix-baby") - use the same name for sender and receiver
-3. Click **"Baby's Phone (Sender)"** or **"Parent's Phone (Receiver)"**
-4. **Bookmark the URL** (e.g., `/sender/felix-baby`) for easy daily access
+3. Choose **Direct** or **Server Relay** on the start page
+4. Click **"Baby's Phone (Sender)"** or **"Parent's Phone (Receiver)"**
+5. **Bookmark the URL** (e.g., `/sender/felix-baby`) for easy daily access
 
 ### 3. Daily Use (After Bookmarking)
 
@@ -96,7 +98,8 @@ Navigate to `http://<server-ip>:3000/` for a status page showing active sessions
 - Node.js 21.x runtime
 - HTTPS certificate (required for camera/microphone access)
 - SSE support (standard HTTP, no WebSocket upgrade needed)
-- Open ports for WebRTC media (or configure TURN servers for restrictive NATs)
+- Open ports for normal HTTPS traffic and browser WebRTC connectivity to the server
+- Relay mode is built into the Node app; no separate TURN service is required
 
 ### Deploy with FTP (GitHub Actions)
 
@@ -201,6 +204,7 @@ Require valid-user
 |----------|-------------|---------|
 | `PORT` | Server port | `3000` |
 | `ENABLE_DEBUG_TIMER` | Show 1-minute timer option for testing | `false` |
+Relay mode is built in when the server has the `@roamhq/wrtc` dependency installed.
 
 ## Project Structure
 
@@ -213,10 +217,11 @@ baby-monitor/
 │   ├── sse-manager.js         # SSE setup and broadcast
 │   ├── signal-router.js       # WebRTC signaling handlers
 │   ├── music-api.js           # Playlist scanning
+│   ├── relay-manager.js       # Server-side WebRTC relay bridge + client RTC config
 │   ├── static-server.js       # Static file serving
 │   └── utils.js               # Shared utilities
-├── package.json               # Project config (no framework dependencies)
-├── CLAUDE.md                  # AI assistant context file
+├── package.json               # Project config
+├── AGENT.md                   # AI assistant context file
 ├── README.md                  # This file
 ├── mp3/                       # Lullaby MP3 files (add your own)
 ├── .github/
@@ -296,8 +301,9 @@ baby-monitor/
 ### Architecture
 
 1. **Signaling Server** - Pure Node.js HTTP server uses Server-Sent Events (SSE) for connection setup
-2. **Peer-to-Peer Streaming** - Direct connection between devices for low-latency media
-3. **STUN Servers** - Public servers for NAT traversal (no TURN by default)
+2. **Peer-to-Peer Streaming** - Direct connection between devices for lowest-latency media
+3. **STUN Servers** - Public servers help browsers gather usable ICE candidates
+4. **Optional Server Relay** - The Node server can bridge media through paired WebRTC peer connections when direct paths fail
 
 ### Connection Flow
 
@@ -308,7 +314,11 @@ baby-monitor/
 5. Sender creates offer and sends via signal endpoint
 6. Receiver responds with answer
 7. ICE candidates are exchanged
-8. Direct peer-to-peer media connection established
+8. Direct or server-relayed media connection established
+
+### Relay Mode
+
+If you choose **Server Relay** on the start page, the app keeps WebRTC but replaces the direct browser-to-browser path with two browser-to-server peer connections. The Node server bridges sender media to each receiver and also bridges the PTT return audio back to the sender.
 
 ### Push-to-Talk Flow
 
@@ -357,9 +367,10 @@ Add a `name.txt` file to each folder to give it a custom display name.
 
 ## Privacy & Security
 
-- **No data storage** - Video/audio streams peer-to-peer, server only handles signaling
-- **No external services** - Only STUN servers are contacted (for NAT traversal)
-- **STUN servers used**:
+- **No data storage** - Video/audio is never recorded or persisted on the server
+- **Direct mode** - Only public STUN servers are contacted for NAT traversal
+- **Relay mode** - Media goes through the built-in server relay on your infrastructure
+- **STUN servers used in direct mode**:
   - `stun.stunprotocol.org:3478`
   - `stun.nextcloud.com:443`
   - `stun.sipgate.net:3478`
@@ -415,7 +426,8 @@ The app uses multiple keep-awake mechanisms (Wake Lock API, background video, si
 2. Ensure both devices can reach the server
 3. Try refreshing both pages (sender first, then receiver)
 4. Verify STUN servers are accessible (not blocked by firewall)
-5. If behind strict NAT, you may need a TURN server
+5. If direct peer-to-peer is blocked, switch the start page to **Server Relay**
+6. Ensure the browser can still reach your Node server for WebRTC traffic
 
 ### No audio on parent talk-back (PTT)
 
@@ -458,7 +470,7 @@ WebRTC audio is classified as "communication audio" by mobile browsers, which ma
 - **Backend**: Node.js 21.x (pure http module, no frameworks)
 - **Frontend**: Vanilla JavaScript, WebRTC API
 - **Signaling**: Server-Sent Events (SSE) + HTTP POST
-- **NAT Traversal**: STUN (public servers)
+- **NAT Traversal**: STUN (public servers) + optional built-in server-side WebRTC relay
 - **Deployment**: GitHub Actions with FTPS
 
 ## API Endpoints
@@ -466,6 +478,7 @@ WebRTC audio is classified as "communication audio" by mobile browsers, which ma
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/` | GET | Landing page with session input |
+| `/api/webrtc-config` | GET | Returns direct or relay WebRTC ICE configuration |
 | `/sender` | GET | Sender page (shows session prompt) |
 | `/s/:session` | GET | Sender page for specific session |
 | `/receiver` | GET | Receiver page (shows session prompt) |

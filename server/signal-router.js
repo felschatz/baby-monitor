@@ -6,6 +6,14 @@
 const { parseJsonBody, sendJson } = require('./utils');
 const { hasSender } = require('./session-manager');
 const { broadcastToReceivers, sendToReceiver, sendToSender } = require('./sse-manager');
+const {
+    handleSenderOffer,
+    handleReceiverAnswer,
+    handleSenderIceCandidate,
+    handleReceiverIceCandidate,
+    isRelayAvailable,
+    getRelayError
+} = require('./relay-manager');
 
 /**
  * Handle signal endpoint
@@ -29,6 +37,8 @@ async function handleSignal(req, res) {
         return sendJson(res, { error: 'Session required' }, 400);
     }
 
+    const relayTransport = message.transport === 'relay';
+
     console.log('Signal received in session', sessionName, ':', message.type, 'from', message.role || 'unknown');
 
     switch (message.type) {
@@ -45,6 +55,38 @@ async function handleSignal(req, res) {
             break;
 
         case 'offer':
+            if (relayTransport) {
+                if (!message.receiverId) {
+                    return sendJson(res, { error: 'Receiver required for server relay offer' }, 400);
+                }
+                if (!isRelayAvailable()) {
+                    return sendJson(res, { error: getRelayError() || 'Server relay unavailable' }, 503);
+                }
+                try {
+                    const negotiation = await handleSenderOffer(
+                        sessionName,
+                        message.receiverId,
+                        message.offer,
+                        message.pttMid
+                    );
+
+                    sendToSender(sessionName, {
+                        type: 'answer',
+                        answer: negotiation.answer,
+                        receiverId: message.receiverId
+                    });
+
+                    sendToReceiver(sessionName, message.receiverId, {
+                        type: 'offer',
+                        offer: negotiation.receiverOffer,
+                        pttMid: negotiation.receiverPttMid
+                    });
+                } catch (err) {
+                    console.error('Relay offer handling failed:', err.message || err);
+                    return sendJson(res, { error: err.message || 'Relay offer handling failed' }, 500);
+                }
+                break;
+            }
             // If receiverId is specified, send only to that receiver; otherwise broadcast
             if (message.receiverId) {
                 sendToReceiver(sessionName, message.receiverId, { type: 'offer', offer: message.offer, pttMid: message.pttMid });
@@ -54,6 +96,18 @@ async function handleSignal(req, res) {
             break;
 
         case 'answer':
+            if (relayTransport) {
+                if (!message.receiverId) {
+                    return sendJson(res, { error: 'Receiver required for server relay answer' }, 400);
+                }
+                try {
+                    await handleReceiverAnswer(sessionName, message.receiverId, message.answer);
+                } catch (err) {
+                    console.error('Relay answer handling failed:', err.message || err);
+                    return sendJson(res, { error: err.message || 'Relay answer handling failed' }, 500);
+                }
+                break;
+            }
             sendToSender(sessionName, { type: 'answer', answer: message.answer, receiverId: message.receiverId });
             break;
 
@@ -205,6 +259,22 @@ async function handleSignal(req, res) {
             break;
 
         case 'ice-candidate':
+            if (relayTransport) {
+                if (!message.receiverId) {
+                    return sendJson(res, { error: 'Receiver required for server relay ICE candidate' }, 400);
+                }
+                try {
+                    if (message.role === 'sender') {
+                        await handleSenderIceCandidate(sessionName, message.receiverId, message.candidate);
+                    } else {
+                        await handleReceiverIceCandidate(sessionName, message.receiverId, message.candidate);
+                    }
+                } catch (err) {
+                    console.error('Relay ICE candidate handling failed:', err.message || err);
+                    return sendJson(res, { error: err.message || 'Relay ICE candidate handling failed' }, 500);
+                }
+                break;
+            }
             if (message.role === 'sender') {
                 // If receiverId is specified, send only to that receiver; otherwise broadcast
                 if (message.receiverId) {
