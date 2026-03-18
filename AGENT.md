@@ -102,7 +102,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 
 - Wake Lock API keeps screens on (with auto-shutdown timer)
 - Auto-shutdown configured by receiver (manual; supports minutes/hours/seconds, uses short options when ENABLE_DEBUG_TIMER=true)
-- Relay mode is selected on the start page and preserved via `transport=relay` in sender/receiver URLs
+- Relay mode is selected on the start page and preserved via `transport=relay` on sender URLs; receivers learn it automatically from the active session
 - In relay mode the server keeps one sender-facing and one receiver-facing peer connection per receiver
 - AudioContext analyzes volume for loud sound detection
 - Sensitivity slider controls threshold (saved to localStorage)
@@ -179,7 +179,7 @@ mp3/
 - `/s/{session}?transport=relay` - Force server relay instead of direct peer-to-peer
 - `/receiver` - Landing page with session prompt
 - `/r/{session}` - Receiver page for specific session (bookmarkable)
-- `/r/{session}?transport=relay` - Force server relay instead of direct peer-to-peer
+- `/r/{session}?transport=relay` - Legacy/manual receiver override; normally detected automatically from the sender session
 - Short paths (`/s/`, `/r/`) avoid conflicts with static files on some hosting setups
 - Session name stored in `localStorage` for convenience
 

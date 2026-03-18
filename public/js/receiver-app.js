@@ -124,9 +124,11 @@ const thresholdMarkerInline = document.getElementById('thresholdMarkerInline');
 const noiseGateMarkerInline = document.getElementById('noiseGateMarkerInline');
 const audioMeterRow = document.querySelector('.audio-meter-row');
 
-const transportMode = new URLSearchParams(window.location.search).get('transport') === 'relay'
+let transportMode = new URLSearchParams(window.location.search).get('transport') === 'relay'
     ? 'relay'
     : 'direct';
+let sessionTransportMode = null;
+let loadedTransportMode = null;
 
 // Initialize session
 const sessionName = initSession({
@@ -135,7 +137,7 @@ const sessionName = initSession({
     input: sessionInput,
     button: sessionJoinBtn,
     redirectPrefix: '/r/',
-    queryString: transportMode === 'relay' ? 'transport=relay' : ''
+    queryString: ''
 });
 
 if (!sessionName) {
@@ -763,6 +765,57 @@ const signaling = createSignalingManager({
     }
 });
 
+function setSignalingTransportMode(mode) {
+    transportMode = mode === 'relay' ? 'relay' : 'direct';
+    signaling.setTransportMode(transportMode);
+}
+
+async function ensureTransportMode(mode) {
+    const nextTransportMode = mode === 'relay' ? 'relay' : 'direct';
+    setSignalingTransportMode(nextTransportMode);
+
+    if (loadedTransportMode === nextTransportMode) {
+        return true;
+    }
+
+    try {
+        await loadRtcConfig(nextTransportMode);
+        loadedTransportMode = nextTransportMode;
+        return true;
+    } catch (err) {
+        console.error('Failed to initialize WebRTC transport:', err);
+        setDisconnectedState();
+        overlayText.textContent = err.message || 'Failed to initialize relay mode.';
+        info.textContent = err.message || 'Failed to initialize relay mode.';
+        pttBtn.disabled = true;
+        return false;
+    }
+}
+
+async function requestStreamFromSender(statusText, advertisedTransportMode = null) {
+    const nextTransportMode = advertisedTransportMode === 'relay'
+        ? 'relay'
+        : (advertisedTransportMode === 'direct'
+            ? 'direct'
+            : (sessionTransportMode || transportMode));
+
+    sessionTransportMode = nextTransportMode;
+
+    const ready = await ensureTransportMode(nextTransportMode);
+    if (!ready) {
+        return;
+    }
+
+    if (statusText) {
+        overlayText.textContent = statusText;
+    }
+
+    requestOffer(!getAudioOnlyMode());
+    if (echoCancelEnabled) {
+        signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
+    }
+}
+
 // Initialize modules
 initAudioAnalysis({
     onLoudSound: triggerLoudSoundAlert,
@@ -817,7 +870,7 @@ initReceiverWebRTC({
             setDisconnectedState();
             info.textContent = 'Connection failed. Requesting new stream...';
             setTimeout(() => {
-                requestOffer(!getAudioOnlyMode());
+                requestStreamFromSender('Connection failed. Requesting new stream...', sessionTransportMode);
             }, 2000);
         }
     },
@@ -904,12 +957,11 @@ async function handleMessage(message) {
         case 'registered':
             console.log('Registered as receiver');
             resetMusicUI();
+            sessionTransportMode = message.transportMode === 'relay'
+                ? 'relay'
+                : (message.transportMode === 'direct' ? 'direct' : null);
             if (message.senderAvailable) {
-                overlayText.textContent = 'Sender available. Requesting stream...';
-                signaling.sendSignal({ type: 'request-offer', videoEnabled: !getAudioOnlyMode() });
-                if (echoCancelEnabled) {
-                    signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
-                }
+                await requestStreamFromSender('Sender available. Requesting stream...', sessionTransportMode);
             } else {
                 overlayText.textContent = 'Waiting for sender to start streaming...';
             }
@@ -924,15 +976,13 @@ async function handleMessage(message) {
                 window.location.reload();
                 return;
             }
+            sessionTransportMode = message.transportMode === 'relay' ? 'relay' : 'direct';
             // First connection - request stream normally
-            overlayText.textContent = 'Sender started. Requesting stream...';
-            signaling.sendSignal({ type: 'request-offer', videoEnabled: !getAudioOnlyMode() });
-            if (echoCancelEnabled) {
-                signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
-            }
+            await requestStreamFromSender('Sender started. Requesting stream...', sessionTransportMode);
             break;
 
         case 'sender-disconnected':
+            sessionTransportMode = null;
             setDisconnectedState();
             handleShutdownStatus({ active: false, remainingMs: 0 });
             closePeerConnection();
@@ -991,11 +1041,10 @@ async function handleMessage(message) {
             // Sender's stream is now ready - request an offer
             // This handles the case where our earlier request-offer arrived before sender was ready
             console.log('Sender ready, requesting stream');
-            overlayText.textContent = 'Sender ready. Requesting stream...';
-            signaling.sendSignal({ type: 'request-offer', videoEnabled: !getAudioOnlyMode() });
-            if (echoCancelEnabled) {
-                signaling.sendSignal({ type: 'echo-cancel-enable', enabled: true });
-            }
+            sessionTransportMode = message.transportMode === 'relay'
+                ? 'relay'
+                : (message.transportMode === 'direct' ? 'direct' : sessionTransportMode);
+            await requestStreamFromSender('Sender ready. Requesting stream...', sessionTransportMode);
             break;
 
         case 'test-sound-status':
@@ -1277,16 +1326,6 @@ checkMusicAvailability();
 setDebugEnabled(debugEnabled);
 
 async function initializeApp() {
-    try {
-        await loadRtcConfig(transportMode);
-    } catch (err) {
-        console.error('Failed to initialize WebRTC transport:', err);
-        setDisconnectedState();
-        overlayText.textContent = err.message || 'Failed to initialize relay mode.';
-        pttBtn.disabled = true;
-        return;
-    }
-
     signaling.connect();
 }
 

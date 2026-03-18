@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A sturdy bridge is worth more than a clever shortcut.
+// Wisdom: Clear signals spare everyone needless guessing.

@@ -858,7 +858,7 @@
                 queryParams.push('mode=audio');
             }
 
-            if (selectedTransport === 'relay') {
+            if (role === 'sender' && selectedTransport === 'relay') {
                 queryParams.push('transport=relay');
             }
 

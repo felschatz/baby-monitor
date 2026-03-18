@@ -4,7 +4,7 @@
  */
 
 const { generateId } = require('./utils');
-const { getSession, hasSender, cleanupSession } = require('./session-manager');
+const { getSession, getSessionTransport, hasSender, cleanupSession, setSessionTransport } = require('./session-manager');
 const { closeRelayConnection, closeRelaySession } = require('./relay-manager');
 
 /**
@@ -105,10 +105,12 @@ function setupSSE(res) {
  * @param {http.IncomingMessage} req
  * @param {http.ServerResponse} res
  * @param {string} sessionName
+ * @param {string} transportMode
  */
-function handleSenderSSE(req, res, sessionName) {
+function handleSenderSSE(req, res, sessionName, transportMode = 'direct') {
     const id = generateId();
     const session = getSession(sessionName);
+    const sessionTransportMode = setSessionTransport(sessionName, transportMode);
 
     // If sender already exists, close old connection (allows page refresh/takeover)
     if (session.sender !== null && session.senderRes !== null) {
@@ -132,10 +134,10 @@ function handleSenderSSE(req, res, sessionName) {
     console.log('Sender connected to session', sessionName, ':', id);
 
     // Send registration confirmation
-    sendSSE(res, { type: 'registered', role: 'sender' });
+    sendSSE(res, { type: 'registered', role: 'sender', transportMode: sessionTransportMode });
 
     // Notify all receivers in this session that sender is available
-    broadcastToReceivers(sessionName, { type: 'sender-available' });
+    broadcastToReceivers(sessionName, { type: 'sender-available', transportMode: sessionTransportMode });
 
     // Keep connection alive with heartbeat (15s for aggressive proxies)
     const heartbeat = setInterval(() => {
@@ -174,6 +176,8 @@ function handleSenderSSE(req, res, sessionName) {
 function handleReceiverSSE(req, res, sessionName) {
     const id = generateId();
     const session = getSession(sessionName);
+    const senderAvailable = hasSender(sessionName);
+    const transportMode = senderAvailable ? (getSessionTransport(sessionName) || 'direct') : null;
 
     setupSSE(res);
 
@@ -185,7 +189,8 @@ function handleReceiverSSE(req, res, sessionName) {
         type: 'registered',
         role: 'receiver',
         receiverId: id,
-        senderAvailable: hasSender(sessionName)
+        senderAvailable,
+        transportMode
     });
 
     // Keep connection alive with heartbeat (15s for aggressive proxies)

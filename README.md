@@ -61,7 +61,7 @@ npm start
 
 1. Navigate to `http://<server-ip>:3000/`
 2. Enter a session name (e.g., "felix-baby") - use the same name for sender and receiver
-3. Choose **Direct** or **Server Relay** on the start page
+3. Choose **Direct** or **Server Relay** on the start page for the sender session
 4. Click **"Baby's Phone (Sender)"** or **"Parent's Phone (Receiver)"**
 5. **Bookmark the URL** (e.g., `/sender/felix-baby`) for easy daily access
 
@@ -318,7 +318,7 @@ baby-monitor/
 
 ### Relay Mode
 
-If you choose **Server Relay** on the start page, the app keeps WebRTC but replaces the direct browser-to-browser path with two browser-to-server peer connections. The Node server bridges sender media to each receiver and also bridges the PTT return audio back to the sender.
+If you choose **Server Relay** on the sender side, the app keeps WebRTC but replaces the direct browser-to-browser path with two browser-to-server peer connections. The Node server bridges sender media to each receiver and also bridges the PTT return audio back to the sender. Receivers learn the correct transport mode automatically from the active sender session before requesting an offer.
 
 ### Push-to-Talk Flow
 

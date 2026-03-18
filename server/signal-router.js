@@ -4,7 +4,7 @@
  */
 
 const { parseJsonBody, sendJson } = require('./utils');
-const { hasSender } = require('./session-manager');
+const { getSessionTransport, hasSender, setSessionTransport } = require('./session-manager');
 const { broadcastToReceivers, sendToReceiver, sendToSender } = require('./sse-manager');
 const {
     handleSenderOffer,
@@ -38,6 +38,10 @@ async function handleSignal(req, res) {
     }
 
     const relayTransport = message.transport === 'relay';
+
+    if (message.role === 'sender') {
+        setSessionTransport(sessionName, message.transport);
+    }
 
     console.log('Signal received in session', sessionName, ':', message.type, 'from', message.role || 'unknown');
 
@@ -246,7 +250,10 @@ async function handleSignal(req, res) {
 
         case 'sender-ready':
             // Sender -> Receivers: sender's stream is ready, request offers now
-            broadcastToReceivers(sessionName, { type: 'sender-ready' });
+            broadcastToReceivers(sessionName, {
+                type: 'sender-ready',
+                transportMode: getSessionTransport(sessionName) || (relayTransport ? 'relay' : 'direct')
+            });
             break;
 
         case 'video-unavailable':

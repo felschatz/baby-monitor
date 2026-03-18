@@ -64,7 +64,7 @@ function createServer(baseDir) {
             // SSE sender endpoint
             let params = matchRoute('/api/sse/sender/:session', pathname);
             if (params) {
-                return handleSenderSSE(req, res, params.session);
+                return handleSenderSSE(req, res, params.session, query.transport);
             }
 
             // SSE receiver endpoint
