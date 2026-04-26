@@ -467,6 +467,7 @@ function setUiLocked(locked) {
     uiLocked = !!locked;
     document.body.classList.toggle('ui-locked', uiLocked);
     lockOverlay.classList.toggle('hidden', !uiLocked);
+    lockOverlay.hidden = !uiLocked;
     lockOverlay.setAttribute('aria-hidden', uiLocked ? 'false' : 'true');
     lockBtn.classList.toggle('locked', uiLocked);
     lockBtn.setAttribute('aria-pressed', uiLocked ? 'true' : 'false');

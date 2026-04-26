@@ -1187,6 +1187,11 @@ body.loud-alert-active .info-strip {
     display: none;
 }
 
+.lock-overlay[hidden],
+.lock-overlay[aria-hidden="true"] {
+    display: none !important;
+}
+
 .lock-overlay-content {
     width: min(100%, 360px);
     padding: 28px 24px;
