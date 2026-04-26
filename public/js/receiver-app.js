@@ -95,6 +95,9 @@ const echoCancelToggle = document.getElementById('echoCancelToggle');
 const echoCancelToggleLabel = document.getElementById('echoCancelToggleLabel');
 const sensitivityAlertToggle = document.getElementById('sensitivityAlertToggle');
 const monitorNoiseToggle = document.getElementById('monitorNoiseToggle');
+const monitorNoiseVolumeContainer = document.getElementById('monitorNoiseVolumeContainer');
+const monitorNoiseVolumeSlider = document.getElementById('monitorNoiseVolume');
+const monitorNoiseVolumeValue = document.getElementById('monitorNoiseVolumeValue');
 const shutdownTimerSelect = document.getElementById('shutdownTimerSelect');
 const shutdownBtn = document.getElementById('shutdownBtn');
 const shutdownStatus = document.getElementById('shutdownStatus');
@@ -134,6 +137,7 @@ let transportMode = new URLSearchParams(window.location.search).get('transport')
     : 'direct';
 let sessionTransportMode = null;
 let loadedTransportMode = null;
+const DEFAULT_MONITOR_NOISE_VOLUME = 35;
 
 // Initialize session
 const sessionName = initSession({
@@ -180,11 +184,9 @@ const UNLOCK_HOLD_MS = 1000;
 const CONNECTION_LOST_SOUND_DELAY_MS = 5000;
 const connectionLostAudio = new Audio('/connection_lost.mp3');
 connectionLostAudio.preload = 'auto';
-const monitorNoiseAudio = new Audio('/noise.mp3');
-monitorNoiseAudio.preload = 'auto';
-monitorNoiseAudio.loop = true;
 let connectionLostSoundStartTimer = null;
 let connectionLostSoundLoopTimer = null;
+let monitorNoiseVolume = DEFAULT_MONITOR_NOISE_VOLUME;
 
 function playSensitivityAlertSound() {
     if (!sensitivityAlertEnabled || !isConnected) return;
@@ -256,28 +258,21 @@ function startConnectionLostSoundLoop(immediate = false) {
     }, CONNECTION_LOST_SOUND_DELAY_MS);
 }
 
-function updateMonitorNoiseVolume(sourceVolumePercent) {
-    const volumePercent = Number.isFinite(sourceVolumePercent)
-        ? sourceVolumePercent
-        : parseInt(volumeSlider.value, 10);
-
-    if (volumePercent <= 0) {
-        monitorNoiseAudio.volume = 0;
-        return;
+function clampMonitorNoiseVolume(value) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+        return DEFAULT_MONITOR_NOISE_VOLUME;
     }
-
-    const scaledVolume = (volumePercent / 100) * 0.12;
-    monitorNoiseAudio.volume = Math.min(Math.max(scaledVolume, 0.025), 0.12);
+    return Math.min(100, Math.max(0, parsed));
 }
 
-function stopMonitorNoise(resetPosition = true) {
-    monitorNoiseAudio.pause();
-    if (resetPosition) {
-        try {
-            monitorNoiseAudio.currentTime = 0;
-        } catch (err) {
-            console.log('Could not reset monitor tone:', err);
-        }
+function updateMonitorNoiseVolumeUi(value) {
+    monitorNoiseVolume = clampMonitorNoiseVolume(value);
+    if (monitorNoiseVolumeSlider) {
+        monitorNoiseVolumeSlider.value = monitorNoiseVolume;
+    }
+    if (monitorNoiseVolumeValue) {
+        monitorNoiseVolumeValue.textContent = monitorNoiseVolume + '%';
     }
 }
 
@@ -285,26 +280,27 @@ function syncMonitorNoiseUi() {
     if (monitorNoiseToggle) {
         monitorNoiseToggle.checked = monitorNoiseEnabled;
     }
+    if (monitorNoiseVolumeContainer) {
+        monitorNoiseVolumeContainer.style.display = monitorNoiseEnabled ? 'block' : 'none';
+    }
     if (monitorNoiseInfoItem) {
         monitorNoiseInfoItem.style.display = monitorNoiseEnabled ? 'flex' : 'none';
     }
     if (monitorNoiseStatusDisplay) {
-        monitorNoiseStatusDisplay.textContent = monitorNoiseEnabled ? 'Tone' : 'Off';
+        monitorNoiseStatusDisplay.textContent = monitorNoiseEnabled
+            ? `Tone ${monitorNoiseVolume}%`
+            : 'Off';
     }
 }
 
-function syncMonitorNoisePlayback() {
-    if (!monitorNoiseEnabled || !isConnected) {
-        stopMonitorNoise();
+function sendMonitorNoiseState() {
+    if (!isConnected) {
         return;
     }
-
-    updateMonitorNoiseVolume(parseInt(volumeSlider.value, 10));
-    if (!monitorNoiseAudio.paused) {
-        return;
-    }
-    monitorNoiseAudio.play().catch(err => {
-        console.log('Monitor tone play failed:', err);
+    signaling.sendSignal({
+        type: 'monitor-noise',
+        enabled: monitorNoiseEnabled,
+        volume: monitorNoiseVolume
     });
 }
 
@@ -383,6 +379,7 @@ let debugEnabled = debugParams.get('debug') === '1' || debugParams.get('debug') 
 const savedVolume = localStorage.getItem('receiver-volume');
 const savedSensitivity = localStorage.getItem('receiver-sensitivity');
 const savedNoiseGate = localStorage.getItem('receiver-noise-gate');
+const savedMonitorNoiseVolume = localStorage.getItem('receiver-monitor-noise-volume');
 
 if (savedVolume !== null) {
     volumeSlider.value = savedVolume;
@@ -398,6 +395,11 @@ if (savedNoiseGate !== null) {
     noiseGateSlider.value = savedNoiseGate;
     updateNoiseGateDisplay(parseInt(savedNoiseGate));
 }
+if (savedMonitorNoiseVolume !== null) {
+    updateMonitorNoiseVolumeUi(savedMonitorNoiseVolume);
+} else {
+    updateMonitorNoiseVolumeUi(DEFAULT_MONITOR_NOISE_VOLUME);
+}
 
 // Initialize audio-only toggle
 audioOnlyToggle.checked = getAudioOnlyMode();
@@ -406,7 +408,6 @@ if (sensitivityAlertToggle) {
     sensitivityAlertToggle.checked = sensitivityAlertEnabled;
 }
 syncMonitorNoiseUi();
-updateMonitorNoiseVolume(savedVolume !== null ? parseInt(savedVolume, 10) : parseInt(volumeSlider.value, 10));
 
 // Set video element reference for noise gate
 setVideoElement(remoteVideo);
@@ -502,7 +503,7 @@ function setConnectedState(connected) {
         pttBtn.disabled = false;
         sessionStorage.setItem('receiver-streaming', 'true');
         updateAudioOnlyIndicator();
-        syncMonitorNoisePlayback();
+        sendMonitorNoiseState();
     } else {
         document.body.classList.remove('connected');
         statusDot.classList.remove('connected');
@@ -511,7 +512,6 @@ function setConnectedState(connected) {
         pttBtn.disabled = true;
         stopPTT(pttBtn, pttLabel);
         audioOnlyIndicator.classList.remove('active');
-        stopMonitorNoise();
     }
     updateTestSoundButton();
 }
@@ -535,7 +535,6 @@ function setDisconnectedState() {
     noiseGateInfoItem.classList.remove('gating');
     resetMusicUI();
     resetTestSoundButton();
-    stopMonitorNoise();
 }
 
 function resetTestSoundButton() {
@@ -1306,8 +1305,17 @@ if (monitorNoiseToggle) {
         monitorNoiseEnabled = monitorNoiseToggle.checked;
         localStorage.setItem('receiver-monitor-noise', monitorNoiseEnabled);
         syncMonitorNoiseUi();
-        syncMonitorNoisePlayback();
+        sendMonitorNoiseState();
         console.log('Monitor tone:', monitorNoiseEnabled ? 'enabled' : 'disabled');
+    });
+}
+
+if (monitorNoiseVolumeSlider) {
+    monitorNoiseVolumeSlider.addEventListener('input', () => {
+        updateMonitorNoiseVolumeUi(monitorNoiseVolumeSlider.value);
+        localStorage.setItem('receiver-monitor-noise-volume', monitorNoiseVolume);
+        syncMonitorNoiseUi();
+        sendMonitorNoiseState();
     });
 }
 
@@ -1369,7 +1377,6 @@ function updateVolume(value) {
     volumeDisplay.textContent = numValue + '%';
     overlay.classList.add('hidden');
     localStorage.setItem('receiver-volume', numValue);
-    updateMonitorNoiseVolume(numValue);
 }
 
 volumeSlider.addEventListener('input', () => updateVolume(volumeSlider.value));
@@ -1458,7 +1465,6 @@ function onUserInteractionGlobal() {
     const savedGate = localStorage.getItem('receiver-noise-gate');
     const noiseGateValue = savedGate !== null ? parseInt(savedGate) : 0;
     setNoiseGateThreshold(noiseGateValue);
-    syncMonitorNoisePlayback();
 }
 document.addEventListener('click', onUserInteractionGlobal, { passive: true });
 document.addEventListener('touchstart', onUserInteractionGlobal, { passive: true });
@@ -1533,7 +1539,6 @@ window.addEventListener('beforeunload', () => {
         clearInterval(debugInterval);
     }
     stopConnectionLostSound();
-    stopMonitorNoise();
     cleanupPTT();
     destroyKeepAwake();
     destroyAudioAnalysis();

@@ -182,6 +182,15 @@
                 </label>
             </div>
 
+            <div class="control-section" id="monitorNoiseVolumeContainer" style="display: none;">
+                <label class="control-label">Monitor Tone Volume</label>
+                <div class="control-row">
+                    <input type="range" id="monitorNoiseVolume" min="0" max="100" value="35" class="slider-input">
+                    <span id="monitorNoiseVolumeValue" class="slider-value">35%</span>
+                </div>
+                <div class="control-hint">Only used when Loop monitor tone while connected is enabled</div>
+            </div>
+
             <div class="control-section shutdown-section" id="shutdownContainer">
                 <label class="control-label">Auto-shutdown</label>
                 <div class="shutdown-controls">
