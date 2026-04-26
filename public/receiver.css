@@ -538,11 +538,10 @@ body.loud-alert-active .info-strip {
 .lock-toggle {
     display: flex;
     align-items: center;
-    gap: 8px;
     justify-content: center;
-    min-width: 112px;
+    width: 56px;
     min-height: 52px;
-    padding: 14px 22px;
+    padding: 14px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid var(--border-subtle);
     border-radius: 12px;
@@ -551,6 +550,8 @@ body.loud-alert-active .info-strip {
     cursor: pointer;
     transition: all 0.2s;
     flex-shrink: 0;
+    position: relative;
+    z-index: 10001;
 }
 
 .lock-toggle:hover {
@@ -570,17 +571,30 @@ body.loud-alert-active .info-strip {
 }
 
 .lock-toggle-icon {
-    width: 0.8rem;
+    width: 0.9rem;
     height: 0.8rem;
     border: 2px solid currentColor;
     border-radius: 3px;
-    font-size: 1rem;
-    line-height: 1;
     pointer-events: none;
     opacity: 0.8;
+    position: relative;
+}
+
+.lock-toggle-icon::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% - 1px);
+    width: 0.58rem;
+    height: 0.5rem;
+    border: 2px solid currentColor;
+    border-bottom: 0;
+    border-radius: 0.5rem 0.5rem 0 0;
+    transform: translateX(-50%);
 }
 
 .lock-toggle-text {
+    display: none;
     font-weight: 600;
     pointer-events: none;
 }
@@ -1204,29 +1218,34 @@ body.loud-alert-active .info-strip {
     color: var(--text-primary);
 }
 
-.unlock-hold-btn {
-    width: 100%;
-    margin-top: 22px;
+body.ui-locked #lockBtn {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: min(84vw, 320px);
     min-height: 72px;
     padding: 20px 24px;
-    border-radius: 18px;
-    touch-action: none;
-}
-
-.unlock-toggle {
+    gap: 12px;
+    transform: translate(-50%, -50%);
     background: rgba(37, 99, 235, 0.24);
     border-color: rgba(96, 165, 250, 0.45);
     color: #dbeafe;
+    z-index: 10060;
+    touch-action: none;
+}
+
+body.ui-locked #lockBtn .lock-toggle-text {
+    display: inline;
     font-size: 1.08rem;
 }
 
-.unlock-toggle .lock-toggle-icon {
+body.ui-locked #lockBtn .lock-toggle-icon {
     width: 0.95rem;
-    height: 0.95rem;
+    height: 0.9rem;
 }
 
-.unlock-hold-btn:active,
-.unlock-hold-btn.holding {
+body.ui-locked #lockBtn:active,
+body.ui-locked #lockBtn.holding {
     background: rgba(34, 197, 94, 0.24);
     border-color: rgba(34, 197, 94, 0.45);
     color: #dcfce7;
