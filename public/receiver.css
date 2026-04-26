@@ -538,15 +538,16 @@ body.loud-alert-active .info-strip {
 .lock-toggle {
     display: flex;
     align-items: center;
+    gap: 8px;
     justify-content: center;
-    width: 56px;
-    min-height: 52px;
-    padding: 14px;
+    min-width: 94px;
+    min-height: 48px;
+    padding: 12px 16px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid var(--border-subtle);
     border-radius: 12px;
     color: var(--text-secondary);
-    font-size: 0.98rem;
+    font-size: 0.9rem;
     cursor: pointer;
     transition: all 0.2s;
     flex-shrink: 0;
@@ -564,20 +565,21 @@ body.loud-alert-active .info-strip {
 }
 
 .lock-toggle.locked {
-    background: rgba(34, 197, 94, 0.18);
-    border-color: rgba(34, 197, 94, 0.35);
+    background: rgba(34, 197, 94, 0.16);
+    border-color: rgba(34, 197, 94, 0.3);
     color: #dcfce7;
-    box-shadow: 0 0 18px rgba(34, 197, 94, 0.18);
+    box-shadow: 0 0 14px rgba(34, 197, 94, 0.16);
 }
 
 .lock-toggle-icon {
-    width: 0.9rem;
-    height: 0.8rem;
+    width: 0.95rem;
+    height: 0.82rem;
     border: 2px solid currentColor;
     border-radius: 3px;
     pointer-events: none;
-    opacity: 0.8;
+    opacity: 0.9;
     position: relative;
+    flex-shrink: 0;
 }
 
 .lock-toggle-icon::before {
@@ -594,7 +596,7 @@ body.loud-alert-active .info-strip {
 }
 
 .lock-toggle-text {
-    display: none;
+    display: inline;
     font-weight: 600;
     pointer-events: none;
 }
@@ -1240,7 +1242,6 @@ body.ui-locked #lockBtn {
 }
 
 body.ui-locked #lockBtn .lock-toggle-text {
-    display: inline;
     font-size: 1.08rem;
 }
 
