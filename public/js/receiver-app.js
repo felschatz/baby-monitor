@@ -89,6 +89,7 @@ const lockBtn = document.getElementById('lockBtn');
 const lockBtnText = document.getElementById('lockBtnText');
 const lockOverlay = document.getElementById('lockOverlay');
 const unlockHoldBtn = document.getElementById('unlockHoldBtn');
+const unlockHoldBtnText = document.getElementById('unlockHoldBtnText');
 const reloadBtn = document.getElementById('reloadBtn');
 const info = document.getElementById('info');
 const thresholdMarker = document.getElementById('thresholdMarker');
@@ -477,8 +478,8 @@ function setUiLocked(locked) {
 
     if (uiLocked) {
         closeControlsDrawer();
-        if (unlockHoldBtn) {
-            unlockHoldBtn.textContent = 'Hold to unlock';
+        if (unlockHoldBtnText) {
+            unlockHoldBtnText.textContent = 'Hold to unlock';
         }
     } else {
         cancelUnlockHold();
@@ -493,7 +494,9 @@ function cancelUnlockHold() {
 
     if (unlockHoldBtn) {
         unlockHoldBtn.classList.remove('holding');
-        unlockHoldBtn.textContent = 'Hold to unlock';
+    }
+    if (unlockHoldBtnText) {
+        unlockHoldBtnText.textContent = 'Hold to unlock';
     }
 }
 
@@ -502,11 +505,14 @@ function startUnlockHold(event) {
 
     event.preventDefault();
     unlockHoldBtn.classList.add('holding');
-    unlockHoldBtn.textContent = 'Keep holding...';
+    if (unlockHoldBtnText) {
+        unlockHoldBtnText.textContent = 'Keep holding...';
+    }
 
     unlockHoldTimer = setTimeout(() => {
         cancelUnlockHold();
         setUiLocked(false);
+        exitFullscreenIfActive();
     }, UNLOCK_HOLD_MS);
 }
 

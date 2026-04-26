@@ -539,12 +539,15 @@ body.loud-alert-active .info-strip {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 18px;
+    justify-content: center;
+    min-width: 112px;
+    min-height: 52px;
+    padding: 14px 22px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid var(--border-subtle);
     border-radius: 12px;
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    font-size: 0.98rem;
     cursor: pointer;
     transition: all 0.2s;
     flex-shrink: 0;
@@ -1204,22 +1207,30 @@ body.loud-alert-active .info-strip {
 .unlock-hold-btn {
     width: 100%;
     margin-top: 22px;
-    padding: 18px 20px;
-    border: none;
+    min-height: 72px;
+    padding: 20px 24px;
     border-radius: 18px;
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
-    color: white;
-    font-size: 1.05rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
     touch-action: none;
+}
+
+.unlock-toggle {
+    background: rgba(37, 99, 235, 0.24);
+    border-color: rgba(96, 165, 250, 0.45);
+    color: #dbeafe;
+    font-size: 1.08rem;
+}
+
+.unlock-toggle .lock-toggle-icon {
+    width: 0.95rem;
+    height: 0.95rem;
 }
 
 .unlock-hold-btn:active,
 .unlock-hold-btn.holding {
-    background: linear-gradient(135deg, #22c55e, #16a34a);
-    box-shadow: 0 0 22px rgba(34, 197, 94, 0.4);
+    background: rgba(34, 197, 94, 0.24);
+    border-color: rgba(34, 197, 94, 0.45);
+    color: #dcfce7;
+    box-shadow: 0 0 22px rgba(34, 197, 94, 0.28);
 }
 
 .lock-hint {
