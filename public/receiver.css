@@ -604,8 +604,7 @@ body.loud-alert-active .info-strip {
 .ptt-container {
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex: 1;
+    flex: 0 0 auto;
 }
 
 .ptt-btn {
@@ -638,13 +637,6 @@ body.loud-alert-active .info-strip {
     opacity: 0.5;
     cursor: not-allowed;
 }
-
-.ptt-label {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-}
-
 
 .drawer-toggle {
     display: flex;
