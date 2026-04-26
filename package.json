@@ -20,5 +20,6 @@
   },
   "homepage": "https://github.com/felschatz/baby-monitor#readme",
   "dependencies": {
+    "@roamhq/wrtc": "^0.10.0"
   }
 }

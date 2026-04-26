@@ -4,7 +4,7 @@
  * Supports multiple simultaneous receivers
  */
 
-import { rtcConfig, waitForStableState, addIceCandidates, getMediaConstraints, optimizeSdpForLowLatency } from './webrtc.js';
+import { createPeerConnection, waitForStableState, addIceCandidates, getMediaConstraints, optimizeSdpForLowLatency } from './webrtc.js';
 import { getMicGain } from './mic-gain.js';
 
 // State - now using Maps to support multiple receivers
@@ -212,7 +212,7 @@ export async function createOffer(pttAudio, receiverId) {
     }
 
     pendingCandidates.set(receiverId, []);
-    const peerConnection = new RTCPeerConnection(rtcConfig);
+    const peerConnection = createPeerConnection();
     peerConnections.set(receiverId, peerConnection);
     console.log('Created new peer connection for receiver:', receiverId, 'total connections:', peerConnections.size);
 

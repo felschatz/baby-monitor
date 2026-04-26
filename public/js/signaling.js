@@ -15,8 +15,17 @@
  * @returns {object} Signaling manager
  */
 export function createSignalingManager(options) {
-    const { sessionName, role, sseEndpoint, onMessage, onConnect, onError } = options;
+    const {
+        sessionName,
+        role,
+        sseEndpoint,
+        onMessage,
+        onConnect,
+        onError,
+        transportMode = 'direct'
+    } = options;
 
+    let activeTransportMode = transportMode === 'relay' ? 'relay' : 'direct';
     let eventSource = null;
     let connected = false;
     let receiverId = null;
@@ -30,6 +39,7 @@ export function createSignalingManager(options) {
     async function sendSignal(message) {
         message.role = role;
         message.session = sessionName;
+        message.transport = activeTransportMode;
         if (receiverId) {
             message.receiverId = receiverId;
         }
@@ -61,7 +71,7 @@ export function createSignalingManager(options) {
         }
         autoReconnect = true;
 
-        const sseUrl = `${sseEndpoint}/${encodeURIComponent(sessionName)}`;
+        const sseUrl = `${sseEndpoint}/${encodeURIComponent(sessionName)}?transport=${encodeURIComponent(activeTransportMode)}`;
         console.log('Connecting to SSE:', sseUrl);
 
         eventSource = new EventSource(sseUrl);
@@ -131,11 +141,25 @@ export function createSignalingManager(options) {
         connected = value;
     }
 
+    /**
+     * Update transport mode for future signaling requests.
+     * @param {string} mode
+     */
+    function setTransportMode(mode) {
+        activeTransportMode = mode === 'relay' ? 'relay' : 'direct';
+    }
+
+    function getTransportMode() {
+        return activeTransportMode;
+    }
+
     return {
         sendSignal,
         connect,
         disconnect,
         isConnected,
-        setConnected
+        setConnected,
+        setTransportMode,
+        getTransportMode
     };
 }

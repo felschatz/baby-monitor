@@ -4,8 +4,12 @@
  */
 
 // Session-based data structure
-// sessions.get(sessionName) = { sender, senderRes, receivers: Map }
+// sessions.get(sessionName) = { sender, senderRes, receivers: Map, transportMode }
 const sessions = new Map();
+
+function normalizeTransportMode(transportMode) {
+    return transportMode === 'relay' ? 'relay' : 'direct';
+}
 
 /**
  * Get or create a session
@@ -17,11 +21,34 @@ function getSession(sessionName) {
         sessions.set(sessionName, {
             sender: null,
             senderRes: null,
-            receivers: new Map()
+            receivers: new Map(),
+            transportMode: null
         });
         console.log('Created session:', sessionName);
     }
     return sessions.get(sessionName);
+}
+
+/**
+ * Set the transport mode for a session
+ * @param {string} sessionName
+ * @param {string} transportMode
+ * @returns {string}
+ */
+function setSessionTransport(sessionName, transportMode) {
+    const session = getSession(sessionName);
+    session.transportMode = normalizeTransportMode(transportMode);
+    return session.transportMode;
+}
+
+/**
+ * Get the transport mode for a session
+ * @param {string} sessionName
+ * @returns {string|null}
+ */
+function getSessionTransport(sessionName) {
+    const session = sessions.get(sessionName);
+    return session ? session.transportMode : null;
 }
 
 /**
@@ -56,7 +83,10 @@ function getAllSessions() {
 
 module.exports = {
     getSession,
+    getSessionTransport,
     hasSender,
     cleanupSession,
-    getAllSessions
+    getAllSessions,
+    normalizeTransportMode,
+    setSessionTransport
 };

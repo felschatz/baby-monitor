@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Real-time baby monitor web app using WebRTC for peer-to-peer streaming between two phones.
+Real-time baby monitor web app using WebRTC for direct or server-relayed streaming between two phones.
 - **Sender** (`/sender/{session}`) - Baby's phone with camera/mic
 - **Receiver** (`/receiver/{session}`) - Parent's phone viewing stream
 
@@ -11,7 +11,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 ## Tech Stack
 
 - **Runtime**: Node.js 21.7.x
-- **Server**: Pure Node.js http module (zero framework dependencies)
+- **Server**: Pure Node.js http module with optional server-side WebRTC relay
 - **Signaling**: Server-Sent Events (SSE) + HTTP POST (no WebSockets)
 - **Streaming**: WebRTC (RTCPeerConnection)
 - **Frontend**: Vanilla JS, no frameworks
@@ -24,6 +24,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 |--------|---------|
 | `server.js` | Thin wrapper for backwards compatibility, starts the server |
 | `server/index.js` | HTTP server, main router, env loading |
+| `server/relay-manager.js` | Server-side WebRTC relay bridge + client ICE config |
 | `server/session-manager.js` | Session state (Map), cleanup |
 | `server/sse-manager.js` | SSE setup, broadcast, heartbeats |
 | `server/signal-router.js` | WebRTC signaling message handlers |
@@ -40,7 +41,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 | `keep-awake.js` | Wake lock API, NoSleep video, auto-shutdown timer |
 | `session.js` | URL parsing, localStorage, session prompt |
 | `signaling.js` | SSE connection, sendSignal(), reconnection |
-| `webrtc.js` | STUN config, peer connection utilities |
+| `webrtc.js` | Runtime ICE config loading, peer connection utilities |
 
 **Sender modules**:
 
@@ -77,7 +78,9 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Session-based isolation: each session has its own sender and receivers
 - Session names are server-side only, never broadcast to clients
 - Single sender per session, multiple receivers supported
+- Optional relay mode bridges media through the Node server with paired WebRTC peer connections
 - PTT (Push-to-Talk) works via WebRTC `replaceTrack()` (no renegotiation)
+- Relay mode preserves PTT by bridging a dedicated audio transceiver through the server
 - Audio ducking reduces baby audio to 15% during PTT
 - STUN servers: stunprotocol.org, nextcloud.com, sipgate.net
 - FFT-based spectral subtraction for music echo reduction
@@ -99,6 +102,8 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 
 - Wake Lock API keeps screens on (with auto-shutdown timer)
 - Auto-shutdown configured by receiver (manual; supports minutes/hours/seconds, uses short options when ENABLE_DEBUG_TIMER=true)
+- Relay mode is selected on the start page and preserved via `transport=relay` on sender URLs; receivers learn it automatically from the active session
+- In relay mode the server keeps one sender-facing and one receiver-facing peer connection per receiver
 - AudioContext analyzes volume for loud sound detection
 - Sensitivity slider controls threshold (saved to localStorage)
 - Volume control persisted to localStorage (boost >100% routes audio through Web Audio and may break Bluetooth)
@@ -118,6 +123,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - `GET /api/sse/sender/:session` - SSE stream for sender in session
 - `GET /api/sse/receiver/:session` - SSE stream for receivers in session
 - `POST /api/signal` - WebRTC signaling (requires `session` in body, stripped before forwarding)
+- `GET /api/webrtc-config?transport=direct|relay` - JSON ICE config for client WebRTC setup
 - `GET /api/status/:session` - JSON: `{senderActive, receiverCount}` for specific session
 - `GET /api/status` - JSON: `{activeSessions, totalReceivers}` for global status
 - `GET /api/music?playlist=1` - JSON: `{files: [{name, url}], playlists: ["1","2"], currentPlaylist, debugTimer}`
@@ -170,16 +176,18 @@ mp3/
 - `/sender` - Landing page with session prompt
 - `/s/{session}` - Sender page for specific session (bookmarkable)
 - `/s/{session}?q=sd` - SD quality mode (default is HD)
+- `/s/{session}?transport=relay` - Force server relay instead of direct peer-to-peer
 - `/receiver` - Landing page with session prompt
 - `/r/{session}` - Receiver page for specific session (bookmarkable)
+- `/r/{session}?transport=relay` - Legacy/manual receiver override; normally detected automatically from the sender session
 - Short paths (`/s/`, `/r/`) avoid conflicts with static files on some hosting setups
 - Session name stored in `localStorage` for convenience
 
 ## When Making Changes
 
-1. Keep it dependency-free (no frameworks, pure Node.js)
+1. Keep the main app framework-free; only add focused dependencies when architecture truly requires them (for example the server-side relay bridge)
 2. No WebSockets - use SSE + HTTP POST
-3. No data storage - everything is peer-to-peer
+3. No data storage - direct mode is peer-to-peer; relay mode only forwards packets and does not persist media
 4. Test on mobile browsers (Chrome Android recommended)
 5. HTTPS required for camera/mic in production
 6. CSS is in separate files, not inline

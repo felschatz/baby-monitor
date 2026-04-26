@@ -3,7 +3,7 @@
  * Handles answer creation, offer handling
  */
 
-import { rtcConfig, addIceCandidates } from './webrtc.js';
+import { createPeerConnection, addIceCandidates } from './webrtc.js';
 
 // State
 let peerConnection = null;
@@ -43,7 +43,7 @@ export async function handleOffer(offer, pttMid = null) {
 
     pendingCandidates = [];
 
-    peerConnection = new RTCPeerConnection(rtcConfig);
+    peerConnection = createPeerConnection();
     console.log('Created peer connection');
 
     peerConnection.ontrack = (event) => {
