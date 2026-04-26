@@ -87,7 +87,6 @@ const noiseGateMarker = document.getElementById('noiseGateMarker');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 const lockBtn = document.getElementById('lockBtn');
 const lockBtnText = document.getElementById('lockBtnText');
-const lockOverlay = document.getElementById('lockOverlay');
 const reloadBtn = document.getElementById('reloadBtn');
 const info = document.getElementById('info');
 const thresholdMarker = document.getElementById('thresholdMarker');
@@ -466,9 +465,6 @@ async function exitFullscreenIfActive() {
 function setUiLocked(locked) {
     uiLocked = !!locked;
     document.body.classList.toggle('ui-locked', uiLocked);
-    lockOverlay.classList.toggle('hidden', !uiLocked);
-    lockOverlay.hidden = !uiLocked;
-    lockOverlay.setAttribute('aria-hidden', uiLocked ? 'false' : 'true');
     lockBtn.classList.toggle('locked', uiLocked);
     lockBtn.setAttribute('aria-pressed', uiLocked ? 'true' : 'false');
     lockBtn.setAttribute('aria-label', uiLocked ? 'Hold to unlock controls' : 'Lock controls');
@@ -1338,16 +1334,6 @@ if (lockBtn) {
     document.addEventListener('mouseup', cancelUnlockHold);
     document.addEventListener('touchend', cancelUnlockHold, { passive: true });
     document.addEventListener('touchcancel', cancelUnlockHold, { passive: true });
-}
-
-if (lockOverlay) {
-    ['click', 'touchstart', 'touchmove', 'pointerdown'].forEach((eventName) => {
-        lockOverlay.addEventListener(eventName, (event) => {
-            if (lockBtn && lockBtn.contains(event.target)) return;
-            event.preventDefault();
-            event.stopPropagation();
-        }, { passive: false });
-    });
 }
 
 // Drawer toggle - position drawer above bottom bar
