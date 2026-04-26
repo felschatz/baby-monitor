@@ -1272,6 +1272,7 @@ fullscreenBtn.addEventListener('click', async () => {
 
 document.addEventListener('fullscreenchange', updateFullscreenButtonLabel);
 updateFullscreenButtonLabel();
+setUiLocked(false);
 
 musicBtn.addEventListener('click', toggleMusic);
 
@@ -1410,6 +1411,12 @@ window.addEventListener('beforeunload', () => {
     destroyVideoPlayback();
     closePeerConnection();
     signaling.disconnect();
+});
+
+window.addEventListener('pageshow', () => {
+    if (!uiLocked) {
+        setUiLocked(false);
+    }
 });
 
 function formatTrackState(track) {
