@@ -85,6 +85,9 @@ const noiseGateInfoItem = document.getElementById('noiseGateInfoItem');
 const noiseGateDisplay = document.getElementById('noiseGateDisplay');
 const noiseGateMarker = document.getElementById('noiseGateMarker');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
+const lockBtn = document.getElementById('lockBtn');
+const lockOverlay = document.getElementById('lockOverlay');
+const unlockHoldBtn = document.getElementById('unlockHoldBtn');
 const reloadBtn = document.getElementById('reloadBtn');
 const info = document.getElementById('info');
 const thresholdMarker = document.getElementById('thresholdMarker');
@@ -168,6 +171,10 @@ let shutdownCountdownInterval = null;
 let debugInterval = null;
 const DEBUG_MINIMIZED_STORAGE_KEY = 'receiver-debug-minimized';
 let debugMinimized = localStorage.getItem(DEBUG_MINIMIZED_STORAGE_KEY) === 'true';
+let uiLocked = false;
+let unlockHoldTimer = null;
+let unlockPointerId = null;
+const UNLOCK_HOLD_MS = 1000;
 function playSensitivityAlertSound() {
     if (!sensitivityAlertEnabled || !isConnected) return;
     signaling.sendSignal({ type: 'sensitivity-sound' });
@@ -419,6 +426,92 @@ function resetTestSoundButton() {
 function updateTestSoundButton() {
     if (!testSoundBtn) return;
     testSoundBtn.disabled = !isConnected;
+}
+
+function updateFullscreenButtonLabel() {
+    if (!fullscreenBtn) return;
+    fullscreenBtn.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
+}
+
+function closeControlsDrawer() {
+    controlsDrawer.classList.remove('open');
+    drawerToggle.classList.remove('active');
+    document.body.classList.remove('drawer-open');
+}
+
+async function enterFullscreenIfPossible() {
+    if (document.fullscreenElement) return true;
+    if (!document.documentElement.requestFullscreen) return false;
+
+    try {
+        await document.documentElement.requestFullscreen();
+        return true;
+    } catch (err) {
+        console.log('Fullscreen request failed:', err);
+        return false;
+    }
+}
+
+async function exitFullscreenIfActive() {
+    if (!document.fullscreenElement || !document.exitFullscreen) return false;
+
+    try {
+        await document.exitFullscreen();
+        return true;
+    } catch (err) {
+        console.log('Exit fullscreen failed:', err);
+        return false;
+    }
+}
+
+function setUiLocked(locked) {
+    uiLocked = !!locked;
+    document.body.classList.toggle('ui-locked', uiLocked);
+    lockOverlay.classList.toggle('hidden', !uiLocked);
+    lockOverlay.setAttribute('aria-hidden', uiLocked ? 'false' : 'true');
+    lockBtn.classList.toggle('locked', uiLocked);
+    lockBtn.setAttribute('aria-pressed', uiLocked ? 'true' : 'false');
+    lockBtn.innerHTML = `<span class="lock-toggle-icon">${uiLocked ? 'Locked' : 'Lock'}</span>`;
+
+    if (uiLocked) {
+        closeControlsDrawer();
+    } else {
+        cancelUnlockHold();
+    }
+}
+
+function cancelUnlockHold() {
+    if (unlockHoldTimer) {
+        clearTimeout(unlockHoldTimer);
+        unlockHoldTimer = null;
+    }
+
+    if (unlockPointerId !== null && unlockHoldBtn?.hasPointerCapture?.(unlockPointerId)) {
+        unlockHoldBtn.releasePointerCapture(unlockPointerId);
+    }
+
+    unlockPointerId = null;
+    unlockHoldBtn?.classList.remove('holding');
+}
+
+function startUnlockHold(event) {
+    if (!uiLocked || unlockHoldTimer) return;
+
+    unlockPointerId = event.pointerId;
+    unlockHoldBtn.classList.add('holding');
+    if (unlockHoldBtn.setPointerCapture) {
+        unlockHoldBtn.setPointerCapture(event.pointerId);
+    }
+
+    unlockHoldTimer = setTimeout(() => {
+        cancelUnlockHold();
+        setUiLocked(false);
+    }, UNLOCK_HOLD_MS);
+}
+
+async function lockInterface() {
+    await enterFullscreenIfPossible();
+    setUiLocked(true);
 }
 
 function handleTestSoundStatus(message) {
@@ -1160,13 +1253,21 @@ if (reloadBtn) {
     });
 }
 
-fullscreenBtn.addEventListener('click', () => {
+lockBtn.addEventListener('click', () => {
+    if (uiLocked) return;
+    lockInterface();
+});
+
+fullscreenBtn.addEventListener('click', async () => {
     if (document.fullscreenElement) {
-        document.exitFullscreen();
+        await exitFullscreenIfActive();
     } else {
-        document.documentElement.requestFullscreen();
+        await enterFullscreenIfPossible();
     }
 });
+
+document.addEventListener('fullscreenchange', updateFullscreenButtonLabel);
+updateFullscreenButtonLabel();
 
 musicBtn.addEventListener('click', toggleMusic);
 
@@ -1221,6 +1322,23 @@ document.addEventListener('click', onUserInteractionGlobal, { passive: true });
 document.addEventListener('touchstart', onUserInteractionGlobal, { passive: true });
 document.addEventListener('keydown', () => handleUserInteraction(), { passive: true });
 
+if (unlockHoldBtn) {
+    unlockHoldBtn.addEventListener('pointerdown', startUnlockHold);
+    unlockHoldBtn.addEventListener('pointerup', cancelUnlockHold);
+    unlockHoldBtn.addEventListener('pointercancel', cancelUnlockHold);
+    unlockHoldBtn.addEventListener('pointerleave', cancelUnlockHold);
+}
+
+if (lockOverlay) {
+    ['click', 'touchstart', 'touchmove', 'pointerdown'].forEach((eventName) => {
+        lockOverlay.addEventListener(eventName, (event) => {
+            if (event.target === unlockHoldBtn) return;
+            event.preventDefault();
+            event.stopPropagation();
+        }, { passive: false });
+    });
+}
+
 // Drawer toggle - position drawer above bottom bar
 function updateDrawerPosition() {
     const audioMeterRowEl = document.querySelector('.audio-meter-row');
@@ -1238,6 +1356,7 @@ function updateDrawerPosition() {
 updateDrawerPosition();
 
 drawerToggle.addEventListener('click', () => {
+    if (uiLocked) return;
     updateDrawerPosition();
     const isOpen = controlsDrawer.classList.toggle('open');
     drawerToggle.classList.toggle('active', isOpen);
@@ -1254,9 +1373,7 @@ document.addEventListener('click', (e) => {
     if (controlsDrawer.classList.contains('open') &&
         !controlsDrawer.contains(e.target) &&
         !drawerToggle.contains(e.target)) {
-        controlsDrawer.classList.remove('open');
-        drawerToggle.classList.remove('active');
-        document.body.classList.remove('drawer-open');
+        closeControlsDrawer();
     }
 }, { passive: true });
 

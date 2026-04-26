@@ -73,6 +73,10 @@
             <div class="ptt-label" id="pttLabel">Hold to talk</div>
         </div>
 
+        <button class="lock-toggle" id="lockBtn" type="button" aria-pressed="false">
+            <span class="lock-toggle-icon">Lock</span>
+        </button>
+
         <button class="drawer-toggle" id="drawerToggle">
             <span class="drawer-toggle-icon">⚙</span>
             <span class="drawer-toggle-text">Controls</span>
@@ -197,6 +201,15 @@
 
             <button class="fullscreen-btn" id="fullscreenBtn">⛶ Fullscreen</button>
             <div class="wisdom-text" id="receiverWisdom">Wisdom - Mar 17, 2026: Clear signals spare everyone needless guessing.</div>
+        </div>
+    </div>
+
+    <div class="lock-overlay hidden" id="lockOverlay" aria-hidden="true">
+        <div class="lock-overlay-content">
+            <div class="lock-badge">Pocket lock on</div>
+            <div class="lock-message">Buttons are protected</div>
+            <button class="unlock-hold-btn" id="unlockHoldBtn" type="button">Hold to unlock</button>
+            <div class="lock-hint">Press and hold for 1 second</div>
         </div>
     </div>
 
