@@ -86,6 +86,7 @@ const noiseGateDisplay = document.getElementById('noiseGateDisplay');
 const noiseGateMarker = document.getElementById('noiseGateMarker');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 const lockBtn = document.getElementById('lockBtn');
+const lockBtnText = document.getElementById('lockBtnText');
 const lockOverlay = document.getElementById('lockOverlay');
 const unlockHoldBtn = document.getElementById('unlockHoldBtn');
 const reloadBtn = document.getElementById('reloadBtn');
@@ -173,7 +174,6 @@ const DEBUG_MINIMIZED_STORAGE_KEY = 'receiver-debug-minimized';
 let debugMinimized = localStorage.getItem(DEBUG_MINIMIZED_STORAGE_KEY) === 'true';
 let uiLocked = false;
 let unlockHoldTimer = null;
-let unlockPointerId = null;
 const UNLOCK_HOLD_MS = 1000;
 function playSensitivityAlertSound() {
     if (!sensitivityAlertEnabled || !isConnected) return;
@@ -471,10 +471,15 @@ function setUiLocked(locked) {
     lockOverlay.setAttribute('aria-hidden', uiLocked ? 'false' : 'true');
     lockBtn.classList.toggle('locked', uiLocked);
     lockBtn.setAttribute('aria-pressed', uiLocked ? 'true' : 'false');
-    lockBtn.innerHTML = `<span class="lock-toggle-icon">${uiLocked ? 'Locked' : 'Lock'}</span>`;
+    if (lockBtnText) {
+        lockBtnText.textContent = uiLocked ? 'Locked' : 'Lock';
+    }
 
     if (uiLocked) {
         closeControlsDrawer();
+        if (unlockHoldBtn) {
+            unlockHoldBtn.textContent = 'Hold to unlock';
+        }
     } else {
         cancelUnlockHold();
     }
@@ -486,22 +491,18 @@ function cancelUnlockHold() {
         unlockHoldTimer = null;
     }
 
-    if (unlockPointerId !== null && unlockHoldBtn?.hasPointerCapture?.(unlockPointerId)) {
-        unlockHoldBtn.releasePointerCapture(unlockPointerId);
+    if (unlockHoldBtn) {
+        unlockHoldBtn.classList.remove('holding');
+        unlockHoldBtn.textContent = 'Hold to unlock';
     }
-
-    unlockPointerId = null;
-    unlockHoldBtn?.classList.remove('holding');
 }
 
 function startUnlockHold(event) {
     if (!uiLocked || unlockHoldTimer) return;
 
-    unlockPointerId = event.pointerId;
+    event.preventDefault();
     unlockHoldBtn.classList.add('holding');
-    if (unlockHoldBtn.setPointerCapture) {
-        unlockHoldBtn.setPointerCapture(event.pointerId);
-    }
+    unlockHoldBtn.textContent = 'Keep holding...';
 
     unlockHoldTimer = setTimeout(() => {
         cancelUnlockHold();
@@ -1323,16 +1324,21 @@ document.addEventListener('touchstart', onUserInteractionGlobal, { passive: true
 document.addEventListener('keydown', () => handleUserInteraction(), { passive: true });
 
 if (unlockHoldBtn) {
-    unlockHoldBtn.addEventListener('pointerdown', startUnlockHold);
-    unlockHoldBtn.addEventListener('pointerup', cancelUnlockHold);
-    unlockHoldBtn.addEventListener('pointercancel', cancelUnlockHold);
-    unlockHoldBtn.addEventListener('pointerleave', cancelUnlockHold);
+    unlockHoldBtn.addEventListener('mousedown', startUnlockHold);
+    unlockHoldBtn.addEventListener('touchstart', startUnlockHold, { passive: false });
+    unlockHoldBtn.addEventListener('mouseup', cancelUnlockHold);
+    unlockHoldBtn.addEventListener('mouseleave', cancelUnlockHold);
+    unlockHoldBtn.addEventListener('touchend', cancelUnlockHold);
+    unlockHoldBtn.addEventListener('touchcancel', cancelUnlockHold);
+    document.addEventListener('mouseup', cancelUnlockHold);
+    document.addEventListener('touchend', cancelUnlockHold, { passive: true });
+    document.addEventListener('touchcancel', cancelUnlockHold, { passive: true });
 }
 
 if (lockOverlay) {
     ['click', 'touchstart', 'touchmove', 'pointerdown'].forEach((eventName) => {
         lockOverlay.addEventListener(eventName, (event) => {
-            if (event.target === unlockHoldBtn) return;
+            if (unlockHoldBtn && unlockHoldBtn.contains(event.target)) return;
             event.preventDefault();
             event.stopPropagation();
         }, { passive: false });
