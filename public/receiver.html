@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Baby Monitor - Receiver</title>
-    <link rel="stylesheet" href="/receiver.css?v=20260426c">
+    <link rel="stylesheet" href="/receiver.css?v=20260426d">
 </head>
 <body>
     <!-- Session prompt overlay -->
@@ -105,6 +105,10 @@
             <span class="info-icon">🌙</span>
             <span id="shutdownStatusDisplay">—</span>
         </div>
+        <div class="info-item monitor-noise-info" id="monitorNoiseInfoItem" style="display: none;">
+            <span class="info-icon">Tone</span>
+            <span id="monitorNoiseStatusDisplay">On</span>
+        </div>
         <span class="info-status" id="info">Waiting...</span>
     </div>
 
@@ -172,6 +176,10 @@
                     <input type="checkbox" id="sensitivityAlertToggle" checked>
                     <span>Play sensitivity alert sound</span>
                 </label>
+                <label class="toggle-option">
+                    <input type="checkbox" id="monitorNoiseToggle">
+                    <span>Loop monitor tone while connected</span>
+                </label>
             </div>
 
             <div class="control-section shutdown-section" id="shutdownContainer">
@@ -204,6 +212,6 @@
         </div>
     </div>
 
-    <script type="module" src="/js/receiver-app.js?v=20260426c"></script>
+    <script type="module" src="/js/receiver-app.js?v=20260426d"></script>
 </body>
 </html>

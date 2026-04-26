@@ -749,6 +749,16 @@ body.loud-alert-active .info-strip {
     text-shadow: 0 0 10px rgba(168, 85, 247, 0.5) !important;
 }
 
+.monitor-noise-info {
+    background: rgba(34, 197, 94, 0.22) !important;
+    border-color: rgba(34, 197, 94, 0.45) !important;
+}
+
+.monitor-noise-info span:not(.info-icon) {
+    color: #86efac !important;
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.35) !important;
+}
+
 /* Noise gate indicator */
 .noise-gate-info {
     background: rgba(59, 130, 246, 0.25) !important;
