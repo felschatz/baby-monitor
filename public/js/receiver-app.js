@@ -173,6 +173,12 @@ let debugMinimized = localStorage.getItem(DEBUG_MINIMIZED_STORAGE_KEY) === 'true
 let uiLocked = false;
 let unlockHoldTimer = null;
 const UNLOCK_HOLD_MS = 1000;
+const CONNECTION_LOST_SOUND_DELAY_MS = 5000;
+const connectionLostAudio = new Audio('/connection_lost.mp3');
+connectionLostAudio.preload = 'auto';
+let connectionLostSoundStartTimer = null;
+let connectionLostSoundLoopTimer = null;
+
 function playSensitivityAlertSound() {
     if (!sensitivityAlertEnabled || !isConnected) return;
     signaling.sendSignal({ type: 'sensitivity-sound' });
@@ -186,6 +192,50 @@ function playSensitivityAlertSound() {
 
 // Initialize keep-awake
 initKeepAwake();
+
+function stopConnectionLostSound() {
+    if (connectionLostSoundStartTimer) {
+        clearTimeout(connectionLostSoundStartTimer);
+        connectionLostSoundStartTimer = null;
+    }
+    if (connectionLostSoundLoopTimer) {
+        clearInterval(connectionLostSoundLoopTimer);
+        connectionLostSoundLoopTimer = null;
+    }
+    connectionLostAudio.pause();
+    connectionLostAudio.currentTime = 0;
+}
+
+function playConnectionLostSound() {
+    if (isConnected) return;
+    try {
+        connectionLostAudio.pause();
+        connectionLostAudio.currentTime = 0;
+    } catch (err) {
+        console.log('Could not reset connection lost sound:', err);
+    }
+    connectionLostAudio.play().catch(err => {
+        console.log('Connection lost sound play failed:', err);
+    });
+}
+
+function startConnectionLostSoundLoop() {
+    if (isConnected || connectionLostSoundStartTimer || connectionLostSoundLoopTimer) return;
+
+    connectionLostSoundStartTimer = setTimeout(() => {
+        connectionLostSoundStartTimer = null;
+        if (isConnected) return;
+
+        playConnectionLostSound();
+        connectionLostSoundLoopTimer = setInterval(() => {
+            if (isConnected) {
+                stopConnectionLostSound();
+                return;
+            }
+            playConnectionLostSound();
+        }, CONNECTION_LOST_SOUND_DELAY_MS);
+    }, CONNECTION_LOST_SOUND_DELAY_MS);
+}
 
 function ensureDebugBanner() {
     if (!debugBanner) {
@@ -370,6 +420,7 @@ updateShutdownButtonState();
 function setConnectedState(connected) {
     isConnected = connected;
     if (connected) {
+        stopConnectionLostSound();
         document.body.classList.add('connected');
         statusDot.classList.add('connected');
         statusText.textContent = 'Connected';
@@ -393,6 +444,7 @@ function setConnectedState(connected) {
 function setDisconnectedState() {
     isConnected = false;
     isMediaMuted = false;
+    startConnectionLostSoundLoop();
     setHasVideoTrack(false);
     document.body.classList.remove('connected');
     statusDot.classList.remove('connected');
@@ -1392,6 +1444,7 @@ window.addEventListener('beforeunload', () => {
     if (debugInterval) {
         clearInterval(debugInterval);
     }
+    stopConnectionLostSound();
     cleanupPTT();
     destroyKeepAwake();
     destroyAudioAnalysis();
@@ -1446,6 +1499,7 @@ checkMusicAvailability();
 setDebugEnabled(debugEnabled);
 
 async function initializeApp() {
+    startConnectionLostSoundLoop();
     signaling.connect();
 }
 
