@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Shared state stays trustworthy when one source owns the truth.
+// Wisdom: Robust UI code treats optional DOM elements as optional, not guaranteed.
