@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Good preparation works quietly in the background.
+// Wisdom: A single control is strongest when it owns the whole behavior.

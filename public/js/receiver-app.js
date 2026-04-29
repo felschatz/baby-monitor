@@ -84,7 +84,6 @@ const noiseGateHint = document.getElementById('noiseGateHint');
 const noiseGateInfoItem = document.getElementById('noiseGateInfoItem');
 const noiseGateDisplay = document.getElementById('noiseGateDisplay');
 const noiseGateMarker = document.getElementById('noiseGateMarker');
-const fullscreenBtn = document.getElementById('fullscreenBtn');
 const lockBtn = document.getElementById('lockBtn');
 const lockBtnText = document.getElementById('lockBtnText');
 const reloadBtn = document.getElementById('reloadBtn');
@@ -551,11 +550,6 @@ function resetTestSoundButton() {
 function updateTestSoundButton() {
     if (!testSoundBtn) return;
     testSoundBtn.disabled = !isConnected;
-}
-
-function updateFullscreenButtonLabel() {
-    if (!fullscreenBtn) return;
-    fullscreenBtn.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
 }
 
 function closeControlsDrawer() {
@@ -1404,17 +1398,6 @@ lockBtn.addEventListener('click', () => {
     if (uiLocked) return;
     lockInterface();
 });
-
-fullscreenBtn.addEventListener('click', async () => {
-    if (document.fullscreenElement) {
-        await exitFullscreenIfActive();
-    } else {
-        await enterFullscreenIfPossible();
-    }
-});
-
-document.addEventListener('fullscreenchange', updateFullscreenButtonLabel);
-updateFullscreenButtonLabel();
 setUiLocked(false);
 
 musicBtn.addEventListener('click', toggleMusic);

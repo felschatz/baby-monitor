@@ -1155,24 +1155,6 @@ body.loud-alert-active .info-strip {
     color: var(--accent-green);
 }
 
-/* Fullscreen button */
-.fullscreen-btn {
-    width: 100%;
-    padding: 14px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid var(--border-subtle);
-    color: var(--text-primary);
-    border-radius: 12px;
-    font-size: 0.95rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.fullscreen-btn:active {
-    background: rgba(255, 255, 255, 0.15);
-}
-
 body.ui-locked #lockBtn {
     min-width: 148px;
     min-height: 52px;
@@ -1233,8 +1215,7 @@ body.ui-locked .music-btn,
 body.ui-locked .music-playlist-select,
 body.ui-locked .music-timer-select,
 body.ui-locked .music-reset-btn,
-body.ui-locked .test-sound-btn,
-body.ui-locked .fullscreen-btn {
+body.ui-locked .test-sound-btn {
     pointer-events: none;
 }
 
