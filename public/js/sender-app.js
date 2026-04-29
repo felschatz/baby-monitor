@@ -162,6 +162,19 @@ let monitorNoiseInputSource = null;
 let monitorNoiseMixedTrack = null;
 let monitorNoiseBaseTrackId = null;
 
+async function registerSenderOfflineSupport() {
+    if (!('serviceWorker' in navigator)) {
+        return;
+    }
+
+    try {
+        await navigator.serviceWorker.register('/sender-offline-sw.js', { scope: '/' });
+        console.log('Sender offline music cache ready');
+    } catch (err) {
+        console.log('Could not register sender offline cache:', err.message || err);
+    }
+}
+
 // Initialize keep-awake (auto-shutdown will be configured by receiver)
 initKeepAwake();
 
@@ -1153,6 +1166,8 @@ document.addEventListener('touchend', () => enableAudioPlayback(true), { passive
 
 // Initialize - connect SSE immediately
 async function initializeApp() {
+    await registerSenderOfflineSupport();
+
     try {
         await loadRtcConfig(transportMode);
     } catch (err) {

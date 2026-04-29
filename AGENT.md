@@ -49,6 +49,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 |--------|---------|
 | `screen-dimming.js` | Inactivity timer, dim overlay |
 | `music-player.js` | Playlist loading, shuffle, timer, playback |
+| `sender-offline-sw.js` | Sender-only service worker for cached lullaby playback |
 | `echo-cancellation.js` | FFT, spectral subtraction, fallback mode |
 | `sender-webrtc.js` | Offer creation, stream handling, PTT receive |
 | `sender-app.js` | Main orchestration, event wiring |
@@ -108,6 +109,8 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Sensitivity slider controls threshold (saved to localStorage)
 - Volume control persisted to localStorage
 - Screen dims on sender after 5s inactivity to save battery
+- Sender caches fetched playlist metadata and tracks in Cache Storage so lullabies can keep playing offline after one online warm-up
+- Sender caches fetched playlist metadata and tracks in Cache Storage so lullabies can keep playing offline after one online warm-up, skipping uncached tracks if the device goes offline mid-download
 - Echo cancellation uses FFT-based spectral subtraction via ScriptProcessorNode
   - Inline Radix-2 Cooley-Tukey FFT (no external dependencies)
   - 2048-sample FFT with 50% overlap (1024 hop size)
