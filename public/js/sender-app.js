@@ -193,6 +193,12 @@ function setDisconnectedState() {
     statusText.textContent = 'Disconnected!';
 }
 
+function setReconnectingState() {
+    document.body.classList.remove('connected', 'disconnected');
+    statusDot.classList.remove('connected');
+    statusText.textContent = 'Reconnecting...';
+}
+
 function clampMonitorNoiseVolume(value) {
     const parsed = Number.parseInt(value, 10);
     if (!Number.isFinite(parsed)) {
@@ -681,7 +687,14 @@ const signaling = createSignalingManager({
     sseEndpoint: '/api/sse/sender',
     transportMode,
     onMessage: handleMessage,
-    onError: () => setDisconnectedState()
+    onError: () => {
+        if (isStreaming) {
+            setReconnectingState();
+            info.textContent = 'Lost server connection. Reconnecting...';
+            return;
+        }
+        setDisconnectedState();
+    }
 });
 
 // Initialize WebRTC
@@ -795,7 +808,12 @@ async function handleMessage(message) {
         case 'registered':
             console.log('Registered as sender, isStreaming:', isStreaming);
             signaling.setConnected(true);
-            info.textContent = 'Connected to server. Auto-starting stream...';
+            if (isStreaming) {
+                setConnectedState(true);
+                info.textContent = 'Streaming... Waiting for receivers.';
+            } else {
+                info.textContent = 'Connected to server. Auto-starting stream...';
+            }
             if (!isStreaming) {
                 console.log('Scheduling auto-start in 500ms');
                 setTimeout(() => {

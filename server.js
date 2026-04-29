@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Robust UI code treats optional DOM elements as optional, not guaranteed.
+// Wisdom: Reconnected systems should clear transient alarms as deliberately as they raise them.
