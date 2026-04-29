@@ -11,5 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: The best fallback is the one you prepare before you need it.
-// Wisdom: Resilience means moving forward with what is ready.
+// Wisdom: Good preparation works quietly in the background.

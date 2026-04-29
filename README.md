@@ -233,10 +233,10 @@ baby-monitor/
     ├── index.html             # Landing page with status
     ├── sender.html            # Baby's phone UI
     ├── sender.css             # Sender styles
-    ├── sender-offline-sw.js   # Sender service worker for offline lullaby caching
     ├── receiver.html          # Parent's phone UI
     ├── receiver.css           # Receiver styles
     └── js/                    # Frontend modules (ES6)
+        ├── sender-offline-sw.js # Sender service worker for offline lullaby caching
         ├── sender-app.js      # Sender main orchestration
         ├── receiver-app.js    # Receiver main orchestration
         ├── keep-awake.js      # Wake lock, NoSleep

@@ -49,7 +49,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 |--------|---------|
 | `screen-dimming.js` | Inactivity timer, dim overlay |
 | `music-player.js` | Playlist loading, shuffle, timer, playback |
-| `sender-offline-sw.js` | Sender-only service worker for cached lullaby playback |
+| `sender-offline-sw.js` | Sender-only service worker under `public/js/` for cached lullaby playback |
 | `echo-cancellation.js` | FFT, spectral subtraction, fallback mode |
 | `sender-webrtc.js` | Offer creation, stream handling, PTT receive |
 | `sender-app.js` | Main orchestration, event wiring |

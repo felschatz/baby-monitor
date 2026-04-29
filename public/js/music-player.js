@@ -16,6 +16,7 @@ let musicTimerRemaining = 0;
 let musicStatusInterval = null;
 let isFadingOut = false;
 let playNextTrackInFlight = false;
+let cacheWarmupTimer = null;
 
 // DOM elements (set via init)
 let musicAudio = null;
@@ -46,6 +47,8 @@ let onEchoCancelTeardown = null;
 
 const MUSIC_OFFLINE_CACHE = 'sender-music-offline-v1';
 const PLAYLIST_SNAPSHOT_KEY_PREFIX = 'sender-music-playlist-cache:';
+const MUSIC_CACHE_WARMUP_DELAY_MS = 5000;
+const MUSIC_CACHE_WARMUP_GAP_MS = 250;
 
 /**
  * Convert slider value (0-100) to volume (0-1)
@@ -185,7 +188,7 @@ export function initMusicPlayer(elements, callbacks) {
 
     window.addEventListener('online', () => {
         if (musicPlaylist.length > 0) {
-            void cacheMusicFiles(musicPlaylist);
+            scheduleCacheWarmup(musicPlaylist, 1000);
         }
     });
 
@@ -378,33 +381,29 @@ async function cacheMusicMetadata(requestUrl, response) {
 }
 
 async function cacheMusicFiles(files) {
-    if (!('caches' in window) || !Array.isArray(files) || files.length === 0) {
+    if (!('caches' in window) || !Array.isArray(files) || files.length === 0 || !navigator.onLine) {
         return;
     }
 
-    try {
-        const cache = await caches.open(MUSIC_OFFLINE_CACHE);
-        await Promise.all(files.map(async (file) => {
-            if (!file?.url) return;
-
-            const request = new Request(file.url, { credentials: 'same-origin' });
-            const cached = await cache.match(request);
-            if (cached) {
-                return;
-            }
-
-            try {
-                const response = await fetch(request);
-                if (response.ok) {
-                    await cache.put(request, response.clone());
-                }
-            } catch (err) {
-                console.log('Could not cache music file:', file.url, err.message || err);
-            }
-        }));
-    } catch (err) {
-        console.log('Could not open music cache:', err.message || err);
+    for (const file of files) {
+        await ensureTrackCached(file);
+        await new Promise(resolve => setTimeout(resolve, MUSIC_CACHE_WARMUP_GAP_MS));
     }
+}
+
+function scheduleCacheWarmup(files, delayMs = MUSIC_CACHE_WARMUP_DELAY_MS) {
+    if (!Array.isArray(files) || files.length === 0) {
+        return;
+    }
+
+    if (cacheWarmupTimer) {
+        clearTimeout(cacheWarmupTimer);
+    }
+
+    cacheWarmupTimer = setTimeout(() => {
+        cacheWarmupTimer = null;
+        void cacheMusicFiles(files);
+    }, delayMs);
 }
 
 function getTrackCacheKey(track) {
@@ -534,7 +533,7 @@ export async function fetchMusicPlaylist(playlistId = null) {
         void cacheMusicMetadata(requestUrl, response.clone());
         const data = await response.json();
         storePlaylistSnapshot(playlist, data);
-        void cacheMusicFiles(data.files || []);
+        scheduleCacheWarmup(data.files || []);
 
         return applyPlaylistData(playlist, data, 'network');
     } catch (err) {

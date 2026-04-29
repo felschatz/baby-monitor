@@ -168,7 +168,7 @@ async function registerSenderOfflineSupport() {
     }
 
     try {
-        await navigator.serviceWorker.register('/sender-offline-sw.js', { scope: '/' });
+        await navigator.serviceWorker.register('/js/sender-offline-sw.js', { scope: '/' });
         console.log('Sender offline music cache ready');
     } catch (err) {
         console.log('Could not register sender offline cache:', err.message || err);
