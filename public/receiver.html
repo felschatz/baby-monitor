@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Baby Monitor - Receiver</title>
-    <link rel="stylesheet" href="/receiver.css">
+    <link rel="stylesheet" href="/receiver.css?v=20260426d">
 </head>
 <body>
     <!-- Session prompt overlay -->
@@ -70,8 +70,12 @@
     <div class="bottom-bar">
         <div class="ptt-container">
             <button class="ptt-btn" id="pttBtn" disabled>🎤</button>
-            <div class="ptt-label" id="pttLabel">Hold to talk</div>
         </div>
+
+        <button class="lock-toggle" id="lockBtn" type="button" aria-pressed="false" aria-label="Lock controls" title="Lock controls">
+            <span class="lock-toggle-icon"></span>
+            <span class="lock-toggle-text" id="lockBtnText">Lock</span>
+        </button>
 
         <button class="drawer-toggle" id="drawerToggle">
             <span class="drawer-toggle-icon">⚙</span>
@@ -100,6 +104,10 @@
         <div class="info-item shutdown-info" id="shutdownInfoItem" style="display: none;">
             <span class="info-icon">🌙</span>
             <span id="shutdownStatusDisplay">—</span>
+        </div>
+        <div class="info-item monitor-noise-info" id="monitorNoiseInfoItem" style="display: none;">
+            <span class="info-icon">Tone</span>
+            <span id="monitorNoiseStatusDisplay">On</span>
         </div>
         <span class="info-status" id="info">Waiting...</span>
     </div>
@@ -168,6 +176,19 @@
                     <input type="checkbox" id="sensitivityAlertToggle" checked>
                     <span>Play sensitivity alert sound</span>
                 </label>
+                <label class="toggle-option">
+                    <input type="checkbox" id="monitorNoiseToggle">
+                    <span>Loop monitor tone while connected</span>
+                </label>
+            </div>
+
+            <div class="control-section" id="monitorNoiseVolumeContainer" style="display: none;">
+                <label class="control-label">Monitor Tone Volume</label>
+                <div class="control-row">
+                    <input type="range" id="monitorNoiseVolume" min="0" max="100" value="35" class="slider-input">
+                    <span id="monitorNoiseVolumeValue" class="slider-value">35%</span>
+                </div>
+                <div class="control-hint">Only used when Loop monitor tone while connected is enabled</div>
             </div>
 
             <div class="control-section shutdown-section" id="shutdownContainer">
@@ -196,10 +217,11 @@
             </div>
 
             <button class="fullscreen-btn" id="fullscreenBtn">⛶ Fullscreen</button>
-            <div class="wisdom-text" id="receiverWisdom">Wisdom - Mar 17, 2026: Clear signals spare everyone needless guessing.</div>
+            <div class="wisdom-text" id="receiverWisdom">Wisdom - Apr 29, 2026: The best fallback is the one you prepare before you need it.</div>
+            <div class="wisdom-text" id="receiverWisdom">Wisdom - Apr 29, 2026: Good preparation works quietly in the background.</div>
         </div>
     </div>
 
-    <script type="module" src="/js/receiver-app.js"></script>
+    <script type="module" src="/js/receiver-app.js?v=20260426d"></script>
 </body>
 </html>

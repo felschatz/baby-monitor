@@ -23,6 +23,7 @@ A real-time baby monitor web application for streaming audio and video between t
 - **Fullscreen mode** - Immersive viewing on receiver
 - **Auto-reconnect** - Automatically reconnects when connection is lost
 - **Lullaby playback** - Play music on baby's phone with configurable sleep timer
+- **Offline lullaby cache** - Sender caches fetched playlist metadata and songs for offline playback after an online warm-up
 - **Music echo reduction** (Experimental) - Reduces music bleedthrough in the audio stream using spectral subtraction
 - **No WebSocket required** - Uses Server-Sent Events (SSE) for signaling, works with simple hosting
 
@@ -78,6 +79,7 @@ npm start
 3. Select video/audio options (both enabled by default)
 4. Streaming auto-starts when connected
 5. Screen will dim after 5 seconds of inactivity - tap to wake
+6. Open the sender once while online to cache the selected lullaby playlist for offline playback later
 
 ### 5. Receiver Setup (Parent's Device)
 
@@ -234,6 +236,7 @@ baby-monitor/
     ├── receiver.html          # Parent's phone UI
     ├── receiver.css           # Receiver styles
     └── js/                    # Frontend modules (ES6)
+        ├── sender-offline-sw.js # Sender service worker for offline lullaby caching
         ├── sender-app.js      # Sender main orchestration
         ├── receiver-app.js    # Receiver main orchestration
         ├── keep-awake.js      # Wake lock, NoSleep
@@ -251,6 +254,13 @@ baby-monitor/
 ```
 
 ## Visual Indicators
+
+## Offline Music
+
+- The sender caches the selected playlist metadata and track files after it loads them successfully online
+- Cached lullabies are served locally by a sender-only service worker, so the sender can keep playing them without internet access
+- First load still requires internet access; offline playback works after the playlist has been warmed into cache once
+- If the sender goes offline mid-download, playback now skips uncached tracks and keeps using whatever tracks are already cached
 
 ### Receiver (Parent's Phone)
 

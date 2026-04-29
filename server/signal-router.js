@@ -177,6 +177,18 @@ async function handleSignal(req, res) {
             }
             break;
 
+        case 'monitor-noise':
+            // Receiver -> Sender: toggle outbound monitor tone injection
+            if (hasSender(sessionName)) {
+                sendToSender(sessionName, {
+                    type: 'monitor-noise',
+                    enabled: message.enabled,
+                    volume: message.volume,
+                    receiverId: message.receiverId
+                });
+            }
+            break;
+
         case 'test-sound':
             // Receiver -> Sender: trigger a short ping through the outgoing audio stream
             if (hasSender(sessionName)) {
