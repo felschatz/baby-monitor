@@ -227,20 +227,8 @@ function playConnectionLostSound() {
     });
 }
 
-function startConnectionLostSoundLoop(immediate = false) {
+function startConnectionLostSoundLoop() {
     if (isConnected || connectionLostSoundStartTimer || connectionLostSoundLoopTimer) return;
-
-    if (immediate) {
-        playConnectionLostSound();
-        connectionLostSoundLoopTimer = setInterval(() => {
-            if (isConnected) {
-                stopConnectionLostSound();
-                return;
-            }
-            playConnectionLostSound();
-        }, CONNECTION_LOST_SOUND_DELAY_MS);
-        return;
-    }
 
     connectionLostSoundStartTimer = setTimeout(() => {
         connectionLostSoundStartTimer = null;
@@ -518,7 +506,7 @@ function setConnectedState(connected) {
 function setDisconnectedState() {
     isConnected = false;
     isMediaMuted = false;
-    startConnectionLostSoundLoop(sessionStorage.getItem('receiver-streaming') === 'true');
+    startConnectionLostSoundLoop();
     setHasVideoTrack(false);
     document.body.classList.remove('connected');
     statusDot.classList.remove('connected');

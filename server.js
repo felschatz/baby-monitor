@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A single control is strongest when it owns the whole behavior.
+// Wisdom: Delay is only helpful when it is applied consistently.
