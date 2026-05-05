@@ -15,6 +15,7 @@ const { MIME_TYPES } = require('./utils');
 function sendFile(res, filePath) {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    const basename = path.basename(filePath);
 
     fs.readFile(filePath, (err, data) => {
         if (err) {
@@ -27,6 +28,9 @@ function sendFile(res, filePath) {
         const headers = { 'Content-Type': contentType };
         if (ext === '.js' || ext === '.css') {
             headers['Cache-Control'] = 'no-cache, must-revalidate';
+        }
+        if (basename === 'sender-offline-sw.js') {
+            headers['Service-Worker-Allowed'] = '/';
         }
 
         res.writeHead(200, headers);

@@ -145,11 +145,35 @@ let shutdownConfigured = false;
 let testSoundInProgress = false;
 let testSoundBuffer = null;
 let sensitivitySoundBuffer = null;
+let monitorNoiseBuffer = null;
 let testSoundContext = null;
 let reclaimTimer = null;
 let reclaimPending = false;
 let reclaimAttempts = 0;
 const RECLAIM_DELAY_MS = 2000;
+const DEFAULT_MONITOR_NOISE_VOLUME = 35;
+const MAX_MONITOR_NOISE_GAIN = 0.35;
+let monitorNoiseEnabled = false;
+let monitorNoiseVolume = DEFAULT_MONITOR_NOISE_VOLUME;
+let monitorNoiseSource = null;
+let monitorNoiseGainNode = null;
+let monitorNoiseDestination = null;
+let monitorNoiseInputSource = null;
+let monitorNoiseMixedTrack = null;
+let monitorNoiseBaseTrackId = null;
+
+async function registerSenderOfflineSupport() {
+    if (!('serviceWorker' in navigator)) {
+        return;
+    }
+
+    try {
+        await navigator.serviceWorker.register('/js/sender-offline-sw.js', { scope: '/' });
+        console.log('Sender offline music cache ready');
+    } catch (err) {
+        console.log('Could not register sender offline cache:', err.message || err);
+    }
+}
 
 // Initialize keep-awake (auto-shutdown will be configured by receiver)
 initKeepAwake();
@@ -180,6 +204,62 @@ function setDisconnectedState() {
     document.body.classList.remove('connected');
     statusDot.classList.remove('connected');
     statusText.textContent = 'Disconnected!';
+}
+
+function setReconnectingState() {
+    document.body.classList.remove('connected', 'disconnected');
+    statusDot.classList.remove('connected');
+    statusText.textContent = 'Reconnecting...';
+}
+
+function clampMonitorNoiseVolume(value) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+        return DEFAULT_MONITOR_NOISE_VOLUME;
+    }
+    return Math.min(100, Math.max(0, parsed));
+}
+
+function getMonitorNoiseGain(volumePercent) {
+    return (clampMonitorNoiseVolume(volumePercent) / 100) * MAX_MONITOR_NOISE_GAIN;
+}
+
+function cleanupMonitorNoiseMix() {
+    if (monitorNoiseSource) {
+        try {
+            monitorNoiseSource.stop();
+        } catch (e) {}
+        try {
+            monitorNoiseSource.disconnect();
+        } catch (e) {}
+    }
+    if (monitorNoiseGainNode) {
+        try {
+            monitorNoiseGainNode.disconnect();
+        } catch (e) {}
+    }
+    if (monitorNoiseInputSource) {
+        try {
+            monitorNoiseInputSource.disconnect();
+        } catch (e) {}
+    }
+    if (monitorNoiseDestination) {
+        try {
+            monitorNoiseDestination.disconnect();
+        } catch (e) {}
+    }
+    if (monitorNoiseMixedTrack) {
+        try {
+            monitorNoiseMixedTrack.stop();
+        } catch (e) {}
+    }
+
+    monitorNoiseSource = null;
+    monitorNoiseGainNode = null;
+    monitorNoiseDestination = null;
+    monitorNoiseInputSource = null;
+    monitorNoiseMixedTrack = null;
+    monitorNoiseBaseTrackId = null;
 }
 
 function formatShutdownTime(ms) {
@@ -266,13 +346,19 @@ function enableAudioPlayback(fromUserGesture = false) {
 
     const ctx = getAudioContext();
     if (ctx && ctx.state === 'suspended') {
-        ctx.resume().then(() => {
+        ctx.resume().then(async () => {
             if (!isEchoCancelActive()) {
-                applyMicGainIfReady();
+                await applyMicGainIfReady();
             }
+            await syncPreferredOutboundTrack();
         }).catch(() => {});
-    } else if (!isEchoCancelActive()) {
-        applyMicGainIfReady();
+    } else {
+        Promise.resolve().then(async () => {
+            if (!isEchoCancelActive()) {
+                await applyMicGainIfReady();
+            }
+            await syncPreferredOutboundTrack();
+        }).catch(() => {});
     }
 
     if (fromUserGesture) {
@@ -329,7 +415,7 @@ function scheduleReclaim() {
     }, RECLAIM_DELAY_MS);
 }
 
-function getOutboundAudioTrackForRestore() {
+function getBaseOutboundAudioTrack() {
     const localStream = getLocalStream();
     const localTrack = localStream ? localStream.getAudioTracks()[0] : null;
 
@@ -338,6 +424,84 @@ function getOutboundAudioTrackForRestore() {
     }
 
     return localTrack || getOriginalAudioTrack();
+}
+
+async function ensureMonitorNoiseBuffer(ctx) {
+    if (monitorNoiseBuffer) return monitorNoiseBuffer;
+    const response = await fetch('/noise.mp3');
+    if (!response.ok) {
+        throw new Error(`Failed to load noise.mp3: ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    monitorNoiseBuffer = await ctx.decodeAudioData(arrayBuffer);
+    return monitorNoiseBuffer;
+}
+
+async function getPreferredOutboundAudioTrack() {
+    const baseTrack = getBaseOutboundAudioTrack();
+    if (!monitorNoiseEnabled || !isStreaming || !baseTrack) {
+        cleanupMonitorNoiseMix();
+        return baseTrack;
+    }
+
+    let ctx = getAudioContext();
+    if (!ctx || ctx.state === 'closed') {
+        if (!testSoundContext || testSoundContext.state === 'closed') {
+            testSoundContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        ctx = testSoundContext;
+    }
+
+    if (ctx.state === 'suspended') {
+        try {
+            await ctx.resume();
+        } catch (err) {
+            console.log('Monitor noise: audio context resume blocked');
+        }
+    }
+
+    if (monitorNoiseMixedTrack && monitorNoiseBaseTrackId === baseTrack.id) {
+        if (monitorNoiseGainNode) {
+            monitorNoiseGainNode.gain.value = getMonitorNoiseGain(monitorNoiseVolume);
+        }
+        return monitorNoiseMixedTrack;
+    }
+
+    cleanupMonitorNoiseMix();
+
+    const buffer = await ensureMonitorNoiseBuffer(ctx);
+    monitorNoiseInputSource = ctx.createMediaStreamSource(new MediaStream([baseTrack]));
+    monitorNoiseGainNode = ctx.createGain();
+    monitorNoiseGainNode.gain.value = getMonitorNoiseGain(monitorNoiseVolume);
+    monitorNoiseDestination = ctx.createMediaStreamDestination();
+    monitorNoiseSource = ctx.createBufferSource();
+    monitorNoiseSource.buffer = buffer;
+    monitorNoiseSource.loop = true;
+
+    monitorNoiseInputSource.connect(monitorNoiseDestination);
+    monitorNoiseSource.connect(monitorNoiseGainNode);
+    monitorNoiseGainNode.connect(monitorNoiseDestination);
+    monitorNoiseSource.start(0);
+
+    monitorNoiseMixedTrack = monitorNoiseDestination.stream.getAudioTracks()[0] || null;
+    monitorNoiseBaseTrackId = baseTrack.id;
+
+    return monitorNoiseMixedTrack || baseTrack;
+}
+
+async function syncPreferredOutboundTrack() {
+    if (testSoundInProgress) {
+        return;
+    }
+
+    const preferredTrack = await getPreferredOutboundAudioTrack();
+    if (preferredTrack) {
+        await replaceAudioTrack(preferredTrack);
+    }
+}
+
+function getOutboundAudioTrackForRestore() {
+    return getPreferredOutboundAudioTrack();
 }
 
 async function ensureTestSoundBuffer(ctx) {
@@ -384,7 +548,7 @@ async function playTestSound(receiverId) {
         return;
     }
 
-    const restoreTrack = getOutboundAudioTrackForRestore();
+    const restoreTrack = await getOutboundAudioTrackForRestore();
     if (!restoreTrack) {
         console.log('Test sound ignored: no outbound audio track');
         sendTestSoundStatus('ignored', 'no-audio-track');
@@ -437,8 +601,9 @@ async function playTestSound(receiverId) {
         console.error('Test sound failed:', err);
         sendTestSoundStatus('failed', err.message);
         try {
-            if (restoreTrack) {
-                await replaceAudioTrack(restoreTrack);
+            const fallbackTrack = await getPreferredOutboundAudioTrack();
+            if (fallbackTrack) {
+                await replaceAudioTrack(fallbackTrack);
             }
         } catch (restoreErr) {
             console.error('Failed to restore audio track after test sound:', restoreErr);
@@ -463,7 +628,7 @@ async function playSensitivitySound(receiverId) {
         return;
     }
 
-    const restoreTrack = getOutboundAudioTrackForRestore();
+    const restoreTrack = await getOutboundAudioTrackForRestore();
     if (!restoreTrack) {
         console.log('Sensitivity sound ignored: no outbound audio track');
         return;
@@ -511,8 +676,9 @@ async function playSensitivitySound(receiverId) {
     } catch (err) {
         console.error('Sensitivity sound failed:', err);
         try {
-            if (restoreTrack) {
-                await replaceAudioTrack(restoreTrack);
+            const fallbackTrack = await getPreferredOutboundAudioTrack();
+            if (fallbackTrack) {
+                await replaceAudioTrack(fallbackTrack);
             }
         } catch (restoreErr) {
             console.error('Failed to restore audio track after sensitivity sound:', restoreErr);
@@ -534,7 +700,14 @@ const signaling = createSignalingManager({
     sseEndpoint: '/api/sse/sender',
     transportMode,
     onMessage: handleMessage,
-    onError: () => setDisconnectedState()
+    onError: () => {
+        if (isStreaming) {
+            setReconnectingState();
+            info.textContent = 'Lost server connection. Reconnecting...';
+            return;
+        }
+        setDisconnectedState();
+    }
 });
 
 // Initialize WebRTC
@@ -595,7 +768,7 @@ initMusicPlayer(
                     return;
                 }
                 if (setupEchoCancellation()) {
-                    await replaceAudioTrack(getProcessedAudioTrack());
+                    await syncPreferredOutboundTrack();
                     broadcastEchoCancelStatus();
                 }
             }
@@ -603,10 +776,8 @@ initMusicPlayer(
         onEchoCancelTeardown: async () => {
             if (isEchoCancelActive()) {
                 teardownEchoCancellation();
-                if (getOriginalAudioTrack()) {
-                    await replaceAudioTrack(getOriginalAudioTrack());
-                }
                 await applyMicGainIfReady();
+                await syncPreferredOutboundTrack();
                 broadcastEchoCancelStatus();
             }
         }
@@ -633,14 +804,12 @@ async function handleEchoCancelToggle(enabled) {
             return;
         }
         if (setupEchoCancellation()) {
-            await replaceAudioTrack(getProcessedAudioTrack());
+            await syncPreferredOutboundTrack();
         }
     } else {
         teardownEchoCancellation();
-        if (getOriginalAudioTrack()) {
-            await replaceAudioTrack(getOriginalAudioTrack());
-        }
         await applyMicGainIfReady();
+        await syncPreferredOutboundTrack();
     }
 
     broadcastEchoCancelStatus();
@@ -652,7 +821,12 @@ async function handleMessage(message) {
         case 'registered':
             console.log('Registered as sender, isStreaming:', isStreaming);
             signaling.setConnected(true);
-            info.textContent = 'Connected to server. Auto-starting stream...';
+            if (isStreaming) {
+                setConnectedState(true);
+                info.textContent = 'Streaming... Waiting for receivers.';
+            } else {
+                info.textContent = 'Connected to server. Auto-starting stream...';
+            }
             if (!isStreaming) {
                 console.log('Scheduling auto-start in 500ms');
                 setTimeout(() => {
@@ -832,6 +1006,13 @@ async function handleMessage(message) {
             await playSensitivitySound(message.receiverId);
             break;
 
+        case 'monitor-noise':
+            monitorNoiseEnabled = !!message.enabled;
+            monitorNoiseVolume = clampMonitorNoiseVolume(message.volume);
+            console.log('Received monitor noise config:', monitorNoiseEnabled, monitorNoiseVolume + '%');
+            await syncPreferredOutboundTrack();
+            break;
+
         case 'shutdown-timeout':
             console.log('Received shutdown timeout:', message.value, message.unit);
             shutdownUnit = message.unit || 'hours';
@@ -912,6 +1093,7 @@ async function startStreamingHandler() {
         setConnectedState(true);
 
         enableAudioPlayback();
+        await syncPreferredOutboundTrack();
 
         // Start auto-shutdown timer to save battery after long periods
         startAutoShutdown(() => {
@@ -951,6 +1133,8 @@ function stopStreamingHandler() {
         fadeOutAndStop();
     }
 
+    cleanupMonitorNoiseMix();
+
     stopWebRTCStreaming(localVideo);
 
     startBtn.style.display = 'block';
@@ -982,6 +1166,8 @@ document.addEventListener('touchend', () => enableAudioPlayback(true), { passive
 
 // Initialize - connect SSE immediately
 async function initializeApp() {
+    await registerSenderOfflineSupport();
+
     try {
         await loadRtcConfig(transportMode);
     } catch (err) {

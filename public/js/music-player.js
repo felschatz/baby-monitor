@@ -15,6 +15,8 @@ let musicTimer = null;
 let musicTimerRemaining = 0;
 let musicStatusInterval = null;
 let isFadingOut = false;
+let playNextTrackInFlight = false;
+let cacheWarmupTimer = null;
 
 // DOM elements (set via init)
 let musicAudio = null;
@@ -36,10 +38,17 @@ let volumeTooltip = null;
 let volumeMinusBtn = null;
 let volumePlusBtn = null;
 
+const trackCachePromises = new Map();
+
 // Callbacks
 let onMusicStatusBroadcast = null;
 let onEchoCancelSetup = null;
 let onEchoCancelTeardown = null;
+
+const MUSIC_OFFLINE_CACHE = 'sender-music-offline-v1';
+const PLAYLIST_SNAPSHOT_KEY_PREFIX = 'sender-music-playlist-cache:';
+const MUSIC_CACHE_WARMUP_DELAY_MS = 5000;
+const MUSIC_CACHE_WARMUP_GAP_MS = 250;
 
 /**
  * Convert slider value (0-100) to volume (0-1)
@@ -148,7 +157,7 @@ export function initMusicPlayer(elements, callbacks) {
     // Handle track ended - play next
     musicAudio.addEventListener('ended', () => {
         if (musicPlaying) {
-            playNextTrack();
+            void playNextTrack();
         }
     });
 
@@ -176,6 +185,12 @@ export function initMusicPlayer(elements, callbacks) {
     musicPlaylistSelect.addEventListener('mouseleave', cancelLongPress);
     musicPlaylistSelect.addEventListener('touchend', cancelLongPress);
     musicPlaylistSelect.addEventListener('touchcancel', cancelLongPress);
+
+    window.addEventListener('online', () => {
+        if (musicPlaylist.length > 0) {
+            scheduleCacheWarmup(musicPlaylist, 1000);
+        }
+    });
 
     // Fetch playlist on load
     fetchMusicPlaylist();
@@ -326,56 +341,209 @@ function shuffleArray(array) {
     return shuffled;
 }
 
+function getPlaylistSnapshotKey(playlistId) {
+    return `${PLAYLIST_SNAPSHOT_KEY_PREFIX}${playlistId}`;
+}
+
+function storePlaylistSnapshot(playlistId, data) {
+    try {
+        localStorage.setItem(getPlaylistSnapshotKey(playlistId), JSON.stringify({
+            files: data.files || [],
+            playlists: data.playlists || [],
+            debugTimer: !!data.debugTimer
+        }));
+    } catch (err) {
+        console.log('Could not persist playlist snapshot:', err.message || err);
+    }
+}
+
+function loadPlaylistSnapshot(playlistId) {
+    try {
+        const raw = localStorage.getItem(getPlaylistSnapshotKey(playlistId));
+        return raw ? JSON.parse(raw) : null;
+    } catch (err) {
+        console.log('Could not parse cached playlist snapshot:', err.message || err);
+        return null;
+    }
+}
+
+async function cacheMusicMetadata(requestUrl, response) {
+    if (!('caches' in window) || !response?.ok) {
+        return;
+    }
+
+    try {
+        const cache = await caches.open(MUSIC_OFFLINE_CACHE);
+        await cache.put(requestUrl, response.clone());
+    } catch (err) {
+        console.log('Could not cache playlist metadata:', err.message || err);
+    }
+}
+
+async function cacheMusicFiles(files) {
+    if (!('caches' in window) || !Array.isArray(files) || files.length === 0 || !navigator.onLine) {
+        return;
+    }
+
+    for (const file of files) {
+        await ensureTrackCached(file);
+        await new Promise(resolve => setTimeout(resolve, MUSIC_CACHE_WARMUP_GAP_MS));
+    }
+}
+
+function scheduleCacheWarmup(files, delayMs = MUSIC_CACHE_WARMUP_DELAY_MS) {
+    if (!Array.isArray(files) || files.length === 0) {
+        return;
+    }
+
+    if (cacheWarmupTimer) {
+        clearTimeout(cacheWarmupTimer);
+    }
+
+    cacheWarmupTimer = setTimeout(() => {
+        cacheWarmupTimer = null;
+        void cacheMusicFiles(files);
+    }, delayMs);
+}
+
+function getTrackCacheKey(track) {
+    return track?.url || '';
+}
+
+async function isTrackCached(track) {
+    if (!('caches' in window) || !track?.url) {
+        return false;
+    }
+
+    try {
+        const cache = await caches.open(MUSIC_OFFLINE_CACHE);
+        const request = new Request(track.url, { credentials: 'same-origin' });
+        const cached = await cache.match(request);
+        return !!cached;
+    } catch (err) {
+        console.log('Could not check music cache for track:', track.url, err.message || err);
+        return false;
+    }
+}
+
+function ensureTrackCached(track) {
+    if (!track?.url || !('caches' in window)) {
+        return Promise.resolve(false);
+    }
+
+    const cacheKey = getTrackCacheKey(track);
+    if (trackCachePromises.has(cacheKey)) {
+        return trackCachePromises.get(cacheKey);
+    }
+
+    const cachePromise = (async () => {
+        try {
+            const cache = await caches.open(MUSIC_OFFLINE_CACHE);
+            const request = new Request(track.url, { credentials: 'same-origin' });
+            const cached = await cache.match(request);
+            if (cached) {
+                return true;
+            }
+
+            const response = await fetch(request);
+            if (!response.ok) {
+                return false;
+            }
+
+            await cache.put(request, response.clone());
+            return true;
+        } catch (err) {
+            console.log('Could not fetch missing music track:', track.url, err.message || err);
+            return false;
+        } finally {
+            trackCachePromises.delete(cacheKey);
+        }
+    })();
+
+    trackCachePromises.set(cacheKey, cachePromise);
+    return cachePromise;
+}
+
+function advanceTrackIndex() {
+    musicCurrentIndex = (musicCurrentIndex + 1) % musicShuffled.length;
+
+    if (musicCurrentIndex === 0 && musicPlaying) {
+        musicShuffled = shuffleArray(musicPlaylist);
+    }
+}
+
+function applyPlaylistData(playlistId, data, source) {
+    musicPlaylist = data.files || [];
+    const allPlaylists = data.playlists || [];
+    musicPlaylists = playlistsUnlocked
+        ? allPlaylists
+        : allPlaylists.filter(p => !p.hidden);
+
+    console.log('Music playlist loaded from', source + ':', musicPlaylist.length, 'tracks from playlist', playlistId);
+    console.log('Available playlists:', musicPlaylists, playlistsUnlocked ? '(unlocked)' : '(locked)');
+
+    if (musicPlaylists.length > 0) {
+        musicPlaylistSelect.innerHTML = '';
+        musicPlaylists.forEach(p => {
+            const option = document.createElement('option');
+            option.value = p.id;
+            option.textContent = p.name;
+            if (p.id === playlistId) option.selected = true;
+            musicPlaylistSelect.appendChild(option);
+        });
+        musicPlaylistSelect.style.display = 'inline-block';
+
+        const playlistIds = musicPlaylists.map(p => p.id);
+        if (!playlistIds.includes(currentPlaylistId)) {
+            currentPlaylistId = musicPlaylists[0].id;
+            localStorage.setItem('sender-music-playlist', currentPlaylistId);
+            return fetchMusicPlaylist(currentPlaylistId);
+        }
+    } else {
+        musicPlaylistSelect.style.display = 'none';
+    }
+
+    if (musicPlaylist.length > 0 || musicPlaylists.length > 0) {
+        musicControlsPanel.style.display = 'block';
+    }
+
+    if (data.debugTimer && !musicTimerSelect.querySelector('option[value="1"]')) {
+        const debugOption = document.createElement('option');
+        debugOption.value = '1';
+        debugOption.textContent = '1 min (debug)';
+        musicTimerSelect.insertBefore(debugOption, musicTimerSelect.firstChild);
+    }
+
+    return null;
+}
+
 /**
  * Fetch available music files for a specific playlist
  */
 export async function fetchMusicPlaylist(playlistId = null) {
+    const playlist = playlistId || currentPlaylistId;
+    const requestUrl = `/api/music?playlist=${encodeURIComponent(playlist)}`;
+
     try {
-        const playlist = playlistId || currentPlaylistId;
-        const response = await fetch(`/api/music?playlist=${encodeURIComponent(playlist)}`);
+        const response = await fetch(requestUrl);
+        if (!response.ok) {
+            throw new Error(`Music API failed: ${response.status}`);
+        }
+
+        void cacheMusicMetadata(requestUrl, response.clone());
         const data = await response.json();
-        musicPlaylist = data.files || [];
-        const allPlaylists = data.playlists || [];
-        musicPlaylists = playlistsUnlocked
-            ? allPlaylists
-            : allPlaylists.filter(p => !p.hidden);
+        storePlaylistSnapshot(playlist, data);
+        scheduleCacheWarmup(data.files || []);
 
-        console.log('Music playlist loaded:', musicPlaylist.length, 'tracks from playlist', playlist);
-        console.log('Available playlists:', musicPlaylists, playlistsUnlocked ? '(unlocked)' : '(locked)');
-
-        if (musicPlaylists.length > 0) {
-            musicPlaylistSelect.innerHTML = '';
-            musicPlaylists.forEach(p => {
-                const option = document.createElement('option');
-                option.value = p.id;
-                option.textContent = p.name;
-                if (p.id === playlist) option.selected = true;
-                musicPlaylistSelect.appendChild(option);
-            });
-            musicPlaylistSelect.style.display = 'inline-block';
-
-            const playlistIds = musicPlaylists.map(p => p.id);
-            if (!playlistIds.includes(currentPlaylistId)) {
-                currentPlaylistId = musicPlaylists[0].id;
-                localStorage.setItem('sender-music-playlist', currentPlaylistId);
-                return fetchMusicPlaylist(currentPlaylistId);
-            }
-        } else {
-            musicPlaylistSelect.style.display = 'none';
-        }
-
-        if (musicPlaylist.length > 0 || musicPlaylists.length > 0) {
-            musicControlsPanel.style.display = 'block';
-        }
-
-        if (data.debugTimer && !musicTimerSelect.querySelector('option[value="1"]')) {
-            const debugOption = document.createElement('option');
-            debugOption.value = '1';
-            debugOption.textContent = '1 min (debug)';
-            musicTimerSelect.insertBefore(debugOption, musicTimerSelect.firstChild);
-        }
+        return applyPlaylistData(playlist, data, 'network');
     } catch (err) {
         console.error('Failed to fetch music playlist:', err);
+        const cachedData = loadPlaylistSnapshot(playlist);
+        if (cachedData) {
+            console.log('Using cached playlist snapshot for offline music playback:', playlist);
+            return applyPlaylistData(playlist, cachedData, 'offline cache');
+        }
+
         musicPlaylist = [];
     }
 }
@@ -446,7 +614,7 @@ export function startMusic(timerMinutes, echoCancelEnabled = false) {
     if (musicStatusInterval) clearInterval(musicStatusInterval);
     musicStatusInterval = setInterval(broadcastMusicStatus, 5000);
 
-    playNextTrack();
+    void playNextTrack();
 
     if (echoCancelEnabled && onEchoCancelSetup) {
         setTimeout(() => {
@@ -460,22 +628,49 @@ export function startMusic(timerMinutes, echoCancelEnabled = false) {
 /**
  * Play next track in shuffled playlist
  */
-function playNextTrack() {
-    if (!musicPlaying || musicShuffled.length === 0) return;
+async function playNextTrack() {
+    if (!musicPlaying || musicShuffled.length === 0 || playNextTrackInFlight) return;
 
-    const track = musicShuffled[musicCurrentIndex];
-    console.log('Playing track:', track.name);
-    musicTrackName.textContent = track.name;
+    playNextTrackInFlight = true;
 
-    musicAudio.src = track.url;
-    musicAudio.play().catch(err => {
-        console.error('Music play error:', err);
-    });
+    try {
+        let attempts = 0;
+        while (musicPlaying && attempts < musicShuffled.length) {
+            const track = musicShuffled[musicCurrentIndex];
+            advanceTrackIndex();
+            attempts += 1;
 
-    musicCurrentIndex = (musicCurrentIndex + 1) % musicShuffled.length;
+            const cached = await isTrackCached(track);
+            if (!cached) {
+                void ensureTrackCached(track);
+                if (!navigator.onLine) {
+                    console.log('Skipping uncached offline track:', track.name);
+                    continue;
+                }
+            }
 
-    if (musicCurrentIndex === 0 && musicPlaying) {
-        musicShuffled = shuffleArray(musicPlaylist);
+            console.log('Playing track:', track.name, cached ? '(cached)' : '(network)');
+            musicTrackName.textContent = track.name;
+            musicAudio.src = track.url;
+
+            try {
+                await musicAudio.play();
+                return;
+            } catch (err) {
+                console.error('Music play error for track:', track.name, err);
+                if (navigator.onLine && !cached) {
+                    void ensureTrackCached(track);
+                }
+            }
+        }
+
+        console.warn('No playable music tracks available right now');
+        musicTrackName.textContent = navigator.onLine
+            ? 'Waiting for track downloads...'
+            : 'No cached tracks available offline';
+        stopMusic(true);
+    } finally {
+        playNextTrackInFlight = false;
     }
 }
 
