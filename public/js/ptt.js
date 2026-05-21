@@ -31,6 +31,12 @@ let bluetoothMode = false; // When true, skip microphone acquisition entirely
 let bluetoothAudioOutputDetected = false; // Track if Bluetooth output is detected
 let lastPlaybackTime = 0; // For recovery if playback breaks
 
+function setPTTLabelText(pttLabel, text) {
+    if (pttLabel) {
+        pttLabel.textContent = text;
+    }
+}
+
 // Dependencies
 let remoteVideo = null;
 let sendSignal = null;
@@ -271,10 +277,10 @@ export async function startPTT(pttBtn, pttLabel) {
     pttBtn.classList.add('active');
 
     if (bluetoothMode) {
-        pttLabel.textContent = 'Alerting sender...';
+        setPTTLabelText(pttLabel, 'Alerting sender...');
         console.log('PTT: Bluetooth mode - signal only, no mic');
     } else {
-        pttLabel.textContent = 'Speaking...';
+        setPTTLabelText(pttLabel, 'Speaking...');
     }
 
     // Audio ducking - lower baby audio to prevent echo
@@ -348,7 +354,7 @@ export async function startPTT(pttBtn, pttLabel) {
             }
         }
         console.error('PTT error:', err);
-        pttLabel.textContent = 'Mic access denied';
+        setPTTLabelText(pttLabel, 'Mic access denied');
         stopPTT(pttBtn, pttLabel);
     }
 }
@@ -362,7 +368,7 @@ export async function startPTT(pttBtn, pttLabel) {
 export async function stopPTT(pttBtn, pttLabel) {
     // Always reset visual state
     pttBtn.classList.remove('active');
-    pttLabel.textContent = bluetoothMode ? 'Hold to alert sender' : 'Hold to talk to baby';
+    setPTTLabelText(pttLabel, bluetoothMode ? 'Hold to alert sender' : 'Hold to talk to baby');
 
     // Always send ptt-stop if we sent ptt-start (even if pttActive is false due to race)
     if (pttStartSent) {

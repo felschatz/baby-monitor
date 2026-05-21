@@ -535,11 +535,76 @@ body.loud-alert-active .info-strip {
     gap: 16px;
 }
 
+.lock-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    min-width: 94px;
+    min-height: 48px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10001;
+}
+
+.lock-toggle:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-primary);
+}
+
+.lock-toggle:active {
+    transform: scale(0.98);
+}
+
+.lock-toggle.locked {
+    background: rgba(34, 197, 94, 0.16);
+    border-color: rgba(34, 197, 94, 0.3);
+    color: #dcfce7;
+    box-shadow: 0 0 14px rgba(34, 197, 94, 0.16);
+}
+
+.lock-toggle-icon {
+    width: 0.95rem;
+    height: 0.82rem;
+    border: 2px solid currentColor;
+    border-radius: 3px;
+    pointer-events: none;
+    opacity: 0.9;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.lock-toggle-icon::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% - 1px);
+    width: 0.58rem;
+    height: 0.5rem;
+    border: 2px solid currentColor;
+    border-bottom: 0;
+    border-radius: 0.5rem 0.5rem 0 0;
+    transform: translateX(-50%);
+}
+
+.lock-toggle-text {
+    display: inline;
+    font-weight: 600;
+    pointer-events: none;
+}
+
 .ptt-container {
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex: 1;
+    flex: 0 0 auto;
 }
 
 .ptt-btn {
@@ -572,13 +637,6 @@ body.loud-alert-active .info-strip {
     opacity: 0.5;
     cursor: not-allowed;
 }
-
-.ptt-label {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-}
-
 
 .drawer-toggle {
     display: flex;
@@ -689,6 +747,16 @@ body.loud-alert-active .info-strip {
 .music-info span:not(.info-icon) {
     color: #c084fc !important;
     text-shadow: 0 0 10px rgba(168, 85, 247, 0.5) !important;
+}
+
+.monitor-noise-info {
+    background: rgba(34, 197, 94, 0.22) !important;
+    border-color: rgba(34, 197, 94, 0.45) !important;
+}
+
+.monitor-noise-info span:not(.info-icon) {
+    color: #86efac !important;
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.35) !important;
 }
 
 /* Noise gate indicator */
@@ -1087,22 +1155,68 @@ body.loud-alert-active .info-strip {
     color: var(--accent-green);
 }
 
-/* Fullscreen button */
-.fullscreen-btn {
-    width: 100%;
-    padding: 14px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid var(--border-subtle);
-    color: var(--text-primary);
-    border-radius: 12px;
-    font-size: 0.95rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.2s;
+body.ui-locked #lockBtn {
+    min-width: 148px;
+    min-height: 52px;
+    padding: 12px 18px;
+    background: rgba(37, 99, 235, 0.18);
+    border-color: rgba(96, 165, 250, 0.4);
+    color: #dbeafe;
+    z-index: 10020;
+    touch-action: none;
+    box-shadow: 0 0 16px rgba(37, 99, 235, 0.16);
 }
 
-.fullscreen-btn:active {
-    background: rgba(255, 255, 255, 0.15);
+body.ui-locked #lockBtn .lock-toggle-text {
+    font-size: 0.95rem;
+}
+
+body.ui-locked #lockBtn .lock-toggle-icon {
+    width: 0.95rem;
+    height: 0.9rem;
+}
+
+body.ui-locked #lockBtn:active,
+body.ui-locked #lockBtn.holding {
+    background: rgba(34, 197, 94, 0.24);
+    border-color: rgba(34, 197, 94, 0.45);
+    color: #dcfce7;
+    box-shadow: 0 0 22px rgba(34, 197, 94, 0.28);
+}
+
+body.ui-locked {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body.ui-locked .header,
+body.ui-locked .video-container,
+body.ui-locked .audio-meter-row,
+body.ui-locked .bottom-bar,
+body.ui-locked .info-strip,
+body.ui-locked .controls-drawer {
+    filter: saturate(0.88);
+}
+
+body.ui-locked .header,
+body.ui-locked .video-container,
+body.ui-locked .audio-meter-row,
+body.ui-locked .info-strip,
+body.ui-locked .controls-drawer,
+body.ui-locked #pttBtn,
+body.ui-locked #drawerToggle,
+body.ui-locked #reloadBtn,
+body.ui-locked .back-link,
+body.ui-locked .slider-input,
+body.ui-locked .toggle-option,
+body.ui-locked .shutdown-btn,
+body.ui-locked .timer-select,
+body.ui-locked .music-btn,
+body.ui-locked .music-playlist-select,
+body.ui-locked .music-timer-select,
+body.ui-locked .music-reset-btn,
+body.ui-locked .test-sound-btn {
+    pointer-events: none;
 }
 
 /* Wisdom text - subtle update marker */
