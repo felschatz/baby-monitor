@@ -183,12 +183,18 @@ downloadButton.addEventListener('click', async () => {
             directoryHandle,
             update => {
                 showProgress(update.completed, update.total);
-                if (update.phase === 'downloading') {
-                    const item = update.track ? ` · ${update.track}` : '';
-                    const skipped = update.skipped ? ` · ${update.skipped} already present` : '';
+                if (update.phase === 'checking' || update.phase === 'downloading') {
+                    const trackStatus = update.track
+                        ? ` · ${update.track}${update.fileStatus === 'skipped' ? ' already present' : ''}`
+                        : '';
+                    const title = update.error
+                        ? 'One file could not be checked'
+                        : update.phase === 'downloading'
+                            ? 'Saving missing music'
+                            : 'Checking existing music';
                     setStatus(
-                        update.error ? 'One file could not be saved' : 'Saving music locally',
-                        `${update.completed} of ${update.total}${skipped}${item}`,
+                        title,
+                        `${update.completed} of ${update.total}${trackStatus}`,
                         update.error ? 'error' : ''
                     );
                 }

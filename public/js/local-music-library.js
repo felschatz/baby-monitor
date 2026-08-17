@@ -238,7 +238,7 @@ export async function downloadPublicMusicLibrary(directoryHandle, onProgress = (
     let downloaded = 0;
     let skipped = 0;
     const failures = [];
-    onProgress({ phase: 'downloading', completed, total, downloaded, skipped });
+    onProgress({ phase: 'checking', completed, total, downloaded, skipped });
 
     for (const playlist of playlistData) {
         const existingMetadata = existingManifestPlaylists.find(entry => String(entry.id) === String(playlist.id));
@@ -277,21 +277,28 @@ export async function downloadPublicMusicLibrary(directoryHandle, onProgress = (
 
         for (const track of playlist.files) {
             let error = null;
+            let fileStatus = 'failed';
             try {
                 const result = await downloadFile(playlistDirectory, track);
-                if (result.downloaded) downloaded += 1;
-                else skipped += 1;
+                if (result.downloaded) {
+                    downloaded += 1;
+                    fileStatus = 'downloaded';
+                } else {
+                    skipped += 1;
+                    fileStatus = 'skipped';
+                }
             } catch (err) {
                 error = err.message || String(err);
                 failures.push({ playlist: playlist.name, track: track.name, error });
             }
             completed += 1;
             onProgress({
-                phase: 'downloading',
+                phase: fileStatus === 'downloaded' ? 'downloading' : 'checking',
                 completed,
                 total,
                 downloaded,
                 skipped,
+                fileStatus,
                 playlist: playlist.name,
                 track: track.name,
                 error

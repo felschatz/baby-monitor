@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A good path recognizes its destination from either direction.
+// Wisdom: Clear words distinguish careful checking from needless repetition.
