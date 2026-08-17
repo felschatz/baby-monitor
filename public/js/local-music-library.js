@@ -138,6 +138,15 @@ async function getExistingFile(directoryHandle, filename) {
     }
 }
 
+async function getExistingDirectory(directoryHandle, name) {
+    try {
+        return await directoryHandle.getDirectoryHandle(name);
+    } catch (err) {
+        if (err.name === 'NotFoundError') return null;
+        throw err;
+    }
+}
+
 async function downloadFile(directoryHandle, track) {
     const filename = decodeURIComponent(new URL(track.url, window.location.origin).pathname.split('/').pop());
     const existingHandle = await getExistingFile(directoryHandle, filename);
@@ -204,17 +213,35 @@ export async function downloadPublicMusicLibrary(directoryHandle, onProgress = (
     const existingManifestPlaylists = existingManifest?.playlists || [];
     let completed = 0;
     let downloaded = 0;
+    let skipped = 0;
     const failures = [];
-    onProgress({ phase: 'downloading', completed, total, downloaded });
+    onProgress({ phase: 'downloading', completed, total, downloaded, skipped });
 
     for (const playlist of playlistData) {
         const existingMetadata = existingManifestPlaylists.find(entry => String(entry.id) === String(playlist.id));
-        playlist.directory = existingMetadata?.directory || (
-            existingMetadata ? String(existingMetadata.id) : getSafeDirectoryName(playlist.name, playlist.id)
-        );
-        const playlistDirectory = playlist.id === 'default'
-            ? directoryHandle
-            : await directoryHandle.getDirectoryHandle(playlist.directory, { create: true });
+        const namedDirectory = getSafeDirectoryName(playlist.name, playlist.id);
+        const directoryCandidates = [
+            existingMetadata?.directory,
+            existingMetadata?.id,
+            namedDirectory,
+            playlist.id
+        ].filter((name, index, names) => name && names.indexOf(name) === index);
+        let playlistDirectory = playlist.id === 'default' ? directoryHandle : null;
+
+        if (!playlistDirectory) {
+            for (const candidate of directoryCandidates) {
+                playlistDirectory = await getExistingDirectory(directoryHandle, String(candidate));
+                if (playlistDirectory) {
+                    playlist.directory = String(candidate);
+                    break;
+                }
+            }
+        }
+
+        if (!playlistDirectory) {
+            playlist.directory = namedDirectory;
+            playlistDirectory = await directoryHandle.getDirectoryHandle(playlist.directory, { create: true });
+        }
         await writeTextFile(playlistDirectory, 'name.txt', playlist.name);
 
         for (const track of playlist.files) {
@@ -222,6 +249,7 @@ export async function downloadPublicMusicLibrary(directoryHandle, onProgress = (
             try {
                 const result = await downloadFile(playlistDirectory, track);
                 if (result.downloaded) downloaded += 1;
+                else skipped += 1;
             } catch (err) {
                 error = err.message || String(err);
                 failures.push({ playlist: playlist.name, track: track.name, error });
@@ -232,6 +260,7 @@ export async function downloadPublicMusicLibrary(directoryHandle, onProgress = (
                 completed,
                 total,
                 downloaded,
+                skipped,
                 playlist: playlist.name,
                 track: track.name,
                 error
@@ -255,7 +284,7 @@ export async function downloadPublicMusicLibrary(directoryHandle, onProgress = (
         playlists: mergedManifestPlaylists
     }, null, 2));
 
-    const result = { completed, total, downloaded, failures };
+    const result = { completed, total, downloaded, skipped, failures };
     onProgress({ phase: 'complete', ...result });
     return result;
 }

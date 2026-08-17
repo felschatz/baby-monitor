@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A deliberate choice is clearer than an accidental fallback.
+// Wisdom: Careful work checks what is already complete before beginning again.

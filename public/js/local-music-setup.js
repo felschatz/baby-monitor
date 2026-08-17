@@ -172,9 +172,10 @@ downloadButton.addEventListener('click', async () => {
                 showProgress(update.completed, update.total);
                 if (update.phase === 'downloading') {
                     const item = update.track ? ` · ${update.track}` : '';
+                    const skipped = update.skipped ? ` · ${update.skipped} already present` : '';
                     setStatus(
                         update.error ? 'One file could not be saved' : 'Saving music locally',
-                        `${update.completed} of ${update.total}${item}`,
+                        `${update.completed} of ${update.total}${skipped}${item}`,
                         update.error ? 'error' : ''
                     );
                 }
@@ -196,7 +197,7 @@ downloadButton.addEventListener('click', async () => {
             setStatus(
                 'Offline music ready',
                 result.downloaded > 0
-                    ? `${result.downloaded} new file${result.downloaded === 1 ? '' : 's'} downloaded`
+                    ? `${result.downloaded} new, ${result.skipped} already present`
                     : 'Everything was already downloaded',
                 'ready'
             );
