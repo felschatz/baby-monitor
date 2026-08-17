@@ -777,3 +777,14 @@ body.disconnected {
     margin-top: 6px;
     opacity: 0.7;
 }
+
+.music-source-status {
+    margin-top: 3px;
+    text-align: center;
+    font-size: 0.68rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.music-source-status.local {
+    color: #a5d6a7;
+}

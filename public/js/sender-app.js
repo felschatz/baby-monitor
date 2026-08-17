@@ -87,6 +87,7 @@ const musicTimerSelect = document.getElementById('musicTimerSelect');
 const musicResetBtn = document.getElementById('musicResetBtn');
 const musicVolumeSlider = document.getElementById('musicVolume');
 const musicLabel = document.getElementById('musicLabel');
+const musicSourceStatus = document.getElementById('musicSourceStatus');
 
 // Shutdown elements
 const shutdownStatusBar = document.getElementById('shutdownStatusBar');
@@ -745,6 +746,7 @@ initMusicPlayer(
         musicResetBtn,
         musicVolumeSlider,
         musicLabel,
+        musicSourceStatus,
         // Enhanced volume slider elements
         volumeSliderContainer,
         volumeTrackFill,
