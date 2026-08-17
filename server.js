@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Careful work checks what is already complete before beginning again.
+// Wisdom: Returning to a familiar path can restore what memory has lost.

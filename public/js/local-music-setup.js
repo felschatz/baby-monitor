@@ -25,6 +25,16 @@ let directoryHandle = null;
 let germanLullabiesUnlocked = localStorage.getItem(HIDDEN_PLAYLIST_UNLOCK_KEY) === 'true';
 let secretHoldTimer = null;
 let availablePlaylists = [];
+let localLibrary = null;
+
+function updateDownloadButtonLabel() {
+    const selectedPlaylist = localLibrary?.playlists.find(
+        playlist => String(playlist.id) === String(playlistSelect.value)
+    );
+    downloadButton.textContent = selectedPlaylist?.files.length > 0
+        ? 'Check for missing files'
+        : 'Download selected';
+}
 
 function selectMusicSource(source) {
     const selectedSource = setPreferredMusicSource(source);
@@ -52,6 +62,7 @@ function populatePlaylistSelect(preferredPlaylistId = playlistSelect.value) {
         playlistSelect.value = String(preferredPlaylistId);
     }
     playlistSelect.disabled = visiblePlaylists.length === 0;
+    updateDownloadButtonLabel();
 }
 
 async function loadAvailablePlaylists() {
@@ -114,14 +125,15 @@ function showProgress(completed, total) {
 }
 
 async function showDirectorySummary(handle) {
-    const library = await scanLocalMusicDirectory(handle);
-    const trackCount = library?.playlists.reduce((sum, playlist) => sum + playlist.files.length, 0) || 0;
+    localLibrary = await scanLocalMusicDirectory(handle);
+    const trackCount = localLibrary?.playlists.reduce((sum, playlist) => sum + playlist.files.length, 0) || 0;
     chooseButton.textContent = 'Change folder';
     downloadButton.disabled = playlistSelect.disabled;
+    updateDownloadButtonLabel();
     setStatus(
-        library?.directoryName || handle.name,
+        localLibrary?.directoryName || handle.name,
         trackCount > 0
-            ? `${trackCount} local track${trackCount === 1 ? '' : 's'} ready`
+            ? `${trackCount} existing local track${trackCount === 1 ? '' : 's'} found — only missing files will be downloaded`
             : 'Selected — download music when connected to Wi-Fi',
         trackCount > 0 ? 'ready' : ''
     );
@@ -143,6 +155,7 @@ chooseButton.addEventListener('click', chooseDirectory);
 sourceButtons.forEach(button => {
     button.addEventListener('click', () => selectMusicSource(button.dataset.musicSource));
 });
+playlistSelect.addEventListener('change', updateDownloadButtonLabel);
 heading.addEventListener('pointerdown', startSecretHold);
 heading.addEventListener('pointerup', cancelSecretHold);
 heading.addEventListener('pointercancel', cancelSecretHold);
@@ -208,7 +221,12 @@ downloadButton.addEventListener('click', async () => {
         chooseButton.disabled = false;
         populatePlaylistSelect(playlistSelect.value);
         downloadButton.disabled = !directoryHandle || playlistSelect.disabled;
-        downloadButton.textContent = 'Download selected';
+        try {
+            localLibrary = directoryHandle ? await scanLocalMusicDirectory(directoryHandle) : null;
+        } catch (err) {
+            console.log('Could not refresh local music summary:', err.message || err);
+        }
+        updateDownloadButtonLabel();
     }
 });
 
