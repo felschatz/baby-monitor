@@ -263,8 +263,10 @@ baby-monitor/
 - Cache-only offline playback works for tracks that have already played; use the local-folder download for a complete, user-controlled offline library
 - If the sender goes offline mid-download, playback now skips uncached tracks and keeps using whatever tracks are already cached
 - For user-controlled files, open the start page in Chrome 132+ or another compatible Chromium browser, select one playlist, choose **Offline music → Choose folder**, then press **Download selected** while on Wi-Fi
+- Browsers do not permit a website to choose a filesystem location silently. The picker starts in the device's Music location; after the user approves a parent folder, downloads use a human-readable `<playlist name>/` subfolder
 - The selected directory handle is remembered in IndexedDB; the sender automatically scans that directory and plays its MP3 files through local object URLs without network fallback
-- Downloads preserve numbered playlist directories and skip non-empty files already present. Hidden playlists such as German Lullabies are not exposed or downloaded by the public download control
+- The start page's **Sender playback** toggle chooses **Local** or **Online** and remembers the choice. Local never silently falls back to server tracks; Online ignores the selected folder and uses server music
+- Downloads use human-readable playlist subfolders and skip non-empty files already present. Hidden playlists such as German Lullabies are not exposed until the secret unlock action
 - German Lullabies can be privately enabled by holding the **Offline music** heading for three seconds. This uses the same remembered hidden-playlist unlock as the sender and includes only playlist `1` in subsequent downloads
 - Local directory access requires HTTPS (except localhost) and may need to be reauthorized after browser or device restarts
 

@@ -418,6 +418,45 @@
             margin-bottom: 0.85rem;
         }
 
+        .music-source-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .music-source-label {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .music-source-toggle {
+            display: flex;
+            gap: 3px;
+            padding: 3px;
+            border-radius: 9px;
+            background: var(--night);
+        }
+
+        .music-source-option {
+            padding: 0.45rem 0.7rem;
+            border: 0;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.76rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .music-source-option.active {
+            background: var(--mint);
+            color: var(--night);
+        }
+
         .offline-music-playlist {
             width: 100%;
             margin-bottom: 0.65rem;
@@ -819,8 +858,15 @@
                 <span>Offline music</span>
             </div>
             <p class="offline-music-description">
-                Choose one playlist to save locally without downloading during monitoring.
+                Choose one playlist. The folder picker opens in Music, and the app creates Music/&lt;playlist name&gt; inside the folder you approve.
             </p>
+            <div class="music-source-row">
+                <span class="music-source-label">Sender playback</span>
+                <div class="music-source-toggle" role="group" aria-label="Sender music source">
+                    <button type="button" class="music-source-option" data-music-source="local" aria-pressed="false">Local</button>
+                    <button type="button" class="music-source-option active" data-music-source="online" aria-pressed="true">Online</button>
+                </div>
+            </div>
             <select class="offline-music-playlist" id="offlineMusicPlaylistSelect" aria-label="Playlist to download" disabled>
                 <option>Loading playlists…</option>
             </select>

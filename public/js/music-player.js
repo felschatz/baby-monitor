@@ -5,6 +5,7 @@
 
 import {
     getDirectoryPermission,
+    getPreferredMusicSource,
     getSavedLocalMusicDirectory,
     scanLocalMusicDirectory
 } from './local-music-library.js';
@@ -377,6 +378,15 @@ function loadPlaylistSnapshot(playlistId) {
 }
 
 async function initializeMusicSource() {
+    if (getPreferredMusicSource() === 'online') {
+        if (musicSourceStatus) {
+            musicSourceStatus.textContent = 'Online · server music';
+            musicSourceStatus.classList.remove('local');
+        }
+        await fetchMusicPlaylist();
+        return;
+    }
+
     try {
         const directoryHandle = await getSavedLocalMusicDirectory();
         if (directoryHandle && (await getDirectoryPermission(directoryHandle, 'read')) === 'granted') {
@@ -398,10 +408,10 @@ async function initializeMusicSource() {
     }
 
     if (musicSourceStatus) {
-        musicSourceStatus.textContent = 'Server music';
-        musicSourceStatus.classList.remove('local');
+        musicSourceStatus.textContent = 'Local folder unavailable · choose it on the start page';
+        musicSourceStatus.classList.add('local');
     }
-    await fetchMusicPlaylist();
+    musicPlaylist = [];
 }
 
 function applyLocalMusicLibrary() {

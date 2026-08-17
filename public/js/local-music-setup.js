@@ -2,13 +2,16 @@ import {
     chooseLocalMusicDirectory,
     downloadPublicMusicLibrary,
     getDirectoryPermission,
+    getPreferredMusicSource,
     getSavedLocalMusicDirectory,
     scanLocalMusicDirectory,
+    setPreferredMusicSource,
     supportsLocalMusicDirectories
 } from './local-music-library.js';
 
 const card = document.getElementById('offlineMusicCard');
 const heading = document.getElementById('offlineMusicTitle');
+const sourceButtons = document.querySelectorAll('[data-music-source]');
 const playlistSelect = document.getElementById('offlineMusicPlaylistSelect');
 const chooseButton = document.getElementById('chooseMusicFolderBtn');
 const downloadButton = document.getElementById('downloadMusicBtn');
@@ -22,6 +25,15 @@ let directoryHandle = null;
 let germanLullabiesUnlocked = localStorage.getItem(HIDDEN_PLAYLIST_UNLOCK_KEY) === 'true';
 let secretHoldTimer = null;
 let availablePlaylists = [];
+
+function selectMusicSource(source) {
+    const selectedSource = setPreferredMusicSource(source);
+    sourceButtons.forEach(button => {
+        const selected = button.dataset.musicSource === selectedSource;
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-pressed', String(selected));
+    });
+}
 
 function populatePlaylistSelect(preferredPlaylistId = playlistSelect.value) {
     const visiblePlaylists = availablePlaylists.filter(playlist => (
@@ -118,6 +130,7 @@ async function showDirectorySummary(handle) {
 async function chooseDirectory() {
     try {
         directoryHandle = await chooseLocalMusicDirectory();
+        selectMusicSource('local');
         await showDirectorySummary(directoryHandle);
     } catch (err) {
         if (err.name !== 'AbortError') {
@@ -127,6 +140,9 @@ async function chooseDirectory() {
 }
 
 chooseButton.addEventListener('click', chooseDirectory);
+sourceButtons.forEach(button => {
+    button.addEventListener('click', () => selectMusicSource(button.dataset.musicSource));
+});
 heading.addEventListener('pointerdown', startSecretHold);
 heading.addEventListener('pointerup', cancelSecretHold);
 heading.addEventListener('pointercancel', cancelSecretHold);
@@ -196,6 +212,7 @@ downloadButton.addEventListener('click', async () => {
 });
 
 async function initialize() {
+    selectMusicSource(getPreferredMusicSource());
     updateSecretUnlockState(false);
     await loadAvailablePlaylists();
 

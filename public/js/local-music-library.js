@@ -3,6 +3,17 @@ const DB_VERSION = 1;
 const STORE_NAME = 'settings';
 const DIRECTORY_HANDLE_KEY = 'music-directory-handle';
 const MANIFEST_FILE = '.baby-monitor-music.json';
+const MUSIC_SOURCE_STORAGE_KEY = 'sender-music-source';
+
+export function getPreferredMusicSource() {
+    return localStorage.getItem(MUSIC_SOURCE_STORAGE_KEY) === 'local' ? 'local' : 'online';
+}
+
+export function setPreferredMusicSource(source) {
+    const normalized = source === 'online' ? 'online' : 'local';
+    localStorage.setItem(MUSIC_SOURCE_STORAGE_KEY, normalized);
+    return normalized;
+}
 
 function openDatabase() {
     return new Promise((resolve, reject) => {
@@ -144,6 +155,14 @@ async function downloadFile(directoryHandle, track) {
     return { downloaded: true, filename };
 }
 
+function getSafeDirectoryName(name, fallback) {
+    const sanitized = String(name || '')
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
+        .replace(/[. ]+$/g, '')
+        .trim();
+    return sanitized || `Playlist ${fallback}`;
+}
+
 /**
  * Download every public playlist into the selected user-visible directory.
  * Hidden playlists are omitted unless their IDs are explicitly allowed after
@@ -181,15 +200,21 @@ export async function downloadPublicMusicLibrary(directoryHandle, onProgress = (
     }
 
     const total = playlistData.reduce((sum, playlist) => sum + playlist.files.length, 0);
+    const existingManifest = await readManifest(directoryHandle);
+    const existingManifestPlaylists = existingManifest?.playlists || [];
     let completed = 0;
     let downloaded = 0;
     const failures = [];
     onProgress({ phase: 'downloading', completed, total, downloaded });
 
     for (const playlist of playlistData) {
+        const existingMetadata = existingManifestPlaylists.find(entry => String(entry.id) === String(playlist.id));
+        playlist.directory = existingMetadata?.directory || (
+            existingMetadata ? String(existingMetadata.id) : getSafeDirectoryName(playlist.name, playlist.id)
+        );
         const playlistDirectory = playlist.id === 'default'
             ? directoryHandle
-            : await directoryHandle.getDirectoryHandle(playlist.id, { create: true });
+            : await directoryHandle.getDirectoryHandle(playlist.directory, { create: true });
         await writeTextFile(playlistDirectory, 'name.txt', playlist.name);
 
         for (const track of playlist.files) {
@@ -214,10 +239,20 @@ export async function downloadPublicMusicLibrary(directoryHandle, onProgress = (
         }
     }
 
+    const downloadedIds = new Set(playlistData.map(playlist => String(playlist.id)));
+    const mergedManifestPlaylists = [
+        ...existingManifestPlaylists.filter(playlist => !downloadedIds.has(String(playlist.id))),
+        ...playlistData.map(({ id, name, hidden, directory }) => ({
+            id,
+            name,
+            hidden: !!hidden,
+            directory
+        }))
+    ];
     await writeTextFile(directoryHandle, MANIFEST_FILE, JSON.stringify({
         version: 1,
         downloadedAt: new Date().toISOString(),
-        playlists: playlistData.map(({ id, name, hidden }) => ({ id, name, hidden: !!hidden }))
+        playlists: mergedManifestPlaylists
     }, null, 2));
 
     const result = { completed, total, downloaded, failures };
@@ -242,7 +277,10 @@ export async function scanLocalMusicDirectory(directoryHandle) {
     if ((await getDirectoryPermission(directoryHandle, 'read')) !== 'granted') return null;
 
     const manifest = await readManifest(directoryHandle);
-    const manifestPlaylists = new Map((manifest?.playlists || []).map(playlist => [String(playlist.id), playlist]));
+    const manifestPlaylists = new Map((manifest?.playlists || []).map(playlist => [
+        String(playlist.directory || playlist.id),
+        playlist
+    ]));
     const playlists = [];
     const rootFiles = [];
 
@@ -256,7 +294,7 @@ export async function scanLocalMusicDirectory(directoryHandle) {
         const metadata = manifestPlaylists.get(name);
         const customName = (await readTextFile(handle, 'name.txt')).trim();
         const playlist = await scanPlaylistDirectory(handle, {
-            id: name,
+            id: String(metadata?.id || name),
             name: metadata?.name || customName || `Playlist ${name}`,
             hidden: metadata?.hidden ?? (name === '1' || name === '2')
         });
