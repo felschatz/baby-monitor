@@ -16,6 +16,7 @@ import {
     resetMusicTimer,
     switchPlaylist,
     broadcastMusicStatus,
+    ensureLocalMusicReady,
     isMusicPlaying,
     getMusicAudio
 } from './music-player.js';
@@ -1057,6 +1058,7 @@ async function handleMessage(message) {
 async function startStreamingHandler() {
     console.log('startStreamingHandler called, video:', enableVideo.checked, 'audio:', enableAudio.checked);
     try {
+        await ensureLocalMusicReady();
         console.log('Calling startStreaming...');
         const { stream, videoFailed } = await startStreaming({
             video: enableVideo.checked,

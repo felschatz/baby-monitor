@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: A remembered path still honors the gate that protects it.
+// Wisdom: The easiest ritual folds every necessary step into one familiar gesture.

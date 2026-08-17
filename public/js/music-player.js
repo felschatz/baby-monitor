@@ -7,6 +7,7 @@ import {
     getDirectoryPermission,
     getPreferredMusicSource,
     getSavedLocalMusicDirectory,
+    requestDirectoryPermission,
     scanLocalMusicDirectory
 } from './local-music-library.js';
 // State
@@ -412,6 +413,36 @@ async function initializeMusicSource() {
         musicSourceStatus.classList.add('local');
     }
     musicPlaylist = [];
+}
+
+export async function ensureLocalMusicReady() {
+    if (getPreferredMusicSource() !== 'local') return true;
+
+    try {
+        const directoryHandle = await getSavedLocalMusicDirectory();
+        if (!directoryHandle || !(await requestDirectoryPermission(directoryHandle, 'read'))) {
+            if (musicSourceStatus) {
+                musicSourceStatus.textContent = 'Local folder permission needed · reopen from the start page';
+                musicSourceStatus.classList.add('local');
+            }
+            return false;
+        }
+
+        const library = await scanLocalMusicDirectory(directoryHandle);
+        if (!library?.playlists.length) return false;
+
+        localMusicLibrary = library;
+        localPlaylistsById = new Map(library.playlists.map(playlist => [String(playlist.id), playlist]));
+        applyLocalMusicLibrary();
+        if (musicSourceStatus) {
+            musicSourceStatus.textContent = `Local folder · ${library.directoryName}`;
+            musicSourceStatus.classList.add('local');
+        }
+        return true;
+    } catch (err) {
+        console.log('Could not prepare local music:', err.message || err);
+        return false;
+    }
 }
 
 function applyLocalMusicLibrary() {
