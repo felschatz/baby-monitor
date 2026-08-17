@@ -116,6 +116,7 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Compatible Chromium browsers can save one selected public playlist to a user-selected device directory before monitoring; its handle is stored in IndexedDB and restored by the sender
 - The directory picker starts in Music, but browser security requires user approval; new downloads use a sanitized `<playlist name>/` subdirectory and manifest mapping rather than numeric IDs
 - After browser data loss, users can reselect either the Music parent or the playlist folder itself; non-empty tracks are matched case-insensitively and skipped before any media request
+- Starting the sender in Local mode requests renewed permission for the remembered folder from the start-button user gesture, then continues automatically; the browser permission warning cannot be bypassed
 - Local-directory playback uses `File` object URLs and never falls back to network tracks while active
 - `sender-music-source` persists the start-page Local/Online selection; Online preserves the default behavior, choosing a folder selects Local, and Local does not silently fall back when its directory is unavailable
 - Public directory downloads omit playlists marked `hidden` by the music API, including German Lullabies

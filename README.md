@@ -266,6 +266,7 @@ baby-monitor/
 - Browsers do not permit a website to choose a filesystem location silently. The picker starts in the device's Music location; after the user approves a parent folder, downloads use a human-readable `<playlist name>/` subfolder
 - The selected directory handle is remembered in IndexedDB; the sender automatically scans that directory and plays its MP3 files through local object URLs without network fallback
 - If site data is cleared, choose the same Music parent or playlist folder again. Existing playlists are rescanned, and the download action checks for missing files without replacing non-empty tracks
+- If a remembered folder only needs renewed permission, tapping **Baby's Phone** requests access and continues automatically after approval; Chrome's Android folder-access warning is browser-controlled and cannot be suppressed
 - The start page's **Sender playback** toggle chooses **Local** or **Online** and remembers the choice. Local never silently falls back to server tracks; Online ignores the selected folder and uses server music
 - Downloads use human-readable playlist subfolders and skip non-empty files already present. Hidden playlists such as German Lullabies are not exposed until the secret unlock action
 - German Lullabies can be privately enabled by holding the **Offline music** heading for three seconds. This uses the same remembered hidden-playlist unlock as the sender and includes only playlist `1` in subsequent downloads

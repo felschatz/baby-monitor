@@ -4,6 +4,7 @@ import {
     getDirectoryPermission,
     getPreferredMusicSource,
     getSavedLocalMusicDirectory,
+    requestDirectoryPermission,
     scanLocalMusicDirectory,
     setPreferredMusicSource,
     supportsLocalMusicDirectories
@@ -15,6 +16,7 @@ const sourceButtons = document.querySelectorAll('[data-music-source]');
 const playlistSelect = document.getElementById('offlineMusicPlaylistSelect');
 const chooseButton = document.getElementById('chooseMusicFolderBtn');
 const downloadButton = document.getElementById('downloadMusicBtn');
+const senderButton = document.getElementById('senderBtn');
 const status = document.getElementById('offlineMusicStatus');
 const progress = document.getElementById('offlineMusicProgress');
 const progressBar = document.getElementById('offlineMusicProgressBar');
@@ -26,6 +28,7 @@ let germanLullabiesUnlocked = localStorage.getItem(HIDDEN_PLAYLIST_UNLOCK_KEY) =
 let secretHoldTimer = null;
 let availablePlaylists = [];
 let localLibrary = null;
+let resumingSenderNavigation = false;
 
 function updateDownloadButtonLabel() {
     const selectedPlaylist = localLibrary?.playlists.find(
@@ -151,11 +154,40 @@ async function chooseDirectory() {
     }
 }
 
+async function prepareLocalMusicForSender(event) {
+    if (resumingSenderNavigation || getPreferredMusicSource() !== 'local') return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    if (!directoryHandle) {
+        setStatus('Choose the local music folder', 'Folder access is needed before starting the sender in Local mode.', 'error');
+        chooseButton.focus();
+        return;
+    }
+
+    try {
+        setStatus('Checking folder access', 'Chrome may ask you to allow access to your music folder.');
+        if (!(await requestDirectoryPermission(directoryHandle, 'read'))) {
+            setStatus('Folder access needed', 'Allow access, or select Online before starting the sender.', 'error');
+            return;
+        }
+
+        resumingSenderNavigation = true;
+        senderButton.click();
+    } catch (err) {
+        setStatus('Could not access folder', err.message || String(err), 'error');
+    } finally {
+        resumingSenderNavigation = false;
+    }
+}
+
 chooseButton.addEventListener('click', chooseDirectory);
 sourceButtons.forEach(button => {
     button.addEventListener('click', () => selectMusicSource(button.dataset.musicSource));
 });
 playlistSelect.addEventListener('change', updateDownloadButtonLabel);
+senderButton.addEventListener('click', prepareLocalMusicForSender, { capture: true });
 heading.addEventListener('pointerdown', startSecretHold);
 heading.addEventListener('pointerup', cancelSecretHold);
 heading.addEventListener('pointercancel', cancelSecretHold);
@@ -259,7 +291,7 @@ async function initialize() {
     }
 
     chooseButton.textContent = 'Reconnect folder';
-    setStatus(directoryHandle.name, 'Tap reconnect to allow local playback again');
+    setStatus(directoryHandle.name, 'Start the sender to reconnect automatically, or tap reconnect now');
 }
 
 void initialize();
