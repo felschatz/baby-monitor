@@ -133,9 +133,32 @@ async function getExistingFile(directoryHandle, filename) {
         const file = await fileHandle.getFile();
         return file.size > 0 ? fileHandle : null;
     } catch (err) {
-        if (err.name === 'NotFoundError') return null;
-        throw err;
+        if (err.name !== 'NotFoundError') throw err;
     }
+
+    const normalizedFilename = filename.normalize('NFC').toLocaleLowerCase();
+    for await (const [existingName, handle] of directoryHandle.entries()) {
+        if (
+            handle.kind === 'file' &&
+            existingName.normalize('NFC').toLocaleLowerCase() === normalizedFilename
+        ) {
+            const file = await handle.getFile();
+            return file.size > 0 ? handle : null;
+        }
+    }
+    return null;
+}
+
+function namesMatch(left, right) {
+    return String(left || '').normalize('NFC').toLocaleLowerCase() ===
+        String(right || '').normalize('NFC').toLocaleLowerCase();
+}
+
+async function isPlaylistDirectory(directoryHandle, directoryNames) {
+    if (directoryNames.some(name => namesMatch(directoryHandle.name, name))) return true;
+
+    const manifest = await readManifest(directoryHandle);
+    return (manifest?.playlists || []).some(playlist => playlist.directory === '.');
 }
 
 async function getExistingDirectory(directoryHandle, name) {
@@ -226,7 +249,15 @@ export async function downloadPublicMusicLibrary(directoryHandle, onProgress = (
             namedDirectory,
             playlist.id
         ].filter((name, index, names) => name && names.indexOf(name) === index);
-        let playlistDirectory = playlist.id === 'default' ? directoryHandle : null;
+        const selectedPlaylistFolder = playlistData.length === 1 && await isPlaylistDirectory(
+            directoryHandle,
+            directoryCandidates
+        );
+        let playlistDirectory = playlist.id === 'default' || selectedPlaylistFolder
+            ? directoryHandle
+            : null;
+
+        if (selectedPlaylistFolder) playlist.directory = '.';
 
         if (!playlistDirectory) {
             for (const candidate of directoryCandidates) {
@@ -310,6 +341,7 @@ export async function scanLocalMusicDirectory(directoryHandle) {
         String(playlist.directory || playlist.id),
         playlist
     ]));
+    const rootPlaylistMetadata = manifestPlaylists.get('.');
     const playlists = [];
     const rootFiles = [];
 
@@ -332,7 +364,12 @@ export async function scanLocalMusicDirectory(directoryHandle) {
 
     if (rootFiles.length > 0) {
         rootFiles.sort((a, b) => a.name.localeCompare(b.name));
-        playlists.push({ id: 'default', name: 'Lullabies', hidden: false, files: rootFiles });
+        playlists.push({
+            id: String(rootPlaylistMetadata?.id || 'default'),
+            name: rootPlaylistMetadata?.name || manifest?.name || directoryHandle.name || 'Lullabies',
+            hidden: !!rootPlaylistMetadata?.hidden,
+            files: rootFiles
+        });
     }
 
     playlists.sort((a, b) => a.name.localeCompare(b.name));
