@@ -11,4 +11,4 @@ const { startServer } = require('./server/index');
 // Start the server with this directory as the base
 startServer(__dirname);
 
-// Wisdom: Delay is only helpful when it is applied consistently.
+// Wisdom: The easiest ritual folds every necessary step into one familiar gesture.

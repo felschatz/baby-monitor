@@ -23,7 +23,8 @@ A real-time baby monitor web application for streaming audio and video between t
 - **Fullscreen mode** - Immersive viewing on receiver
 - **Auto-reconnect** - Automatically reconnects when connection is lost
 - **Lullaby playback** - Play music on baby's phone with configurable sleep timer
-- **Offline lullaby cache** - Sender caches fetched playlist metadata and songs for offline playback after an online warm-up
+- **Offline lullaby playback** - Tracks cache when played, or download the complete public library to a chosen device folder beforehand
+- **Local music folder** - On supported Chromium browsers, choose one playlist and a device folder, then explicitly download only the music needed before starting the sender
 - **Music echo reduction** (Experimental) - Reduces music bleedthrough in the audio stream using spectral subtraction
 - **No WebSocket required** - Uses Server-Sent Events (SSE) for signaling, works with simple hosting
 
@@ -257,10 +258,20 @@ baby-monitor/
 
 ## Offline Music
 
-- The sender caches the selected playlist metadata and track files after it loads them successfully online
+- Server tracks cache on demand when played; the app no longer downloads a whole playlist automatically in the background
 - Cached lullabies are served locally by a sender-only service worker, so the sender can keep playing them without internet access
-- First load still requires internet access; offline playback works after the playlist has been warmed into cache once
+- Cache-only offline playback works for tracks that have already played; use the local-folder download for a complete, user-controlled offline library
 - If the sender goes offline mid-download, playback now skips uncached tracks and keeps using whatever tracks are already cached
+- For user-controlled files, open the start page in Chrome 132+ or another compatible Chromium browser, select one playlist, choose **Offline music → Choose folder**, then press **Download selected** while on Wi-Fi
+- Browsers do not permit a website to choose a filesystem location silently. The picker starts in the device's Music location; after the user approves a parent folder, downloads use a human-readable `<playlist name>/` subfolder
+- The selected directory handle is remembered in IndexedDB; the sender automatically scans that directory and plays its MP3 files through local object URLs without network fallback
+- If site data is cleared, choose the same Music parent or playlist folder again. Existing playlists are rescanned, and the download action checks for missing files without replacing non-empty tracks
+- If a remembered folder only needs renewed permission, tapping **Baby's Phone** requests access and continues automatically after approval; Chrome's Android folder-access warning is browser-controlled and cannot be suppressed
+- Bookmarked sender pages perform the same check from the existing **Start Streaming** tap, so renewed local-folder access does not require returning to the start page
+- The start page's **Sender playback** toggle chooses **Local** or **Online** and remembers the choice. Local never silently falls back to server tracks; Online ignores the selected folder and uses server music
+- Downloads use human-readable playlist subfolders and skip non-empty files already present. Hidden playlists such as German Lullabies are not exposed until the secret unlock action
+- German Lullabies can be privately enabled by holding the **Offline music** heading for three seconds. This uses the same remembered hidden-playlist unlock as the sender and includes only playlist `1` in subsequent downloads
+- Local directory access requires HTTPS (except localhost) and may need to be reauthorized after browser or device restarts
 
 ### Receiver (Parent's Phone)
 

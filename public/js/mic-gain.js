@@ -3,7 +3,7 @@
  */
 
 const STORAGE_KEY = 'sender-mic-gain';
-const DEFAULT_GAIN = 1.2;
+const DEFAULT_GAIN = 2.0;
 const MIN_GAIN = 0.0;
 const MAX_GAIN = 3.0;
 

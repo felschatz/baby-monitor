@@ -368,6 +368,172 @@
             text-align: right;
         }
 
+        /* User-controlled local music library */
+        .offline-music-card {
+            background: linear-gradient(165deg, rgba(156, 207, 216, 0.1), var(--night-soft));
+            border: 1px solid rgba(156, 207, 216, 0.18);
+            border-radius: 16px;
+            padding: 1.15rem;
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        .offline-music-heading {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            margin-bottom: 0.35rem;
+            font-weight: 600;
+            color: var(--text);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        .offline-music-heading span:first-child {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 10px;
+            background: rgba(156, 207, 216, 0.14);
+            transition: background 0.25s, box-shadow 0.25s, transform 3s linear;
+        }
+
+        .offline-music-heading.holding span:first-child {
+            background: rgba(246, 193, 119, 0.2);
+            box-shadow: 0 0 16px rgba(246, 193, 119, 0.35);
+            transform: rotate(360deg);
+        }
+
+        .offline-music-heading.unlocked span:first-child {
+            background: rgba(74, 222, 128, 0.16);
+            box-shadow: 0 0 12px rgba(74, 222, 128, 0.2);
+        }
+
+        .offline-music-description {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            line-height: 1.45;
+            margin-bottom: 0.85rem;
+        }
+
+        .music-source-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .music-source-label {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .music-source-toggle {
+            display: flex;
+            gap: 3px;
+            padding: 3px;
+            border-radius: 9px;
+            background: var(--night);
+        }
+
+        .music-source-option {
+            padding: 0.45rem 0.7rem;
+            border: 0;
+            border-radius: 7px;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.76rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .music-source-option.active {
+            background: var(--mint);
+            color: var(--night);
+        }
+
+        .offline-music-playlist {
+            width: 100%;
+            margin-bottom: 0.65rem;
+            padding: 0.7rem 0.8rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            background: var(--night);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+
+        .offline-music-playlist:disabled {
+            opacity: 0.45;
+        }
+
+        .offline-music-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.6rem;
+        }
+
+        .offline-music-action {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 0.7rem;
+            background: var(--night);
+            color: var(--text);
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .offline-music-action.primary {
+            border-color: transparent;
+            background: var(--mint);
+            color: var(--night);
+        }
+
+        .offline-music-action:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .offline-music-status {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            margin-top: 0.75rem;
+            font-size: 0.76rem;
+            color: var(--text-muted);
+        }
+
+        .offline-music-status strong {
+            color: var(--text);
+            font-size: 0.8rem;
+        }
+
+        .offline-music-status.ready strong { color: #86efac; }
+        .offline-music-status.error strong { color: var(--rose); }
+
+        .offline-music-progress {
+            height: 4px;
+            margin-top: 0.65rem;
+            overflow: hidden;
+            border-radius: 999px;
+            background: var(--night);
+        }
+
+        .offline-music-progress-bar {
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: var(--mint);
+            transition: width 0.2s ease;
+        }
+
         /* Role Buttons */
         .role-buttons {
             display: grid;
@@ -686,6 +852,37 @@
             </div>
         </div>
 
+        <section class="offline-music-card" id="offlineMusicCard" aria-labelledby="offlineMusicTitle">
+            <div class="offline-music-heading" id="offlineMusicTitle">
+                <span aria-hidden="true">🎵</span>
+                <span>Offline music</span>
+            </div>
+            <p class="offline-music-description">
+                Choose one playlist. The folder picker opens in Music, and the app creates Music/&lt;playlist name&gt; inside the folder you approve.
+            </p>
+            <div class="music-source-row">
+                <span class="music-source-label">Sender playback</span>
+                <div class="music-source-toggle" role="group" aria-label="Sender music source">
+                    <button type="button" class="music-source-option" data-music-source="local" aria-pressed="false">Local</button>
+                    <button type="button" class="music-source-option active" data-music-source="online" aria-pressed="true">Online</button>
+                </div>
+            </div>
+            <select class="offline-music-playlist" id="offlineMusicPlaylistSelect" aria-label="Playlist to download" disabled>
+                <option>Loading playlists…</option>
+            </select>
+            <div class="offline-music-actions">
+                <button type="button" class="offline-music-action" id="chooseMusicFolderBtn">Choose folder</button>
+                <button type="button" class="offline-music-action primary" id="downloadMusicBtn" disabled>Download selected</button>
+            </div>
+            <div class="offline-music-status" id="offlineMusicStatus" aria-live="polite">
+                <strong>No folder selected</strong>
+                <span>Choose the Music parent or the playlist folder itself; existing tracks will be detected.</span>
+            </div>
+            <div class="offline-music-progress" id="offlineMusicProgress" role="progressbar" aria-label="Music download progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
+                <div class="offline-music-progress-bar" id="offlineMusicProgressBar"></div>
+            </div>
+        </section>
+
         <div class="role-buttons">
             <button class="btn btn-sender" id="senderBtn">
                 <span class="btn-icon">📹</span>
@@ -911,5 +1108,6 @@
         checkRelayAvailability();
         setInterval(checkStatus, 5000);
     </script>
+    <script type="module" src="/js/local-music-setup.js"></script>
 </body>
 </html>

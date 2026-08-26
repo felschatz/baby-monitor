@@ -3,6 +3,13 @@
  * Handles playlist loading, shuffle, timer, and playback
  */
 
+import {
+    getDirectoryPermission,
+    getPreferredMusicSource,
+    getSavedLocalMusicDirectory,
+    requestDirectoryPermission,
+    scanLocalMusicDirectory
+} from './local-music-library.js';
 // State
 let musicPlaylist = [];
 let musicPlaylists = [];
@@ -16,8 +23,10 @@ let musicTimerRemaining = 0;
 let musicStatusInterval = null;
 let isFadingOut = false;
 let playNextTrackInFlight = false;
-let cacheWarmupTimer = null;
 
+let localMusicLibrary = null;
+let localPlaylistsById = new Map();
+let currentLocalObjectUrl = null;
 // DOM elements (set via init)
 let musicAudio = null;
 let musicIndicator = null;
@@ -31,6 +40,7 @@ let musicResetBtn = null;
 let musicVolumeSlider = null;
 let musicLabel = null;
 
+let musicSourceStatus = null;
 // Enhanced volume slider elements
 let volumeSliderContainer = null;
 let volumeTrackFill = null;
@@ -47,8 +57,6 @@ let onEchoCancelTeardown = null;
 
 const MUSIC_OFFLINE_CACHE = 'sender-music-offline-v1';
 const PLAYLIST_SNAPSHOT_KEY_PREFIX = 'sender-music-playlist-cache:';
-const MUSIC_CACHE_WARMUP_DELAY_MS = 5000;
-const MUSIC_CACHE_WARMUP_GAP_MS = 250;
 
 /**
  * Convert slider value (0-100) to volume (0-1)
@@ -92,6 +100,7 @@ export function initMusicPlayer(elements, callbacks) {
     musicVolumeSlider = elements.musicVolumeSlider;
     musicLabel = elements.musicLabel;
 
+    musicSourceStatus = elements.musicSourceStatus;
     // Enhanced volume slider elements
     volumeSliderContainer = elements.volumeSliderContainer;
     volumeTrackFill = elements.volumeTrackFill;
@@ -151,7 +160,11 @@ export function initMusicPlayer(elements, callbacks) {
             stopMusic(true);
         }
 
-        fetchMusicPlaylist(currentPlaylistId);
+        if (localMusicLibrary) {
+            selectLocalPlaylist(currentPlaylistId);
+        } else {
+            fetchMusicPlaylist(currentPlaylistId);
+        }
     });
 
     // Handle track ended - play next
@@ -169,7 +182,11 @@ export function initMusicPlayer(elements, callbacks) {
                 playlistsUnlocked = true;
                 localStorage.setItem('sender-playlists-unlocked', 'true');
                 console.log('Playlists unlocked!');
-                fetchMusicPlaylist();
+                if (localMusicLibrary) {
+                    applyLocalMusicLibrary();
+                } else {
+                    fetchMusicPlaylist();
+                }
             }
         }, 3000);
     };
@@ -186,14 +203,8 @@ export function initMusicPlayer(elements, callbacks) {
     musicPlaylistSelect.addEventListener('touchend', cancelLongPress);
     musicPlaylistSelect.addEventListener('touchcancel', cancelLongPress);
 
-    window.addEventListener('online', () => {
-        if (musicPlaylist.length > 0) {
-            scheduleCacheWarmup(musicPlaylist, 1000);
-        }
-    });
-
-    // Fetch playlist on load
-    fetchMusicPlaylist();
+    // Prefer a previously selected device directory; fall back to server playlists.
+    void initializeMusicSource();
 }
 
 /**
@@ -367,6 +378,121 @@ function loadPlaylistSnapshot(playlistId) {
     }
 }
 
+async function initializeMusicSource() {
+    if (getPreferredMusicSource() === 'online') {
+        if (musicSourceStatus) {
+            musicSourceStatus.textContent = 'Online · server music';
+            musicSourceStatus.classList.remove('local');
+        }
+        await fetchMusicPlaylist();
+        return;
+    }
+
+    try {
+        const directoryHandle = await getSavedLocalMusicDirectory();
+        if (directoryHandle && (await getDirectoryPermission(directoryHandle, 'read')) === 'granted') {
+            const library = await scanLocalMusicDirectory(directoryHandle);
+            if (library?.playlists.length > 0) {
+                localMusicLibrary = library;
+                localPlaylistsById = new Map(library.playlists.map(playlist => [String(playlist.id), playlist]));
+                applyLocalMusicLibrary();
+                if (musicSourceStatus) {
+                    musicSourceStatus.textContent = `Local folder · ${library.directoryName}`;
+                    musicSourceStatus.classList.add('local');
+                }
+                console.log('Using local music directory:', library.directoryName);
+                return;
+            }
+        }
+    } catch (err) {
+        console.log('Could not load local music directory:', err.message || err);
+    }
+
+    if (musicSourceStatus) {
+        musicSourceStatus.textContent = 'Local folder unavailable · choose it on the start page';
+        musicSourceStatus.classList.add('local');
+    }
+    musicPlaylist = [];
+}
+
+export async function ensureLocalMusicReady() {
+    if (getPreferredMusicSource() !== 'local') return true;
+
+    try {
+        const directoryHandle = await getSavedLocalMusicDirectory();
+        if (!directoryHandle || !(await requestDirectoryPermission(directoryHandle, 'read'))) {
+            if (musicSourceStatus) {
+                musicSourceStatus.textContent = 'Local folder permission needed · reopen from the start page';
+                musicSourceStatus.classList.add('local');
+            }
+            return false;
+        }
+
+        const library = await scanLocalMusicDirectory(directoryHandle);
+        if (!library?.playlists.length) return false;
+
+        localMusicLibrary = library;
+        localPlaylistsById = new Map(library.playlists.map(playlist => [String(playlist.id), playlist]));
+        applyLocalMusicLibrary();
+        if (musicSourceStatus) {
+            musicSourceStatus.textContent = `Local folder · ${library.directoryName}`;
+            musicSourceStatus.classList.add('local');
+        }
+        return true;
+    } catch (err) {
+        console.log('Could not prepare local music:', err.message || err);
+        return false;
+    }
+}
+
+function applyLocalMusicLibrary() {
+    if (!localMusicLibrary) return null;
+
+    const availablePlaylists = playlistsUnlocked
+        ? localMusicLibrary.playlists
+        : localMusicLibrary.playlists.filter(playlist => !playlist.hidden);
+    if (availablePlaylists.length === 0) {
+        musicPlaylist = [];
+        return null;
+    }
+
+    if (!availablePlaylists.some(playlist => String(playlist.id) === String(currentPlaylistId))) {
+        currentPlaylistId = String(availablePlaylists[0].id);
+        localStorage.setItem('sender-music-playlist', currentPlaylistId);
+    }
+    return selectLocalPlaylist(currentPlaylistId);
+}
+
+function selectLocalPlaylist(playlistId) {
+    if (!localMusicLibrary) return null;
+    const playlist = localPlaylistsById.get(String(playlistId));
+    if (!playlist || (playlist.hidden && !playlistsUnlocked)) {
+        return applyLocalMusicLibrary();
+    }
+
+    currentPlaylistId = String(playlist.id);
+    const playlistMetadata = localMusicLibrary.playlists.map(({ id, name, hidden }) => ({ id, name, hidden }));
+    return applyPlaylistData(currentPlaylistId, {
+        files: playlist.files,
+        playlists: playlistMetadata,
+        debugTimer: false
+    }, `local folder ${localMusicLibrary.directoryName}`);
+}
+
+function revokeCurrentLocalObjectUrl() {
+    if (!currentLocalObjectUrl) return;
+    URL.revokeObjectURL(currentLocalObjectUrl);
+    currentLocalObjectUrl = null;
+}
+
+async function getTrackPlaybackUrl(track) {
+    revokeCurrentLocalObjectUrl();
+    if (!track?.localFileHandle) return track?.url || '';
+    const file = await track.localFileHandle.getFile();
+    currentLocalObjectUrl = URL.createObjectURL(file);
+    return currentLocalObjectUrl;
+}
+
 async function cacheMusicMetadata(requestUrl, response) {
     if (!('caches' in window) || !response?.ok) {
         return;
@@ -378,32 +504,6 @@ async function cacheMusicMetadata(requestUrl, response) {
     } catch (err) {
         console.log('Could not cache playlist metadata:', err.message || err);
     }
-}
-
-async function cacheMusicFiles(files) {
-    if (!('caches' in window) || !Array.isArray(files) || files.length === 0 || !navigator.onLine) {
-        return;
-    }
-
-    for (const file of files) {
-        await ensureTrackCached(file);
-        await new Promise(resolve => setTimeout(resolve, MUSIC_CACHE_WARMUP_GAP_MS));
-    }
-}
-
-function scheduleCacheWarmup(files, delayMs = MUSIC_CACHE_WARMUP_DELAY_MS) {
-    if (!Array.isArray(files) || files.length === 0) {
-        return;
-    }
-
-    if (cacheWarmupTimer) {
-        clearTimeout(cacheWarmupTimer);
-    }
-
-    cacheWarmupTimer = setTimeout(() => {
-        cacheWarmupTimer = null;
-        void cacheMusicFiles(files);
-    }, delayMs);
 }
 
 function getTrackCacheKey(track) {
@@ -521,6 +621,10 @@ function applyPlaylistData(playlistId, data, source) {
  * Fetch available music files for a specific playlist
  */
 export async function fetchMusicPlaylist(playlistId = null) {
+    if (localMusicLibrary) {
+        return selectLocalPlaylist(playlistId || currentPlaylistId);
+    }
+
     const playlist = playlistId || currentPlaylistId;
     const requestUrl = `/api/music?playlist=${encodeURIComponent(playlist)}`;
 
@@ -533,7 +637,6 @@ export async function fetchMusicPlaylist(playlistId = null) {
         void cacheMusicMetadata(requestUrl, response.clone());
         const data = await response.json();
         storePlaylistSnapshot(playlist, data);
-        scheduleCacheWarmup(data.files || []);
 
         return applyPlaylistData(playlist, data, 'network');
     } catch (err) {
@@ -640,8 +743,8 @@ async function playNextTrack() {
             advanceTrackIndex();
             attempts += 1;
 
-            const cached = await isTrackCached(track);
-            if (!cached) {
+            const cached = track.localFileHandle ? true : await isTrackCached(track);
+            if (!cached && !localMusicLibrary) {
                 void ensureTrackCached(track);
                 if (!navigator.onLine) {
                     console.log('Skipping uncached offline track:', track.name);
@@ -649,9 +752,22 @@ async function playNextTrack() {
                 }
             }
 
-            console.log('Playing track:', track.name, cached ? '(cached)' : '(network)');
+            if (localMusicLibrary && !track.localFileHandle) {
+                console.log('Skipping missing local track:', track.name);
+                continue;
+            }
+
+            let playbackUrl;
+            try {
+                playbackUrl = await getTrackPlaybackUrl(track);
+            } catch (err) {
+                console.log('Skipping unavailable local track:', track.name, err.message || err);
+                continue;
+            }
+
+            console.log('Playing track:', track.name, track.localFileHandle ? '(local folder)' : cached ? '(cached)' : '(network)');
             musicTrackName.textContent = track.name;
-            musicAudio.src = track.url;
+            musicAudio.src = playbackUrl;
 
             try {
                 await musicAudio.play();
@@ -715,6 +831,7 @@ export function stopMusic(broadcast = true) {
     musicPlaying = false;
     musicAudio.pause();
     musicAudio.src = '';
+    revokeCurrentLocalObjectUrl();
 
     const savedVol = localStorage.getItem('sender-music-volume');
     musicAudio.volume = savedVol !== null ? sliderToVolume(parseInt(savedVol)) : sliderToVolume(DEFAULT_VOLUME_SLIDER);
@@ -786,6 +903,19 @@ export function resetMusicTimer(timerMinutes) {
  */
 export function switchPlaylist(playlistId) {
     if (playlistId === currentPlaylistId) return;
+
+    if (localMusicLibrary) {
+        if (!localPlaylistsById.has(String(playlistId))) {
+            console.log('Requested playlist is not available in the selected local folder:', playlistId);
+            return null;
+        }
+        currentPlaylistId = String(playlistId);
+        localStorage.setItem('sender-music-playlist', currentPlaylistId);
+        if (musicPlaylistSelect.value !== currentPlaylistId) {
+            musicPlaylistSelect.value = currentPlaylistId;
+        }
+        return selectLocalPlaylist(currentPlaylistId);
+    }
 
     currentPlaylistId = playlistId;
     localStorage.setItem('sender-music-playlist', currentPlaylistId);

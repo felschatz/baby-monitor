@@ -16,6 +16,7 @@ import {
     resetMusicTimer,
     switchPlaylist,
     broadcastMusicStatus,
+    ensureLocalMusicReady,
     isMusicPlaying,
     getMusicAudio
 } from './music-player.js';
@@ -87,6 +88,7 @@ const musicTimerSelect = document.getElementById('musicTimerSelect');
 const musicResetBtn = document.getElementById('musicResetBtn');
 const musicVolumeSlider = document.getElementById('musicVolume');
 const musicLabel = document.getElementById('musicLabel');
+const musicSourceStatus = document.getElementById('musicSourceStatus');
 
 // Shutdown elements
 const shutdownStatusBar = document.getElementById('shutdownStatusBar');
@@ -745,6 +747,7 @@ initMusicPlayer(
         musicResetBtn,
         musicVolumeSlider,
         musicLabel,
+        musicSourceStatus,
         // Enhanced volume slider elements
         volumeSliderContainer,
         volumeTrackFill,
@@ -1055,6 +1058,7 @@ async function handleMessage(message) {
 async function startStreamingHandler() {
     console.log('startStreamingHandler called, video:', enableVideo.checked, 'audio:', enableAudio.checked);
     try {
+        await ensureLocalMusicReady();
         console.log('Calling startStreaming...');
         const { stream, videoFailed } = await startStreaming({
             video: enableVideo.checked,

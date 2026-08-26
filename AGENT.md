@@ -49,6 +49,8 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 |--------|---------|
 | `screen-dimming.js` | Inactivity timer, dim overlay |
 | `music-player.js` | Playlist loading, shuffle, timer, playback |
+| `local-music-library.js` | User-selected directory persistence, scanning, controlled downloads |
+| `local-music-setup.js` | Start-page offline music setup and progress UI |
 | `sender-offline-sw.js` | Sender-only service worker under `public/js/` for cached lullaby playback |
 | `echo-cancellation.js` | FFT, spectral subtraction, fallback mode |
 | `sender-webrtc.js` | Offer creation, stream handling, PTT receive |
@@ -109,8 +111,17 @@ Sessions isolate multiple monitors on the same server. Session name acts as a sh
 - Sensitivity slider controls threshold (saved to localStorage)
 - Volume control persisted to localStorage
 - Screen dims on sender after 5s inactivity to save battery
-- Sender caches fetched playlist metadata and tracks in Cache Storage so lullabies can keep playing offline after one online warm-up
-- Sender caches fetched playlist metadata and tracks in Cache Storage so lullabies can keep playing offline after one online warm-up, skipping uncached tracks if the device goes offline mid-download
+- Sender caches playlist metadata and tracks on demand in Cache Storage; whole-playlist background warm-up is disabled
+- Offline playback skips uncached server tracks when disconnected
+- Compatible Chromium browsers can save one selected public playlist to a user-selected device directory before monitoring; its handle is stored in IndexedDB and restored by the sender
+- The directory picker starts in Music, but browser security requires user approval; new downloads use a sanitized `<playlist name>/` subdirectory and manifest mapping rather than numeric IDs
+- After browser data loss, users can reselect either the Music parent or the playlist folder itself; non-empty tracks are matched case-insensitively and skipped before any media request
+- Starting the sender in Local mode requests renewed permission for the remembered folder from the start-button user gesture, then continues automatically; the browser permission warning cannot be bypassed
+- Direct/bookmarked sender pages also request local-folder permission from the existing Start Streaming gesture and reload the local library without another navigation
+- Local-directory playback uses `File` object URLs and never falls back to network tracks while active
+- `sender-music-source` persists the start-page Local/Online selection; Online preserves the default behavior, choosing a folder selects Local, and Local does not silently fall back when its directory is unavailable
+- Public directory downloads omit playlists marked `hidden` by the music API, including German Lullabies
+- Holding the start page's Offline music heading for 3 seconds sets the existing hidden-playlist unlock and allows only German Lullabies (playlist `1`) in subsequent local downloads
 - Echo cancellation uses FFT-based spectral subtraction via ScriptProcessorNode
   - Inline Radix-2 Cooley-Tukey FFT (no external dependencies)
   - 2048-sample FFT with 50% overlap (1024 hop size)
